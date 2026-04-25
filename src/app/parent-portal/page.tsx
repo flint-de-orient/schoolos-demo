@@ -6,13 +6,13 @@ import ChatBot from '@/components/shared/ChatBot';
 import { toast } from 'sonner';
 import {
   Home, CalendarCheck, BookOpen, ClipboardList, CreditCard,
-  Heart, Bell, ChevronRight, CheckCircle2, Clock,
+  Heart, Bell, CheckCircle2, Clock,
   AlertCircle, Star, Award, MessageSquare, IndianRupee,
   Phone, Bus, MapPin, GraduationCap, Check, ChevronDown,
-  Calendar, Activity, ShieldCheck, FileText, Download,
+  Calendar, Activity, ShieldCheck, Download,
   ShoppingBag, Plus, Minus, X, Trash2, Package,
-  Smartphone, Building2, Banknote, Wallet, QrCode,
-  ShieldAlert, Tag, TrendingUp, ChevronLeft,
+  Smartphone, Building2, Wallet, QrCode,
+  ShieldAlert,
 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,

@@ -5,8 +5,8 @@ import PageWrapper from '@/components/layout/PageWrapper';
 import { toast } from 'sonner';
 import {
   IdCard, FileText, Printer, Download, Search, X, Check,
-  Users, Award, Shield, GraduationCap, Phone, Heart,
-  MapPin, Star, Calendar, BookOpen, ChevronDown, Plus
+  Award, Shield, GraduationCap, Phone,
+  MapPin, Star,
 } from 'lucide-react';
 import studentsData from '@/data/students.json';
 
@@ -212,7 +212,7 @@ export default function IDCardsPage() {
   const toggleSelect = (id: string) => {
     setSelected(prev => {
       const n = new Set(prev);
-      n.has(id) ? n.delete(id) : n.add(id);
+      if (n.has(id)) { n.delete(id); } else { n.add(id); }
       return n;
     });
   };

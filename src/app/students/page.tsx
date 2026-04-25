@@ -5,7 +5,7 @@ import PageWrapper from '@/components/layout/PageWrapper';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import {
-  Search, Plus, Users, UserCheck, AlertTriangle, CreditCard,
+  Search, Plus, Users, AlertTriangle, CreditCard,
   LayoutGrid, List, X, Phone, MapPin, Calendar, BookOpen,
   ChevronRight, Filter, Download, GraduationCap, Heart
 } from 'lucide-react';

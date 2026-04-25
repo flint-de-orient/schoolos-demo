@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  MessageSquare, X, Send, Bot, User, Sparkles,
+  X, Send, Bot, User,
   Minimize2, Maximize2, RefreshCw, ChevronRight,
 } from 'lucide-react';
 
@@ -50,25 +50,6 @@ type QueryResult = {
 const fmtAmt = (n: number) => '₹' + n.toLocaleString('en-IN');
 const fmtPct = (n: number) => `${n}%`;
 const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
-const includes  = (haystack: string, needle: string) => normalize(haystack).includes(normalize(needle));
-
-function findStudent(query: string) {
-  const q = normalize(query);
-  return studentsData.find(s =>
-    normalize(s.name).includes(q) ||
-    normalize(s.id).includes(q) ||
-    normalize(s.rollNo).includes(q)
-  );
-}
-
-function findStaff(query: string) {
-  const q = normalize(query);
-  return staffData.find(s =>
-    normalize(s.name).includes(q) ||
-    normalize(s.designation).includes(q) ||
-    normalize(s.subject ?? '').includes(q)
-  );
-}
 
 // ─── Query Engine ─────────────────────────────────────────────────────────────
 

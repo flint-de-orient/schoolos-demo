@@ -7,8 +7,8 @@ import {
   CreditCard, TrendingDown, AlertCircle, CheckCircle2, Search,
   MessageSquare, Plus, X, Send, Edit2, Printer, Receipt,
   ChevronRight, Clock, Banknote, Smartphone, FileText,
-  Users, CheckCheck, IndianRupee, TrendingUp, Percent,
-  BarChart3, Check, RefreshCw, CalendarDays, Building2, Eye,
+  CheckCheck, IndianRupee, TrendingUp, Percent,
+  Check, Building2,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -777,7 +777,7 @@ function ConcessionsTab({ concessions, onApprove }: {
                 </div>
               </div>
 
-              <p className="text-xs text-gray-500 mb-3 italic">"{c.reason}"</p>
+              <p className="text-xs text-gray-500 mb-3 italic">&quot;{c.reason}&quot;</p>
               <p className="text-[11px] text-gray-400">Approved by: {c.approvedBy}</p>
 
               {c.status === 'pending' && (

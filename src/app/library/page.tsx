@@ -8,7 +8,7 @@ import {
   BookOpen, BookMarked, AlertCircle, Plus, Search,
   RotateCcw, X, Calendar, User, CheckCircle2,
   AlertTriangle, Library, Bell, Download, BarChart3,
-  BookX, Filter, ChevronRight, Hash, Layers
+  BookX, ChevronRight, Hash, Layers
 } from 'lucide-react';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
