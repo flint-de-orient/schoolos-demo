@@ -1,0 +1,7 @@
+[
+  { "id": "N001", "type": "alert", "title": "Fee Overdue Alert", "message": "8 students have overdue fee payments totaling ₹2.7L", "time": "2025-04-10 08:30", "read": false },
+  { "id": "N002", "type": "attendance", "title": "Low Attendance Warning", "message": "Priya Sen (Class X-A) attendance dropped to 62%", "time": "2025-04-10 09:00", "read": false },
+  { "id": "N003", "type": "ai", "title": "AI Academic Alert", "message": "Class XII predicted board score 79% — below target of 84%", "time": "2025-04-09 18:00", "read": false },
+  { "id": "N004", "type": "admission", "title": "New Admission Inquiry", "message": "3 new admission inquiries received today", "time": "2025-04-10 10:15", "read": false },
+  { "id": "N005", "type": "transport", "title": "Bus Route 1 Update", "message": "Bus Route 1 running 8 minutes late — heavy traffic at Gariahat", "time": "2025-04-10 07:22", "read": true }
+]

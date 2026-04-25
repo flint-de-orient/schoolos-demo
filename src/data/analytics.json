@@ -1,0 +1,49 @@
+{
+  "enrollmentTrend": [
+    { "year": "2019", "students": 420 },
+    { "year": "2020", "students": 438 },
+    { "year": "2021", "students": 452 },
+    { "year": "2022", "students": 468 },
+    { "year": "2023", "students": 491 },
+    { "year": "2024", "students": 506 },
+    { "year": "2025", "students": 520 }
+  ],
+  "feeCollectionByMonth": [
+    { "month": "Apr", "amount": 620000 },
+    { "month": "May", "amount": 540000 },
+    { "month": "Jun", "amount": 480000 },
+    { "month": "Jul", "amount": 390000 },
+    { "month": "Aug", "amount": 720000 },
+    { "month": "Sep", "amount": 650000 },
+    { "month": "Oct", "amount": 490000 },
+    { "month": "Nov", "amount": 580000 },
+    { "month": "Dec", "amount": 320000 },
+    { "month": "Jan", "amount": 840000 },
+    { "month": "Feb", "amount": 760000 },
+    { "month": "Mar", "amount": 590000 }
+  ],
+  "subjectPerformance": {
+    "Class VIII": { "english": 82, "mathematics": 78, "science": 81, "history": 76, "geography": 79, "bengali": 85 },
+    "Class IX": { "english": 79, "mathematics": 81, "science": 80, "history": 74, "geography": 77, "bengali": 82 },
+    "Class X": { "english": 78, "mathematics": 82, "science": 80, "history": 73, "geography": 76, "bengali": 80 },
+    "Class XI": { "english": 75, "mathematics": 77, "science": 76, "history": 71, "geography": 74, "bengali": 78 },
+    "Class XII": { "english": 77, "mathematics": 79, "science": 78, "history": 73, "geography": 75, "bengali": 80 }
+  },
+  "atRiskStudents": [
+    { "studentId": "STU002", "name": "Priya Sen", "class": "Class X-A", "riskScore": 87, "reason": "Attendance 62% — 8 absences this month" },
+    { "studentId": "STU006", "name": "Riya Bose", "class": "Class XI-A", "riskScore": 79, "reason": "Attendance dropped to 71%, academic decline" },
+    { "studentId": "STU015", "name": "Aditya Sinha", "class": "Class XII-A", "riskScore": 74, "reason": "Predicted board score 73% — below school average" }
+  ],
+  "boardResultPrediction": {
+    "Class X": { "predicted": 84, "target": 88, "lastYear": 82 },
+    "Class XII": { "predicted": 79, "target": 84, "lastYear": 77 }
+  },
+  "teacherAttendance": { "percent": 96, "present": 19, "total": 20 },
+  "parentAppAdoption": { "percent": 73, "activated": 380, "total": 520 },
+  "forecasts": {
+    "enrollment2026": 545,
+    "enrollmentGrowth": 4.8,
+    "projectedRevenue": 12400000,
+    "attritionRisk": 2
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "stats": {
+    "nurseVisitsToday": 4,
+    "referredToDoctor": 2,
+    "vaccinationsDueThisMonth": 8
+  },
+  "nurseLog": [
+    { "id": "HLT001", "date": "2025-04-10", "studentId": "STU005", "studentName": "Arnab Das", "class": "Class X-B", "complaint": "Headache and mild fever (99.2°F)", "action": "Paracetamol given, parents informed, sent home", "referredToDoctor": true, "parentNotified": true },
+    { "id": "HLT002", "date": "2025-04-10", "studentId": "STU016", "studentName": "Kasturi Sen", "class": "Class VI-A", "complaint": "Knee injury during PE", "action": "First aid applied, ice pack, rest", "referredToDoctor": false, "parentNotified": true },
+    { "id": "HLT003", "date": "2025-04-09", "studentId": "STU025", "studentName": "Sayan Ghosh", "class": "Class X-A", "complaint": "Low blood sugar episode", "action": "Glucose given, insulin check, stable", "referredToDoctor": true, "parentNotified": true },
+    { "id": "HLT004", "date": "2025-04-09", "studentId": "STU028", "studentName": "Swagata Bose", "class": "Class VI-A", "complaint": "Stomach ache", "action": "Rest given, ORS administered", "referredToDoctor": false, "parentNotified": false },
+    { "id": "HLT005", "date": "2025-04-08", "studentId": "STU014", "studentName": "Ishita Karmakar", "class": "Class VII-B", "complaint": "Mild allergic reaction", "action": "Antihistamine given, monitored for 1 hour", "referredToDoctor": false, "parentNotified": true },
+    { "id": "HLT006", "date": "2025-04-07", "studentId": "STU001", "studentName": "Arjun Chatterjee", "class": "Class X-A", "complaint": "Asthma mild episode", "action": "Inhaler administered, rest, monitored", "referredToDoctor": false, "parentNotified": true },
+    { "id": "HLT007", "date": "2025-04-07", "studentId": "STU033", "studentName": "Arko Basu", "class": "Class VIII-B", "complaint": "Finger cut during craft class", "action": "Wound cleaned, bandaged", "referredToDoctor": false, "parentNotified": false },
+    { "id": "HLT008", "date": "2025-04-05", "studentId": "STU022", "studentName": "Moumita Halder", "class": "Class VII-A", "complaint": "Severe headache, nausea", "action": "Rest given, parents called, sent home", "referredToDoctor": true, "parentNotified": true },
+    { "id": "HLT009", "date": "2025-04-04", "studentId": "STU038", "studentName": "Rupsa Chatterjee", "class": "Class VII-A", "complaint": "Eye strain, redness", "action": "Eye drops applied, rest, advised eye check-up", "referredToDoctor": true, "parentNotified": true },
+    { "id": "HLT010", "date": "2025-04-03", "studentId": "STU011", "studentName": "Rohan Pal", "class": "Class IX-B", "complaint": "Ankle sprain during sports", "action": "RICE method applied, sent home", "referredToDoctor": false, "parentNotified": true },
+    { "id": "HLT011", "date": "2025-04-02", "studentId": "STU020", "studentName": "Priyanka Biswas", "class": "Class X-B", "complaint": "Dizziness, fatigue", "action": "Rest and fluids, BP normal, monitored", "referredToDoctor": false, "parentNotified": false },
+    { "id": "HLT012", "date": "2025-04-01", "studentId": "STU004", "studentName": "Sneha Mukherjee", "class": "Class VIII-B", "complaint": "Cold and sore throat", "action": "Throat lozenges given, advised home rest", "referredToDoctor": false, "parentNotified": true },
+    { "id": "HLT013", "date": "2025-03-28", "studentId": "STU007", "studentName": "Soumya Roy", "class": "Class IX-A", "complaint": "Chest pain during PT", "action": "ECG recommended, sent to hospital", "referredToDoctor": true, "parentNotified": true },
+    { "id": "HLT014", "date": "2025-03-25", "studentId": "STU034", "studentName": "Jayita Roy", "class": "Class VI-B", "complaint": "Stomach cramps", "action": "Rest, antacid given", "referredToDoctor": false, "parentNotified": true },
+    { "id": "HLT015", "date": "2025-03-22", "studentId": "STU024", "studentName": "Trishna Bhattacharya", "class": "Class XII-B", "complaint": "Migraine", "action": "Rest in dark room, pain relief, sent home", "referredToDoctor": true, "parentNotified": true }
+  ],
+  "vaccinationTracker": [
+    { "studentId": "STU001", "name": "Arjun Chatterjee", "class": "Class X-A", "BCG": true, "HepatitisB": true, "MMR": true, "DPT": true, "TyphoidBooster": false },
+    { "studentId": "STU002", "name": "Priya Sen", "class": "Class X-A", "BCG": true, "HepatitisB": true, "MMR": true, "DPT": true, "TyphoidBooster": true },
+    { "studentId": "STU003", "name": "Rahul Banerjee", "class": "Class XII-A", "BCG": true, "HepatitisB": true, "MMR": true, "DPT": true, "TyphoidBooster": true },
+    { "studentId": "STU004", "name": "Sneha Mukherjee", "class": "Class VIII-B", "BCG": true, "HepatitisB": true, "MMR": true, "DPT": true, "TyphoidBooster": false },
+    { "studentId": "STU005", "name": "Arnab Das", "class": "Class X-B", "BCG": true, "HepatitisB": true, "MMR": false, "DPT": true, "TyphoidBooster": false }
+  ]
+}

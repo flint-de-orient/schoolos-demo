@@ -1,0 +1,107 @@
+{
+  "routes": [
+    {
+      "id": "RT001",
+      "routeName": "Route 1 — Behala & Tollygunge",
+      "driver": "Ramesh Kumar",
+      "driverPhone": "9831500001",
+      "vehicle": "WB-02-AB-1234",
+      "capacity": 40,
+      "studentsCount": 38,
+      "currentLocation": { "lat": 22.4892, "lng": 88.3278, "area": "Behala Chowrasta" },
+      "status": "In Transit",
+      "eta": "8 mins",
+      "departed": "06:45",
+      "arrived": null,
+      "stops": [
+        { "stopName": "Behala Chowrasta", "time": "06:50", "studentCount": 12 },
+        { "stopName": "Tollygunge Metro", "time": "07:05", "studentCount": 10 },
+        { "stopName": "Gariahat", "time": "07:18", "studentCount": 9 },
+        { "stopName": "School Gate", "time": "07:30", "studentCount": 38 }
+      ]
+    },
+    {
+      "id": "RT002",
+      "routeName": "Route 2 — Salt Lake & New Town",
+      "driver": "Mohan Lal",
+      "driverPhone": "9831500002",
+      "vehicle": "WB-02-CD-5678",
+      "capacity": 45,
+      "studentsCount": 42,
+      "currentLocation": { "lat": 22.5726, "lng": 88.4265, "area": "Salt Lake Sector V" },
+      "status": "Arrived",
+      "eta": null,
+      "departed": "06:30",
+      "arrived": "07:28",
+      "stops": [
+        { "stopName": "New Town Action Area", "time": "06:35", "studentCount": 15 },
+        { "stopName": "Salt Lake Sector V", "time": "06:55", "studentCount": 14 },
+        { "stopName": "Ultadanga", "time": "07:12", "studentCount": 13 },
+        { "stopName": "School Gate", "time": "07:28", "studentCount": 42 }
+      ]
+    },
+    {
+      "id": "RT003",
+      "routeName": "Route 3 — Dum Dum & Sodepur",
+      "driver": "Suresh Yadav",
+      "driverPhone": "9831500003",
+      "vehicle": "WB-02-EF-9012",
+      "capacity": 40,
+      "studentsCount": 35,
+      "currentLocation": { "lat": 22.6437, "lng": 88.4246, "area": "Dum Dum Park" },
+      "status": "In Transit",
+      "eta": "15 mins",
+      "departed": "06:55",
+      "arrived": null,
+      "stops": [
+        { "stopName": "Sodepur", "time": "07:00", "studentCount": 10 },
+        { "stopName": "Dum Dum Park", "time": "07:15", "studentCount": 13 },
+        { "stopName": "Shyambazar", "time": "07:28", "studentCount": 12 },
+        { "stopName": "School Gate", "time": "07:45", "studentCount": 35 }
+      ]
+    },
+    {
+      "id": "RT004",
+      "routeName": "Route 4 — Jadavpur & Dhakuria",
+      "driver": "Bijoy Singh",
+      "driverPhone": "9831500004",
+      "vehicle": "WB-02-GH-3456",
+      "capacity": 38,
+      "studentsCount": 36,
+      "currentLocation": { "lat": 22.4964, "lng": 88.3720, "area": "Jadavpur University Gate" },
+      "status": "Arrived",
+      "eta": null,
+      "departed": "06:40",
+      "arrived": "07:25",
+      "stops": [
+        { "stopName": "Dhakuria", "time": "06:45", "studentCount": 12 },
+        { "stopName": "Jadavpur", "time": "06:58", "studentCount": 13 },
+        { "stopName": "Rashbehari", "time": "07:10", "studentCount": 11 },
+        { "stopName": "School Gate", "time": "07:25", "studentCount": 36 }
+      ]
+    },
+    {
+      "id": "RT005",
+      "routeName": "Route 5 — Howrah & Shibpur",
+      "driver": "Dilip Prasad",
+      "driverPhone": "9831500005",
+      "vehicle": "WB-02-IJ-7890",
+      "capacity": 40,
+      "studentsCount": 30,
+      "currentLocation": { "lat": 22.5839, "lng": 88.3137, "area": "Howrah Station" },
+      "status": "In Transit",
+      "eta": "22 mins",
+      "departed": "07:00",
+      "arrived": null,
+      "stops": [
+        { "stopName": "Shibpur", "time": "07:05", "studentCount": 10 },
+        { "stopName": "Howrah Station", "time": "07:20", "studentCount": 12 },
+        { "stopName": "Howrah Bridge", "time": "07:30", "studentCount": 8 },
+        { "stopName": "School Gate", "time": "07:52", "studentCount": 30 }
+      ]
+    }
+  ],
+  "sosAlerts": [
+    { "id": "SOS001", "routeId": "RT003", "routeName": "Route 3 — Dum Dum & Sodepur", "date": "2025-02-14", "time": "07:35", "description": "Bus breakdown near Shyambazar — students safe, backup arranged", "resolvedAt": "2025-02-14 08:20", "status": "Resolved" }
+  ]
+}

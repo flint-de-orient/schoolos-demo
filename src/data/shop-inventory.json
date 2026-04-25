@@ -1,0 +1,30 @@
+{
+  "categories": ["Uniform", "Books & Stationery", "School Bag & Gear", "Health & Hygiene", "Achievement Items", "Project & Activity"],
+  "items": [
+    { "id": "SHP001", "category": "Uniform", "name": "School Shirt (White)", "price": 450, "stock": 120, "image": null, "sizes": ["S", "M", "L", "XL"], "emoji": "👕" },
+    { "id": "SHP002", "category": "Uniform", "name": "School Trousers (Navy)", "price": 650, "stock": 85, "image": null, "sizes": ["28", "30", "32", "34"], "emoji": "👖" },
+    { "id": "SHP003", "category": "Uniform", "name": "School Skirt (Girls)", "price": 550, "stock": 70, "image": null, "sizes": ["S", "M", "L"], "emoji": "👗" },
+    { "id": "SHP004", "category": "Uniform", "name": "School Tie (Striped Navy-Gold)", "price": 180, "stock": 200, "image": null, "sizes": null, "emoji": "👔" },
+    { "id": "SHP005", "category": "Uniform", "name": "Sports Kit (T-shirt + Shorts)", "price": 780, "stock": 60, "image": null, "sizes": ["S", "M", "L", "XL"], "emoji": "🏃" },
+    { "id": "SHP006", "category": "Books & Stationery", "name": "ICSE Mathematics Guide (Class X)", "price": 380, "stock": 45, "image": null, "sizes": null, "emoji": "📚" },
+    { "id": "SHP007", "category": "Books & Stationery", "name": "Sundarban Academy Notebook Set (5 pcs)", "price": 150, "stock": 300, "image": null, "sizes": null, "emoji": "📓" },
+    { "id": "SHP008", "category": "Books & Stationery", "name": "Geometry Box (Premium)", "price": 220, "stock": 150, "image": null, "sizes": null, "emoji": "📐" },
+    { "id": "SHP009", "category": "Books & Stationery", "name": "Pen Set (Blue + Black + Red)", "price": 75, "stock": 500, "image": null, "sizes": null, "emoji": "✒️" },
+    { "id": "SHP010", "category": "Books & Stationery", "name": "ISC Chemistry Practicals Guide", "price": 290, "stock": 30, "image": null, "sizes": null, "emoji": "🧪" },
+    { "id": "SHP011", "category": "School Bag & Gear", "name": "School Backpack (Large — 30L)", "price": 1250, "stock": 40, "image": null, "sizes": null, "emoji": "🎒" },
+    { "id": "SHP012", "category": "School Bag & Gear", "name": "Water Bottle (Steel, 750ml)", "price": 350, "stock": 80, "image": null, "sizes": null, "emoji": "🍶" },
+    { "id": "SHP013", "category": "School Bag & Gear", "name": "Lunch Box (3 Compartment)", "price": 280, "stock": 65, "image": null, "sizes": null, "emoji": "🍱" },
+    { "id": "SHP014", "category": "School Bag & Gear", "name": "ID Card Holder with Lanyard", "price": 60, "stock": 400, "image": null, "sizes": null, "emoji": "🪪" },
+    { "id": "SHP015", "category": "Health & Hygiene", "name": "Hand Sanitizer (200ml)", "price": 95, "stock": 250, "image": null, "sizes": null, "emoji": "🧴" },
+    { "id": "SHP016", "category": "Health & Hygiene", "name": "Face Mask Pack (10 pcs)", "price": 120, "stock": 180, "image": null, "sizes": null, "emoji": "😷" },
+    { "id": "SHP017", "category": "Health & Hygiene", "name": "First Aid Pouch (Personal)", "price": 175, "stock": 90, "image": null, "sizes": null, "emoji": "🩹" },
+    { "id": "SHP018", "category": "Achievement Items", "name": "Merit Certificate Frame (A4)", "price": 250, "stock": 50, "image": null, "sizes": null, "emoji": "🏆" },
+    { "id": "SHP019", "category": "Achievement Items", "name": "School Medal (Gold Plated)", "price": 180, "stock": 30, "image": null, "sizes": null, "emoji": "🥇" },
+    { "id": "SHP020", "category": "Achievement Items", "name": "Student Planner 2025-26", "price": 200, "stock": 200, "image": null, "sizes": null, "emoji": "📅" },
+    { "id": "SHP021", "category": "Project & Activity", "name": "Craft Kit (Complete Set)", "price": 350, "stock": 70, "image": null, "sizes": null, "emoji": "✂️" },
+    { "id": "SHP022", "category": "Project & Activity", "name": "Science Project Kit (Class VI-VIII)", "price": 490, "stock": 40, "image": null, "sizes": null, "emoji": "🔬" },
+    { "id": "SHP023", "category": "Project & Activity", "name": "Drawing & Sketching Set", "price": 320, "stock": 55, "image": null, "sizes": null, "emoji": "🎨" },
+    { "id": "SHP024", "category": "Project & Activity", "name": "Robotics Starter Kit", "price": 1800, "stock": 15, "image": null, "sizes": null, "emoji": "🤖" },
+    { "id": "SHP025", "category": "School Bag & Gear", "name": "Canvas Pencil Pouch", "price": 120, "stock": 300, "image": null, "sizes": null, "emoji": "✏️" }
+  ]
+}

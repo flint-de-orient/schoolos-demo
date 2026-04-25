@@ -1,0 +1,41 @@
+{
+  "todayDate": "2025-04-10",
+  "classWise": [
+    { "class": "Class VI-A", "teacher": "Mrs. Swapna Dey", "total": 35, "present": 33, "absent": 2, "percent": 94 },
+    { "class": "Class VI-B", "teacher": "Mrs. Pamela Sen", "total": 34, "present": 31, "absent": 3, "percent": 91 },
+    { "class": "Class VII-A", "teacher": "Mr. Tapas Mukherjee", "total": 36, "present": 32, "absent": 4, "percent": 89 },
+    { "class": "Class VII-B", "teacher": "Mrs. Ranjana Bhaduri", "total": 35, "present": 30, "absent": 5, "percent": 86 },
+    { "class": "Class VIII-A", "teacher": "Mrs. Madhumita Roy", "total": 38, "present": 35, "absent": 3, "percent": 92 },
+    { "class": "Class VIII-B", "teacher": "Mr. Prosenjit Chatterjee", "total": 37, "present": 31, "absent": 6, "percent": 84 },
+    { "class": "Class IX-A", "teacher": "Mr. Subhashis Bose", "total": 40, "present": 38, "absent": 2, "percent": 95 },
+    { "class": "Class IX-B", "teacher": "Mrs. Suchitra Ghosh", "total": 39, "present": 33, "absent": 6, "percent": 85 },
+    { "class": "Class X-A", "teacher": "Mrs. Jayashree Nair", "total": 38, "present": 34, "absent": 4, "percent": 89 },
+    { "class": "Class X-B", "teacher": "Mr. Arijit Das", "total": 37, "present": 28, "absent": 9, "percent": 76 },
+    { "class": "Class XI-A", "teacher": "Mr. Debabrata Pal", "total": 36, "present": 31, "absent": 5, "percent": 86 },
+    { "class": "Class XI-B", "teacher": "Mrs. Priyanka Mondal", "total": 35, "present": 29, "absent": 6, "percent": 83 },
+    { "class": "Class XII-A", "teacher": "Mr. Kaushik Mitra", "total": 32, "present": 30, "absent": 2, "percent": 94 },
+    { "class": "Class XII-B", "teacher": "Mr. Nilanjan Sarkar", "total": 33, "present": 31, "absent": 2, "percent": 94 }
+  ],
+  "schoolOverall": {
+    "total": 520,
+    "present": 468,
+    "absent": 52,
+    "percent": 90
+  },
+  "absentees": [
+    { "studentId": "STU002", "name": "Priya Sen", "class": "Class X-A", "reason": "Sick", "parentNotified": true },
+    { "studentId": "STU006", "name": "Riya Bose", "class": "Class XI-A", "reason": "Family Function", "parentNotified": true },
+    { "studentId": "STU011", "name": "Rohan Pal", "class": "Class IX-B", "reason": "Not Known", "parentNotified": false },
+    { "studentId": "STU015", "name": "Aditya Sinha", "class": "Class XII-A", "reason": "Medical", "parentNotified": true },
+    { "studentId": "STU026", "name": "Dipa Mandal", "class": "Class VIII-B", "reason": "Sick", "parentNotified": true },
+    { "studentId": "STU031", "name": "Prantik Sen", "class": "Class X-B", "reason": "Not Known", "parentNotified": false }
+  ],
+  "monthlyTrend": [
+    { "month": "Nov", "percent": 93 },
+    { "month": "Dec", "percent": 89 },
+    { "month": "Jan", "percent": 91 },
+    { "month": "Feb", "percent": 88 },
+    { "month": "Mar", "percent": 87 },
+    { "month": "Apr", "percent": 90 }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "summary": {
+    "totalDue": 2450000,
+    "collected": 2180000,
+    "pending": 270000,
+    "overdueCount": 8
+  },
+  "records": [
+    { "id": "FEE001", "studentId": "STU001", "studentName": "Arjun Chatterjee", "class": "Class X-A", "term": "Term 2 2024-25", "amount": 18500, "dueDate": "2025-02-15", "status": "paid", "paidDate": "2025-02-10", "paymentMode": "UPI", "receiptNo": "RCP2025-0341" },
+    { "id": "FEE002", "studentId": "STU002", "studentName": "Priya Sen", "class": "Class X-A", "term": "Term 2 2024-25", "amount": 18500, "dueDate": "2025-02-15", "status": "overdue", "paidDate": null, "paymentMode": null, "receiptNo": null },
+    { "id": "FEE003", "studentId": "STU003", "studentName": "Rahul Banerjee", "class": "Class XII-A", "term": "Term 2 2024-25", "amount": 22000, "dueDate": "2025-02-15", "status": "paid", "paidDate": "2025-02-08", "paymentMode": "Net Banking", "receiptNo": "RCP2025-0342" },
+    { "id": "FEE004", "studentId": "STU004", "studentName": "Sneha Mukherjee", "class": "Class VIII-B", "term": "Term 2 2024-25", "amount": 16000, "dueDate": "2025-02-15", "status": "paid", "paidDate": "2025-02-12", "paymentMode": "UPI", "receiptNo": "RCP2025-0343" },
+    { "id": "FEE005", "studentId": "STU005", "studentName": "Arnab Das", "class": "Class X-B", "term": "Term 2 2024-25", "amount": 18500, "dueDate": "2025-02-15", "status": "pending", "paidDate": null, "paymentMode": null, "receiptNo": null },
+    { "id": "FEE006", "studentId": "STU006", "studentName": "Riya Bose", "class": "Class XI-A", "term": "Term 2 2024-25", "amount": 22000, "dueDate": "2025-02-15", "status": "paid", "paidDate": "2025-02-14", "paymentMode": "Cheque", "receiptNo": "RCP2025-0344" },
+    { "id": "FEE007", "studentId": "STU007", "studentName": "Soumya Roy", "class": "Class IX-A", "term": "Term 2 2024-25", "amount": 18500, "dueDate": "2025-02-15", "status": "paid", "paidDate": "2025-02-09", "paymentMode": "UPI", "receiptNo": "RCP2025-0345" },
+    { "id": "FEE008", "studentId": "STU008", "studentName": "Tanvi Ghosh", "class": "Class VII-A", "term": "Term 2 2024-25", "amount": 16000, "dueDate": "2025-02-15", "status": "paid", "paidDate": "2025-02-11", "paymentMode": "Cash", "receiptNo": "RCP2025-0346" },
+    { "id": "FEE009", "studentId": "STU009", "studentName": "Vivek Sharma", "class": "Class XII-B", "term": "Term 2 2024-25", "amount": 22000, "dueDate": "2025-02-15", "status": "paid", "paidDate": "2025-02-07", "paymentMode": "UPI", "receiptNo": "RCP2025-0347" },
+    { "id": "FEE010", "studentId": "STU010", "studentName": "Ananya Dutta", "class": "Class XI-B", "term": "Term 2 2024-25", "amount": 22000, "dueDate": "2025-02-15", "status": "paid", "paidDate": "2025-02-05", "paymentMode": "Net Banking", "receiptNo": "RCP2025-0348" },
+    { "id": "FEE011", "studentId": "STU011", "studentName": "Rohan Pal", "class": "Class IX-B", "term": "Term 2 2024-25", "amount": 18500, "dueDate": "2025-02-15", "status": "overdue", "paidDate": null, "paymentMode": null, "receiptNo": null },
+    { "id": "FEE012", "studentId": "STU012", "studentName": "Shruti Bhaduri", "class": "Class VIII-A", "term": "Term 2 2024-25", "amount": 16000, "dueDate": "2025-02-15", "status": "paid", "paidDate": "2025-02-13", "paymentMode": "UPI", "receiptNo": "RCP2025-0349" },
+    { "id": "FEE013", "studentId": "STU013", "studentName": "Debrup Majumdar", "class": "Class X-A", "term": "Term 2 2024-25", "amount": 18500, "dueDate": "2025-02-15", "status": "paid", "paidDate": "2025-02-10", "paymentMode": "Cash", "receiptNo": "RCP2025-0350" },
+    { "id": "FEE014", "studentId": "STU015", "studentName": "Aditya Sinha", "class": "Class XII-A", "term": "Term 2 2024-25", "amount": 22000, "dueDate": "2025-02-15", "status": "overdue", "paidDate": null, "paymentMode": null, "receiptNo": null },
+    { "id": "FEE015", "studentId": "STU016", "studentName": "Kasturi Sen", "class": "Class VI-A", "term": "Term 2 2024-25", "amount": 13500, "dueDate": "2025-02-15", "status": "paid", "paidDate": "2025-02-06", "paymentMode": "UPI", "receiptNo": "RCP2025-0351" },
+    { "id": "FEE016", "studentId": "STU017", "studentName": "Pratik Chakraborty", "class": "Class IX-A", "term": "Term 2 2024-25", "amount": 18500, "dueDate": "2025-02-15", "status": "pending", "paidDate": null, "paymentMode": null, "receiptNo": null },
+    { "id": "FEE017", "studentId": "STU018", "studentName": "Nandini Roy", "class": "Class VIII-A", "term": "Term 2 2024-25", "amount": 16000, "dueDate": "2025-02-15", "status": "paid", "paidDate": "2025-02-08", "paymentMode": "Net Banking", "receiptNo": "RCP2025-0352" },
+    { "id": "FEE018", "studentId": "STU019", "studentName": "Kiran Mondal", "class": "Class VI-B", "term": "Term 2 2024-25", "amount": 13500, "dueDate": "2025-02-15", "status": "paid", "paidDate": "2025-02-04", "paymentMode": "UPI", "receiptNo": "RCP2025-0353" },
+    { "id": "FEE019", "studentId": "STU020", "studentName": "Priyanka Biswas", "class": "Class X-B", "term": "Term 2 2024-25", "amount": 18500, "dueDate": "2025-02-15", "status": "paid", "paidDate": "2025-02-09", "paymentMode": "UPI", "receiptNo": "RCP2025-0354" },
+    { "id": "FEE020", "studentId": "STU023", "studentName": "Abir Dey", "class": "Class IX-B", "term": "Term 2 2024-25", "amount": 18500, "dueDate": "2025-02-15", "status": "pending", "paidDate": null, "paymentMode": null, "receiptNo": null },
+    { "id": "FEE021", "studentId": "STU024", "studentName": "Trishna Bhattacharya", "class": "Class XII-B", "term": "Term 2 2024-25", "amount": 22000, "dueDate": "2025-02-15", "status": "paid", "paidDate": "2025-02-03", "paymentMode": "Net Banking", "receiptNo": "RCP2025-0355" },
+    { "id": "FEE022", "studentId": "STU025", "studentName": "Sayan Ghosh", "class": "Class X-A", "term": "Term 2 2024-25", "amount": 18500, "dueDate": "2025-02-15", "status": "paid", "paidDate": "2025-02-11", "paymentMode": "UPI", "receiptNo": "RCP2025-0356" },
+    { "id": "FEE023", "studentId": "STU026", "studentName": "Dipa Mandal", "class": "Class VIII-B", "term": "Term 2 2024-25", "amount": 16000, "dueDate": "2025-02-15", "status": "overdue", "paidDate": null, "paymentMode": null, "receiptNo": null },
+    { "id": "FEE024", "studentId": "STU031", "studentName": "Prantik Sen", "class": "Class X-B", "term": "Term 2 2024-25", "amount": 18500, "dueDate": "2025-02-15", "status": "pending", "paidDate": null, "paymentMode": null, "receiptNo": null },
+    { "id": "FEE025", "studentId": "STU035", "studentName": "Partha Saha", "class": "Class XI-A", "term": "Term 2 2024-25", "amount": 22000, "dueDate": "2025-02-15", "status": "pending", "paidDate": null, "paymentMode": null, "receiptNo": null },
+    { "id": "FEE026", "studentId": "STU039", "studentName": "Arup Kundu", "class": "Class XII-B", "term": "Term 2 2024-25", "amount": 22000, "dueDate": "2024-11-15", "status": "overdue", "paidDate": null, "paymentMode": null, "receiptNo": null },
+    { "id": "FEE027", "studentId": "STU027", "studentName": "Niloy Sarkar", "class": "Class XI-B", "term": "Term 2 2024-25", "amount": 22000, "dueDate": "2024-11-15", "status": "overdue", "paidDate": null, "paymentMode": null, "receiptNo": null },
+    { "id": "FEE028", "studentId": "STU033", "studentName": "Arko Basu", "class": "Class VIII-B", "term": "Term 2 2024-25", "amount": 16000, "dueDate": "2025-02-15", "status": "paid", "paidDate": "2025-02-15", "paymentMode": "UPI", "receiptNo": "RCP2025-0357" },
+    { "id": "FEE029", "studentId": "STU036", "studentName": "Poulami Banerjee", "class": "Class IX-B", "term": "Term 2 2024-25", "amount": 18500, "dueDate": "2025-02-15", "status": "paid", "paidDate": "2025-02-12", "paymentMode": "Cash", "receiptNo": "RCP2025-0358" },
+    { "id": "FEE030", "studentId": "STU040", "studentName": "Debasree Mitra", "class": "Class VI-A", "term": "Term 2 2024-25", "amount": 13500, "dueDate": "2025-02-15", "status": "paid", "paidDate": "2025-02-01", "paymentMode": "Net Banking", "receiptNo": "RCP2025-0359" },
+    { "id": "FEE031", "studentId": "STU001", "studentName": "Arjun Chatterjee", "class": "Class X-A", "term": "Term 3 2024-25", "amount": 18500, "dueDate": "2026-04-30", "status": "pending", "paidDate": null, "paymentMode": null, "receiptNo": null },
+    { "id": "FEE032", "studentId": "STU003", "studentName": "Rahul Banerjee", "class": "Class XII-A", "term": "Term 3 2024-25", "amount": 22000, "dueDate": "2026-04-30", "status": "pending", "paidDate": null, "paymentMode": null, "receiptNo": null },
+    { "id": "FEE033", "studentId": "STU004", "studentName": "Sneha Mukherjee", "class": "Class VIII-B", "term": "Term 3 2024-25", "amount": 16000, "dueDate": "2026-04-30", "status": "pending", "paidDate": null, "paymentMode": null, "receiptNo": null }
+  ],
+  "feeStructure": {
+    "Nursery": 9500,
+    "LKG": 10000,
+    "UKG": 10500,
+    "Class I-IV": 13500,
+    "Class V-VIII": 16000,
+    "Class IX-X": 18500,
+    "Class XI-XII": 22000
+  },
+  "aiRiskStudents": [
+    { "studentId": "STU002", "name": "Priya Sen", "class": "Class X-A", "riskScore": 92, "reason": "3 consecutive missed payments" },
+    { "studentId": "STU011", "name": "Rohan Pal", "class": "Class IX-B", "riskScore": 85, "reason": "Payment delayed by 60+ days" },
+    { "studentId": "STU026", "name": "Dipa Mandal", "class": "Class VIII-B", "riskScore": 78, "reason": "Parent contact unsuccessful" },
+    { "studentId": "STU039", "name": "Arup Kundu", "class": "Class XII-B", "riskScore": 74, "reason": "Term 1 also overdue" },
+    { "studentId": "STU015", "name": "Aditya Sinha", "class": "Class XII-A", "riskScore": 70, "reason": "No response to reminders" }
+  ]
+}

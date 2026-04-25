@@ -1,0 +1,82 @@
+{
+  "classes": ["Class VI-A", "Class VI-B", "Class VII-A", "Class VII-B", "Class VIII-A", "Class VIII-B", "Class IX-A", "Class IX-B", "Class X-A", "Class X-B", "Class XI-A", "Class XI-B", "Class XII-A", "Class XII-B"],
+  "schedule": {
+    "Class X-A": {
+      "Monday": [
+        { "periodNo": 1, "subject": "Mathematics", "teacher": "Mr. Subhashis Bose", "startTime": "07:30", "endTime": "08:20", "room": "Room 201" },
+        { "periodNo": 2, "subject": "English", "teacher": "Mrs. Jayashree Nair", "startTime": "08:20", "endTime": "09:10", "room": "Room 201" },
+        { "periodNo": 3, "subject": "Physics", "teacher": "Mr. Arijit Das", "startTime": "09:10", "endTime": "10:00", "room": "Lab 1" },
+        { "periodNo": 4, "subject": "Break", "teacher": "", "startTime": "10:00", "endTime": "10:20", "room": "" },
+        { "periodNo": 5, "subject": "Chemistry", "teacher": "Mrs. Suchitra Ghosh", "startTime": "10:20", "endTime": "11:10", "room": "Lab 2" },
+        { "periodNo": 6, "subject": "History", "teacher": "Mrs. Pamela Sen", "startTime": "11:10", "endTime": "12:00", "room": "Room 201" },
+        { "periodNo": 7, "subject": "Bengali", "teacher": "Mrs. Swapna Dey", "startTime": "12:00", "endTime": "12:50", "room": "Room 201" },
+        { "periodNo": 8, "subject": "Geography", "teacher": "Mr. Tapas Mukherjee", "startTime": "12:50", "endTime": "13:40", "room": "Room 201" }
+      ],
+      "Tuesday": [
+        { "periodNo": 1, "subject": "English", "teacher": "Mrs. Jayashree Nair", "startTime": "07:30", "endTime": "08:20", "room": "Room 201" },
+        { "periodNo": 2, "subject": "Physics", "teacher": "Mr. Arijit Das", "startTime": "08:20", "endTime": "09:10", "room": "Lab 1" },
+        { "periodNo": 3, "subject": "Bengali", "teacher": "Mrs. Swapna Dey", "startTime": "09:10", "endTime": "10:00", "room": "Room 201" },
+        { "periodNo": 4, "subject": "Break", "teacher": "", "startTime": "10:00", "endTime": "10:20", "room": "" },
+        { "periodNo": 5, "subject": "Mathematics", "teacher": "Mr. Subhashis Bose", "startTime": "10:20", "endTime": "11:10", "room": "Room 201" },
+        { "periodNo": 6, "subject": "Computer Science", "teacher": "Mr. Debabrata Pal", "startTime": "11:10", "endTime": "12:00", "room": "Computer Lab" },
+        { "periodNo": 7, "subject": "History", "teacher": "Mrs. Pamela Sen", "startTime": "12:00", "endTime": "12:50", "room": "Room 201" },
+        { "periodNo": 8, "subject": "Physical Education", "teacher": "Mr. Kaushik Mitra", "startTime": "12:50", "endTime": "13:40", "room": "Playground" }
+      ],
+      "Wednesday": [
+        { "periodNo": 1, "subject": "Chemistry", "teacher": "Mrs. Suchitra Ghosh", "startTime": "07:30", "endTime": "08:20", "room": "Lab 2" },
+        { "periodNo": 2, "subject": "Mathematics", "teacher": "Mr. Subhashis Bose", "startTime": "08:20", "endTime": "09:10", "room": "Room 201" },
+        { "periodNo": 3, "subject": "Geography", "teacher": "Mr. Tapas Mukherjee", "startTime": "09:10", "endTime": "10:00", "room": "Room 201" },
+        { "periodNo": 4, "subject": "Break", "teacher": "", "startTime": "10:00", "endTime": "10:20", "room": "" },
+        { "periodNo": 5, "subject": "English", "teacher": "Mrs. Jayashree Nair", "startTime": "10:20", "endTime": "11:10", "room": "Room 201" },
+        { "periodNo": 6, "subject": "Biology", "teacher": "Mr. Prosenjit Chatterjee", "startTime": "11:10", "endTime": "12:00", "room": "Lab 3" },
+        { "periodNo": 7, "subject": "Sanskrit", "teacher": "Mrs. Ranjana Bhaduri", "startTime": "12:00", "endTime": "12:50", "room": "Room 201" },
+        { "periodNo": 8, "subject": "Music", "teacher": "Mrs. Priyanka Mondal", "startTime": "12:50", "endTime": "13:40", "room": "Music Room" }
+      ],
+      "Thursday": [
+        { "periodNo": 1, "subject": "Bengali", "teacher": "Mrs. Swapna Dey", "startTime": "07:30", "endTime": "08:20", "room": "Room 201" },
+        { "periodNo": 2, "subject": "Chemistry", "teacher": "Mrs. Suchitra Ghosh", "startTime": "08:20", "endTime": "09:10", "room": "Lab 2" },
+        { "periodNo": 3, "subject": "English", "teacher": "Mrs. Jayashree Nair", "startTime": "09:10", "endTime": "10:00", "room": "Room 201" },
+        { "periodNo": 4, "subject": "Break", "teacher": "", "startTime": "10:00", "endTime": "10:20", "room": "" },
+        { "periodNo": 5, "subject": "Geography", "teacher": "Mr. Tapas Mukherjee", "startTime": "10:20", "endTime": "11:10", "room": "Room 201" },
+        { "periodNo": 6, "subject": "Mathematics", "teacher": "Mr. Subhashis Bose", "startTime": "11:10", "endTime": "12:00", "room": "Room 201" },
+        { "periodNo": 7, "subject": "Physics", "teacher": "Mr. Arijit Das", "startTime": "12:00", "endTime": "12:50", "room": "Lab 1" },
+        { "periodNo": 8, "subject": "History", "teacher": "Mrs. Pamela Sen", "startTime": "12:50", "endTime": "13:40", "room": "Room 201" }
+      ],
+      "Friday": [
+        { "periodNo": 1, "subject": "Physics", "teacher": "Mr. Arijit Das", "startTime": "07:30", "endTime": "08:20", "room": "Lab 1" },
+        { "periodNo": 2, "subject": "Bengali", "teacher": "Mrs. Swapna Dey", "startTime": "08:20", "endTime": "09:10", "room": "Room 201" },
+        { "periodNo": 3, "subject": "Mathematics", "teacher": "Mr. Subhashis Bose", "startTime": "09:10", "endTime": "10:00", "room": "Room 201" },
+        { "periodNo": 4, "subject": "Break", "teacher": "", "startTime": "10:00", "endTime": "10:20", "room": "" },
+        { "periodNo": 5, "subject": "History", "teacher": "Mrs. Pamela Sen", "startTime": "10:20", "endTime": "11:10", "room": "Room 201" },
+        { "periodNo": 6, "subject": "Computer Science", "teacher": "Mr. Debabrata Pal", "startTime": "11:10", "endTime": "12:00", "room": "Computer Lab" },
+        { "periodNo": 7, "subject": "Chemistry", "teacher": "Mrs. Suchitra Ghosh", "startTime": "12:00", "endTime": "12:50", "room": "Lab 2" },
+        { "periodNo": 8, "subject": "Geography", "teacher": "Mr. Tapas Mukherjee", "startTime": "12:50", "endTime": "13:40", "room": "Room 201" }
+      ],
+      "Saturday": [
+        { "periodNo": 1, "subject": "Mathematics", "teacher": "Mr. Subhashis Bose", "startTime": "07:30", "endTime": "08:20", "room": "Room 201" },
+        { "periodNo": 2, "subject": "English", "teacher": "Mrs. Jayashree Nair", "startTime": "08:20", "endTime": "09:10", "room": "Room 201" },
+        { "periodNo": 3, "subject": "Biology", "teacher": "Mr. Prosenjit Chatterjee", "startTime": "09:10", "endTime": "10:00", "room": "Lab 3" },
+        { "periodNo": 4, "subject": "Break", "teacher": "", "startTime": "10:00", "endTime": "10:20", "room": "" },
+        { "periodNo": 5, "subject": "Bengali", "teacher": "Mrs. Swapna Dey", "startTime": "10:20", "endTime": "11:10", "room": "Room 201" },
+        { "periodNo": 6, "subject": "Sanskrit", "teacher": "Mrs. Ranjana Bhaduri", "startTime": "11:10", "endTime": "12:00", "room": "Room 201" },
+        { "periodNo": 7, "subject": "Physical Education", "teacher": "Mr. Kaushik Mitra", "startTime": "12:00", "endTime": "12:50", "room": "Playground" },
+        { "periodNo": 8, "subject": "Music", "teacher": "Mrs. Priyanka Mondal", "startTime": "12:50", "endTime": "13:40", "room": "Music Room" }
+      ]
+    }
+  },
+  "subjectColors": {
+    "Mathematics": "bg-blue-100 text-blue-800 border-blue-200",
+    "English": "bg-green-100 text-green-800 border-green-200",
+    "Physics": "bg-purple-100 text-purple-800 border-purple-200",
+    "Chemistry": "bg-orange-100 text-orange-800 border-orange-200",
+    "Biology": "bg-teal-100 text-teal-800 border-teal-200",
+    "History": "bg-amber-100 text-amber-800 border-amber-200",
+    "Geography": "bg-cyan-100 text-cyan-800 border-cyan-200",
+    "Bengali": "bg-rose-100 text-rose-800 border-rose-200",
+    "Computer Science": "bg-indigo-100 text-indigo-800 border-indigo-200",
+    "Sanskrit": "bg-yellow-100 text-yellow-800 border-yellow-200",
+    "Physical Education": "bg-lime-100 text-lime-800 border-lime-200",
+    "Music": "bg-pink-100 text-pink-800 border-pink-200",
+    "Break": "bg-gray-100 text-gray-500 border-gray-200"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "stages": ["Inquiry", "Application Received", "Documents Verified", "Interview Scheduled", "Offer Made", "Enrolled", "Rejected"],
+  "applicants": [
+    { "id": "ADM001", "name": "Shreyan Bose", "applyingForClass": "Class I", "parentName": "Soumyajit Bose", "phone": "9831100001", "stage": "Enrolled", "inquiryDate": "2025-01-05", "source": "Referral", "daysInStage": 2 },
+    { "id": "ADM002", "name": "Maitreyi Ghosh", "applyingForClass": "Class VI", "parentName": "Pranab Ghosh", "phone": "9831100002", "stage": "Offer Made", "inquiryDate": "2025-01-10", "source": "School website", "daysInStage": 4 },
+    { "id": "ADM003", "name": "Arnav Chakraborty", "applyingForClass": "LKG", "parentName": "Sudipta Chakraborty", "phone": "9831100003", "stage": "Interview Scheduled", "inquiryDate": "2025-01-15", "source": "Walk-in", "daysInStage": 6 },
+    { "id": "ADM004", "name": "Piyali Sen", "applyingForClass": "Class III", "parentName": "Gouranga Sen", "phone": "9831100004", "stage": "Documents Verified", "inquiryDate": "2025-01-18", "source": "Campaign", "daysInStage": 3 },
+    { "id": "ADM005", "name": "Debojyoti Roy", "applyingForClass": "Class IX", "parentName": "Mrityunjoy Roy", "phone": "9831100005", "stage": "Application Received", "inquiryDate": "2025-02-01", "source": "School website", "daysInStage": 5 },
+    { "id": "ADM006", "name": "Anushka Das", "applyingForClass": "Nursery", "parentName": "Bikash Das", "phone": "9831100006", "stage": "Inquiry", "inquiryDate": "2025-03-01", "source": "Walk-in", "daysInStage": 2 },
+    { "id": "ADM007", "name": "Surjadeep Pal", "applyingForClass": "Class VII", "parentName": "Tapan Pal", "phone": "9831100007", "stage": "Enrolled", "inquiryDate": "2025-01-20", "source": "Referral", "daysInStage": 1 },
+    { "id": "ADM008", "name": "Tithi Basu", "applyingForClass": "Class XI", "parentName": "Biswajit Basu", "phone": "9831100008", "stage": "Offer Made", "inquiryDate": "2025-02-05", "source": "School website", "daysInStage": 3 },
+    { "id": "ADM009", "name": "Aritra Mukherjee", "applyingForClass": "Class V", "parentName": "Debashis Mukherjee", "phone": "9831100009", "stage": "Interview Scheduled", "inquiryDate": "2025-02-10", "source": "Campaign", "daysInStage": 7 },
+    { "id": "ADM010", "name": "Sayoni Dutta", "applyingForClass": "UKG", "parentName": "Amlan Dutta", "phone": "9831100010", "stage": "Documents Verified", "inquiryDate": "2025-02-15", "source": "Referral", "daysInStage": 4 },
+    { "id": "ADM011", "name": "Rahul Mondal", "applyingForClass": "Class II", "parentName": "Subrata Mondal", "phone": "9831100011", "stage": "Rejected", "inquiryDate": "2025-01-25", "source": "Walk-in", "daysInStage": 0 },
+    { "id": "ADM012", "name": "Swastika Banerjee", "applyingForClass": "Class VIII", "parentName": "Saumyen Banerjee", "phone": "9831100012", "stage": "Application Received", "inquiryDate": "2025-02-20", "source": "School website", "daysInStage": 8 },
+    { "id": "ADM013", "name": "Aniket Sarkar", "applyingForClass": "Class X", "parentName": "Dilip Sarkar", "phone": "9831100013", "stage": "Inquiry", "inquiryDate": "2025-03-05", "source": "Walk-in", "daysInStage": 1 },
+    { "id": "ADM014", "name": "Pritha Nandi", "applyingForClass": "Class IV", "parentName": "Prasanta Nandi", "phone": "9831100014", "stage": "Enrolled", "inquiryDate": "2025-01-12", "source": "Referral", "daysInStage": 2 },
+    { "id": "ADM015", "name": "Saikat Biswas", "applyingForClass": "Class VI", "parentName": "Suresh Biswas", "phone": "9831100015", "stage": "Documents Verified", "inquiryDate": "2025-02-25", "source": "Campaign", "daysInStage": 5 },
+    { "id": "ADM016", "name": "Mitali Karmakar", "applyingForClass": "Nursery", "parentName": "Ranjit Karmakar", "phone": "9831100016", "stage": "Interview Scheduled", "inquiryDate": "2025-03-08", "source": "Walk-in", "daysInStage": 3 },
+    { "id": "ADM017", "name": "Subhajit Ghosh", "applyingForClass": "Class III", "parentName": "Alok Ghosh", "phone": "9831100017", "stage": "Offer Made", "inquiryDate": "2025-02-08", "source": "School website", "daysInStage": 4 },
+    { "id": "ADM018", "name": "Rimjhim Bhaduri", "applyingForClass": "LKG", "parentName": "Sanjib Bhaduri", "phone": "9831100018", "stage": "Application Received", "inquiryDate": "2025-03-02", "source": "Referral", "daysInStage": 6 },
+    { "id": "ADM019", "name": "Agniv Roy", "applyingForClass": "Class XII", "parentName": "Debabrata Roy", "phone": "9831100019", "stage": "Rejected", "inquiryDate": "2025-02-18", "source": "School website", "daysInStage": 0 },
+    { "id": "ADM020", "name": "Koyel Halder", "applyingForClass": "Class VII", "parentName": "Shyamal Halder", "phone": "9831100020", "stage": "Inquiry", "inquiryDate": "2025-03-10", "source": "Campaign", "daysInStage": 2 }
+  ]
+}
