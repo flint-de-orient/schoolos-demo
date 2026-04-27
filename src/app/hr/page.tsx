@@ -9,7 +9,9 @@ import {
   X, Phone, Mail, Calendar, BookOpen, Award, Check,
   ChevronRight, Download, DollarSign, Clock, TrendingUp,
   Building2, BarChart3, Banknote, FileText, AlertCircle,
-  CheckCircle2, XCircle, Plus, Briefcase, Star
+  CheckCircle2, XCircle, Plus, Briefcase, Star,
+  Brain, CalendarClock, BookMarked, Zap, RefreshCw,
+  UserCheck, UserX, AlertOctagon, AlertTriangle, Layers
 } from 'lucide-react';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
@@ -27,7 +29,7 @@ type LeaveRequest = {
   reason: string; status: 'Pending' | 'Approved' | 'Rejected';
 };
 
-type Tab = 'directory' | 'leave' | 'payroll' | 'analytics';
+type Tab = 'directory' | 'leave' | 'payroll' | 'analytics' | 'availability';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -97,6 +99,11 @@ function StaffDrawer({ staff, onClose }: { staff: Staff; onClose: () => void }) 
             <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${staff.status === 'active' ? 'bg-green/10 text-green border-green/20' : 'bg-amber/10 text-amber border-amber/20'}`}>
               {staff.status === 'active' ? 'Active' : 'On Leave'}
             </span>
+            {'employmentType' in staff && (
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${staff.employmentType === 'part-time' ? 'bg-purple/15 text-purple border-purple/25' : 'bg-teal/10 text-teal border-teal/20'}`}>
+                {staff.employmentType === 'part-time' ? 'Part-Time' : 'Full-Time'}
+              </span>
+            )}
           </div>
         </div>
 
@@ -135,6 +142,73 @@ function StaffDrawer({ staff, onClose }: { staff: Staff; onClose: () => void }) 
             );
           })}
         </div>
+
+        {/* Teaching capacity */}
+        {'teachingCapacity' in staff && Array.isArray(staff.teachingCapacity) && staff.teachingCapacity.length > 0 && (
+          <div className="p-4 border-b border-gray-100">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+              <BookMarked className="w-3 h-3" /> Teaching Capacity
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {(staff.teachingCapacity as string[]).map((subj: string) => (
+                <span key={subj} className={`text-[10px] font-semibold px-2 py-1 rounded-lg border ${subj === staff.subject ? 'bg-navy/10 text-navy border-navy/20' : 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                  {subj === staff.subject ? '★ ' : ''}{subj}
+                </span>
+              ))}
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1.5">★ = Primary subject</p>
+          </div>
+        )}
+
+        {/* Weekly availability (part-time) */}
+        {'weeklyAvailability' in staff && staff.weeklyAvailability && (
+          <div className="p-4 border-b border-gray-100">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+              <CalendarClock className="w-3 h-3" /> Weekly Availability
+            </p>
+            <div className="space-y-2">
+              {(staff.weeklyAvailability as { day: string; slots: string[] }[]).map((avail) => (
+                <div key={avail.day} className="flex items-start gap-2">
+                  <span className="text-[10px] font-bold text-purple w-20 flex-shrink-0 mt-0.5">{avail.day.slice(0,3)}</span>
+                  <div className="flex flex-wrap gap-1">
+                    {avail.slots.map((slot: string) => (
+                      <span key={slot} className="text-[10px] bg-purple/8 text-purple border border-purple/20 px-1.5 py-0.5 rounded-md font-medium">{slot}</span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Workload */}
+        {'weeklyLoad' in staff && (staff.weeklyLoad as { target: number }).target > 0 && (
+          <div className="p-4 border-b border-gray-100">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+              <Layers className="w-3 h-3" /> Teaching Load
+            </p>
+            <div className="grid grid-cols-3 gap-2 mb-2">
+              {[
+                { label: 'Weekly', value: (staff.weeklyLoad as { current: number }).current, target: (staff.weeklyLoad as { target: number }).target },
+                { label: 'Monthly', value: staff.monthlyLoad as number },
+                { label: 'Annual', value: staff.annualLoad as number },
+              ].map(s => (
+                <div key={s.label} className="bg-gray-50 rounded-lg p-2 text-center">
+                  <div className="text-sm font-sora font-bold text-navy">{s.value}</div>
+                  <div className="text-[9px] text-gray-400">{s.label} periods</div>
+                </div>
+              ))}
+            </div>
+            {(() => {
+              const curr = (staff.weeklyLoad as { current: number }).current;
+              const tgt = (staff.weeklyLoad as { target: number }).target;
+              const diff = curr - tgt;
+              if (diff > 3) return <p className="text-[10px] text-coral font-semibold flex items-center gap-1"><AlertOctagon className="w-3 h-3" />Overloaded by {diff} periods/week</p>;
+              if (diff < -3) return <p className="text-[10px] text-amber font-semibold flex items-center gap-1"><AlertTriangle className="w-3 h-3" />Underloaded by {Math.abs(diff)} periods/week</p>;
+              return <p className="text-[10px] text-green font-semibold flex items-center gap-1"><CheckCircle2 className="w-3 h-3" />Load balanced</p>;
+            })()}
+          </div>
+        )}
 
         {/* Salary breakdown */}
         <div className="p-4 border-b border-gray-100">
@@ -213,7 +287,13 @@ function AddStaffModal({ onClose, onAdd }: { onClose: () => void; onAdd: (s: Sta
       joiningDate: form.joiningDate,
       status: 'active',
       photo: null,
-    });
+      employmentType: 'full-time',
+      teachingCapacity: form.subject ? [form.subject] : [],
+      weeklyAvailability: null,
+      weeklyLoad: { current: 0, target: 28 },
+      monthlyLoad: 0,
+      annualLoad: 0,
+    } as unknown as Staff);
     toast.success(`${form.name} added to staff directory`);
     onClose();
   };
@@ -403,6 +483,21 @@ export default function HRPage() {
   const [processedIds, setProcessedIds] = useState<Set<string>>(new Set(['STF001','STF002','STF003']));
   const [payrollSearch, setPayrollSearch] = useState('');
 
+  // Availability state
+  type AvailEntry = { id: string; staffId: string; name: string; type: 'absence' | 'extra'; date: string; timeTo?: string; period: 'full-day' | 'partial' | 'multi-day'; endDate?: string; reason: string; affectedPeriods?: string[]; substitute?: string };
+  const seedAvail: AvailEntry[] = [
+    { id: 'AV001', staffId: 'STF005', name: 'Mr. Arijit Das',      type: 'absence', date: '2026-04-28', period: 'full-day',   reason: 'Medical leave', affectedPeriods: ['P3 Mathematics XI-A', 'P5 Physics X-B', 'P7 Physics IX-A'], substitute: 'Mr. Subhashis Bose' },
+    { id: 'AV002', staffId: 'STF009', name: 'Mr. Tapas Mukherjee', type: 'absence', date: '2026-04-29', timeTo: '12:00', period: 'partial', reason: 'Dentist appointment', affectedPeriods: ['P1 Geography X-A', 'P2 Geography VIII-B'] },
+    { id: 'AV003', staffId: 'STF012', name: 'Mrs. Ranjana Bhaduri', type: 'extra',  date: '2026-04-30', period: 'partial', timeTo: '14:00', reason: 'Available for extra Sanskrit classes' },
+    { id: 'AV004', staffId: 'STF010', name: 'Mrs. Swapna Dey',     type: 'absence', date: '2026-05-02', endDate: '2026-05-03', period: 'multi-day', reason: 'Family function', affectedPeriods: ['Bengali X-A', 'Bengali XI-B', 'Bengali IX-A'] },
+  ];
+  const [availEntries, setAvailEntries] = useState<AvailEntry[]>(seedAvail);
+  const [showAvailModal, setShowAvailModal] = useState(false);
+  const [availForm, setAvailForm] = useState({ staffId: '', type: 'absence' as 'absence' | 'extra', date: '', endDate: '', period: 'full-day' as 'full-day' | 'partial' | 'multi-day', timeFrom: '', timeTo: '', reason: '' });
+  const [rebalancing, setRebalancing] = useState(false);
+  const [rebalanced, setRebalanced] = useState(false);
+  const [workloadView, setWorkloadView] = useState<'week' | 'month' | 'year'>('week');
+
   // ── Derived ──
   const depts = useMemo(() => ['All', ...new Set(staffList.map(s => s.department))].sort(), [staffList]);
   const activeCount = useMemo(() => staffList.filter(s => s.status === 'active').length, [staffList]);
@@ -470,11 +565,12 @@ export default function HRPage() {
     return sum + net;
   }, 0), [staffList]);
 
-  const tabs: { id: Tab; label: string; icon: React.ElementType; badge?: number }[] = [
-    { id: 'directory', label: 'Staff Directory', icon: Users, badge: staffList.length },
-    { id: 'leave',     label: 'Leave Management', icon: Calendar, badge: pendingLeaveCount },
-    { id: 'payroll',   label: 'Payroll', icon: Banknote },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+  const tabs: { id: Tab; label: string; icon: React.ElementType; badge?: number; ai?: boolean }[] = [
+    { id: 'directory',   label: 'Staff Directory',    icon: Users, badge: staffList.length },
+    { id: 'leave',       label: 'Leave Management',   icon: Calendar, badge: pendingLeaveCount },
+    { id: 'availability',label: 'Availability & Workload', icon: CalendarClock, ai: true },
+    { id: 'payroll',     label: 'Payroll',             icon: Banknote },
+    { id: 'analytics',   label: 'Analytics',           icon: BarChart3 },
   ];
 
   const MONTHS = ['April 2026','March 2026','February 2026','January 2026','December 2025'];
@@ -522,6 +618,11 @@ export default function HRPage() {
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
                       tab.id === 'leave' && (tab.badge ?? 0) > 0 ? 'bg-amber/15 text-amber' : 'bg-gray-100 text-gray-600'
                     }`}>{tab.badge}</span>
+                  )}
+                  {tab.ai && (
+                    <span className="text-[9px] font-bold bg-teal text-white px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                      <Brain className="w-2.5 h-2.5" />AI
+                    </span>
                   )}
                 </button>
               );
@@ -599,9 +700,7 @@ export default function HRPage() {
               {/* Grid view */}
               {viewMode === 'grid' ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                  {filteredStaff.map(s => {
-                    const dept = getDept(s.department);
-                    return (
+                  {filteredStaff.map(s => (
                       <button key={s.id} onClick={() => setSelectedStaff(s)}
                         className="text-left bg-gray-50 hover:bg-white border border-gray-100 hover:border-gray-200 hover:shadow-md rounded-2xl p-4 transition-all group text-center">
                         <div className={`w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center text-white font-bold text-sm font-sora shadow-sm ${s.status === 'active' ? 'gradient-navy' : 'bg-gray-300'}`}>
@@ -610,18 +709,24 @@ export default function HRPage() {
                         <p className="font-semibold text-sm text-gray-800 leading-tight truncate">{s.name}</p>
                         <p className="text-xs text-gray-500 mt-0.5 truncate">{s.designation}</p>
                         {s.subject && <p className="text-[10px] text-navyMid mt-0.5 truncate">{s.subject}</p>}
-                        <div className="mt-2.5 flex justify-center gap-1.5 flex-wrap">
-                          <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${dept.bg} ${dept.color} ${dept.border}`}>{s.department}</span>
+                        <div className="mt-2.5 flex justify-center gap-1 flex-wrap">
+                          <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${'employmentType' in s && s.employmentType === 'part-time' ? 'bg-purple/10 text-purple border-purple/20' : 'bg-teal/8 text-teal border-teal/15'}`}>
+                            {'employmentType' in s && s.employmentType === 'part-time' ? 'Part-Time' : 'Full-Time'}
+                          </span>
                           <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${s.status === 'active' ? 'bg-green/8 text-green border-green/20' : 'bg-amber/8 text-amber border-amber/20'}`}>
                             {s.status === 'active' ? 'Active' : 'On Leave'}
                           </span>
                         </div>
+                        {'teachingCapacity' in s && Array.isArray(s.teachingCapacity) && s.teachingCapacity.length > 0 && (
+                          <p className="text-[9px] text-gray-400 mt-1 truncate">
+                            {(s.teachingCapacity as string[]).slice(0, 2).join(' · ')}{(s.teachingCapacity as string[]).length > 2 ? ` +${(s.teachingCapacity as string[]).length - 2}` : ''}
+                          </p>
+                        )}
                         <div className="mt-2 text-[10px] text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-0.5">
                           View profile <ChevronRight className="w-3 h-3" />
                         </div>
                       </button>
-                    );
-                  })}
+                  ))}
                 </div>
               ) : (
                 /* List view */
@@ -1040,6 +1145,277 @@ export default function HRPage() {
             </div>
           )}
 
+          {/* ── Availability & Workload ── */}
+          {activeTab === 'availability' && (
+            <div className="space-y-6">
+
+              {/* Header row */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-sora font-semibold text-navy flex items-center gap-2">
+                    Availability & Workload Manager
+                    <span className="text-[9px] font-bold bg-teal text-white px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Brain className="w-2.5 h-2.5" />AI</span>
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-0.5">Log sudden absences, extra availability, and auto-rebalance class assignments</p>
+                </div>
+                <button onClick={() => setShowAvailModal(true)}
+                  className="flex items-center gap-1.5 bg-gold text-navy font-sora font-bold text-xs px-3 py-2 rounded-xl hover:bg-gold/90 transition-colors">
+                  <Plus className="w-3.5 h-3.5" /> Log Availability Change
+                </button>
+              </div>
+
+              {/* Summary pills */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: 'Absences Today', value: availEntries.filter(a => a.type === 'absence' && a.date === '2026-04-28').length, color: 'text-coral', bg: 'bg-coral/8', icon: UserX },
+                  { label: 'Extra Available', value: availEntries.filter(a => a.type === 'extra').length, color: 'text-green', bg: 'bg-green/8', icon: UserCheck },
+                  { label: 'Overloaded Teachers', value: staffList.filter(s => 'weeklyLoad' in s && (s.weeklyLoad as { current: number; target: number }).current > (s.weeklyLoad as { current: number; target: number }).target + 3 && (s.weeklyLoad as { target: number }).target > 0).length, color: 'text-amber', bg: 'bg-amber/8', icon: AlertTriangle },
+                  { label: 'Part-Time Staff', value: staffList.filter(s => 'employmentType' in s && s.employmentType === 'part-time').length, color: 'text-purple', bg: 'bg-purple/8', icon: CalendarClock },
+                ].map(stat => {
+                  const Icon = stat.icon;
+                  return (
+                    <div key={stat.label} className={`${stat.bg} rounded-xl p-4 flex items-center gap-3`}>
+                      <Icon className={`w-5 h-5 ${stat.color} flex-shrink-0`} />
+                      <div>
+                        <div className={`text-2xl font-sora font-bold ${stat.color}`}>{stat.value}</div>
+                        <div className="text-xs text-gray-500">{stat.label}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Active availability changes */}
+              <div>
+                <h4 className="font-sora font-semibold text-navy text-sm mb-3">Active Availability Changes</h4>
+                <div className="space-y-3">
+                  {availEntries.map(entry => {
+                    const isAbsence = entry.type === 'absence';
+                    return (
+                      <div key={entry.id} className={`border rounded-2xl p-4 ${isAbsence ? 'border-coral/20 bg-coral/3' : 'border-green/20 bg-green/3'}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3">
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${isAbsence ? 'bg-coral/15' : 'bg-green/15'}`}>
+                              {isAbsence ? <UserX className={`w-4 h-4 text-coral`} /> : <UserCheck className="w-4 h-4 text-green" />}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-sm font-semibold text-gray-800">{entry.name}</p>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isAbsence ? 'bg-coral/15 text-coral' : 'bg-green/15 text-green'}`}>
+                                  {isAbsence ? 'ABSENT' : 'EXTRA AVAILABLE'}
+                                </span>
+                                <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">
+                                  {entry.period === 'multi-day' ? `${entry.date} – ${entry.endDate}` : entry.date}
+                                  {entry.period === 'partial' && entry.timeTo && ` until ${entry.timeTo}`}
+                                  {entry.period === 'full-day' && ' · All day'}
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-500 mt-0.5">{entry.reason}</p>
+                              {entry.affectedPeriods && (
+                                <div className="flex flex-wrap gap-1 mt-2">
+                                  <span className="text-[10px] text-gray-400">Affected:</span>
+                                  {entry.affectedPeriods.map(p => (
+                                    <span key={p} className="text-[10px] bg-coral/8 text-coral border border-coral/15 px-1.5 py-0.5 rounded-md">{p}</span>
+                                  ))}
+                                </div>
+                              )}
+                              {entry.substitute && (
+                                <div className="flex items-center gap-1.5 mt-2">
+                                  <CheckCircle2 className="w-3 h-3 text-green" />
+                                  <span className="text-[10px] text-green font-semibold">AI Substitute: {entry.substitute}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {isAbsence && !entry.substitute && (
+                              <button
+                                onClick={() => {
+                                  setAvailEntries(prev => prev.map(e => e.id === entry.id ? { ...e, substitute: 'AI-Assigned' } : e));
+                                  toast.success('AI assigned substitute teacher', { description: 'WhatsApp notification sent to substitute' });
+                                }}
+                                className="text-[10px] font-semibold bg-teal/10 text-teal border border-teal/20 px-2 py-1 rounded-lg hover:bg-teal/20 transition-colors flex items-center gap-1">
+                                <Brain className="w-3 h-3" /> Assign Sub
+                              </button>
+                            )}
+                            <button
+                              onClick={() => {
+                                setAvailEntries(prev => prev.filter(e => e.id !== entry.id));
+                                toast.success('Entry removed');
+                              }}
+                              className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {availEntries.length === 0 && (
+                    <div className="text-center py-8 bg-gray-50 rounded-2xl border border-gray-100">
+                      <CheckCircle2 className="w-8 h-8 text-green/40 mx-auto mb-2" />
+                      <p className="text-sm text-gray-400">No active availability changes</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Part-time availability grid */}
+              <div>
+                <h4 className="font-sora font-semibold text-navy text-sm mb-3">Part-Time Teacher Weekly Availability</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {staffList.filter(s => 'employmentType' in s && s.employmentType === 'part-time' && s.weeklyAvailability).map(s => {
+                    const avail = s.weeklyAvailability as { day: string; slots: string[] }[];
+                    const dept = getDept(s.department);
+                    return (
+                      <div key={s.id} className="border border-gray-100 rounded-2xl overflow-hidden">
+                        <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border-b border-gray-100">
+                          <div className="w-8 h-8 rounded-lg bg-navy flex items-center justify-center flex-shrink-0">
+                            <span className="text-white text-[10px] font-bold font-sora">{getInitials(s.name)}</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-800 truncate">{s.name}</p>
+                            <p className="text-[10px] text-gray-400">{s.subject} · <span className="text-purple font-semibold">Part-Time</span></p>
+                          </div>
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border flex-shrink-0 ${dept.bg} ${dept.color} ${dept.border}`}>{s.department}</span>
+                        </div>
+                        <div className="p-3 space-y-2">
+                          {avail.map((a) => (
+                            <div key={a.day} className="flex items-center gap-3">
+                              <span className="text-[10px] font-bold text-gray-500 w-8">{a.day.slice(0,3)}</span>
+                              <div className="flex flex-wrap gap-1.5 flex-1">
+                                {a.slots.map((slot) => (
+                                  <span key={slot} className="text-[10px] bg-purple/8 text-purple border border-purple/15 px-2 py-1 rounded-lg font-medium">{slot}</span>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                          <div className="pt-1 border-t border-gray-50 flex items-center justify-between">
+                            <span className="text-[10px] text-gray-400">Capacity: {(s.teachingCapacity as string[]).join(', ')}</span>
+                            <button onClick={() => toast.success(`Availability updated for ${s.name}`)}
+                              className="text-[10px] font-semibold text-teal hover:text-navy transition-colors">Edit</button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Workload balance */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-sora font-semibold text-navy text-sm flex items-center gap-2">
+                    Class Assignment Workload Balance
+                    <span className="text-[9px] font-bold bg-teal text-white px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Brain className="w-2.5 h-2.5" />AI</span>
+                  </h4>
+                  <div className="flex items-center gap-2">
+                    <div className="flex bg-gray-100 rounded-lg p-0.5">
+                      {(['week', 'month', 'year'] as const).map(v => (
+                        <button key={v} onClick={() => setWorkloadView(v)}
+                          className={`px-2.5 py-1 text-[10px] font-semibold rounded-md capitalize transition-all ${workloadView === v ? 'bg-white shadow-sm text-navy' : 'text-gray-500'}`}>
+                          {v}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => {
+                        setRebalancing(true);
+                        setTimeout(() => { setRebalancing(false); setRebalanced(true); toast.success('AI rebalanced class assignments', { description: '3 teachers adjusted · Timetable updated' }); }, 2200);
+                      }}
+                      disabled={rebalancing}
+                      className="flex items-center gap-1.5 bg-navy text-white text-xs font-semibold px-3 py-2 rounded-xl hover:bg-navyMid disabled:opacity-60 transition-all">
+                      {rebalancing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+                      {rebalancing ? 'Rebalancing…' : 'Auto Re-balance'}
+                    </button>
+                  </div>
+                </div>
+
+                {rebalanced && (
+                  <div className="bg-green/5 border border-green/20 rounded-xl p-3 mb-3 flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-green flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-semibold text-green">AI Rebalanced Successfully</p>
+                      <p className="text-[10px] text-gray-600 mt-0.5">Mr. Prosenjit Chatterjee: +4 periods · Mrs. Pamela Sen: +6 periods · Mr. Arijit Das: −6 periods (overload resolved). Timetable regenerated and WhatsApp notifications sent.</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="overflow-x-auto rounded-xl border border-gray-100">
+                  <table className="w-full min-w-[600px]">
+                    <thead className="bg-gray-50 border-b border-gray-100">
+                      <tr>
+                        {['Teacher', 'Type', 'Subject', 'Current Periods', 'Target', 'Balance', 'Status'].map(h => (
+                          <th key={h} className="text-left text-xs uppercase tracking-wide text-gray-400 px-4 py-3 font-medium">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {staffList.filter(s => 'weeklyLoad' in s && (s.weeklyLoad as { target: number }).target > 0).map((s, i) => {
+                        const load = s.weeklyLoad as { current: number; target: number };
+                        const current = rebalanced
+                          ? (s.id === 'STF007' ? load.current + 4 : s.id === 'STF008' ? load.current + 6 : s.id === 'STF005' ? load.current - 6 : load.current)
+                          : load.current;
+                        const diff = current - load.target;
+                        const displayVal = workloadView === 'week' ? current : workloadView === 'month' ? current * 4 : current * 40;
+                        const targetVal = workloadView === 'week' ? load.target : workloadView === 'month' ? load.target * 4 : load.target * 40;
+                        return (
+                          <tr key={s.id} className={`border-b border-gray-50 hover:bg-gray-50/60 ${i % 2 !== 0 ? 'bg-gray-50/20' : ''}`}>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-lg bg-navy flex items-center justify-center flex-shrink-0">
+                                  <span className="text-white text-[10px] font-bold">{getInitials(s.name)}</span>
+                                </div>
+                                <span className="text-sm font-semibold text-gray-800">{s.name}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${'employmentType' in s && s.employmentType === 'part-time' ? 'bg-purple/10 text-purple' : 'bg-teal/8 text-teal'}`}>
+                                {'employmentType' in s ? (s.employmentType === 'part-time' ? 'Part-Time' : 'Full-Time') : 'Full-Time'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-xs text-gray-500">{s.subject ?? '—'}</td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                  <div className={`h-full rounded-full transition-all ${diff > 3 ? 'bg-coral' : diff < -3 ? 'bg-amber' : 'bg-green'}`}
+                                    style={{ width: `${Math.min((displayVal / (targetVal * 1.3)) * 100, 100)}%` }} />
+                                </div>
+                                <span className="text-sm font-bold text-gray-700 tabular-nums">{displayVal}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-500">{targetVal}</td>
+                            <td className="px-4 py-3">
+                              <span className={`text-xs font-bold tabular-nums ${diff > 0 ? 'text-coral' : diff < 0 ? 'text-amber' : 'text-green'}`}>
+                                {diff > 0 ? `+${diff}` : diff < 0 ? diff : '±0'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              {diff > 3 ? (
+                                <span className="text-[10px] font-semibold bg-coral/10 text-coral px-2 py-0.5 rounded-full flex items-center gap-1 w-fit">
+                                  <AlertOctagon className="w-3 h-3" /> Overloaded
+                                </span>
+                              ) : diff < -3 ? (
+                                <span className="text-[10px] font-semibold bg-amber/10 text-amber px-2 py-0.5 rounded-full flex items-center gap-1 w-fit">
+                                  <AlertTriangle className="w-3 h-3" /> Underloaded
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-semibold bg-green/10 text-green px-2 py-0.5 rounded-full flex items-center gap-1 w-fit">
+                                  <CheckCircle2 className="w-3 h-3" /> Balanced
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+          )}
+
         </div>
       </div>
 
@@ -1047,6 +1423,124 @@ export default function HRPage() {
       {selectedStaff && <StaffDrawer staff={selectedStaff} onClose={() => setSelectedStaff(null)} />}
       {showAddStaff && <AddStaffModal onClose={() => setShowAddStaff(false)} onAdd={s => setStaffList(prev => [s, ...prev])} />}
       {showApplyLeave && <ApplyLeaveModal staff={staffList} onClose={() => setShowApplyLeave(false)} onApply={l => setLeaveRequests(prev => [l, ...prev])} />}
+
+      {/* Log Availability Modal */}
+      {showAvailModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <div>
+                <h2 className="font-sora font-bold text-navy text-lg">Log Availability Change</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Record sudden absence or extra availability</p>
+              </div>
+              <button onClick={() => setShowAvailModal(false)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              {/* Type toggle */}
+              <div>
+                <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Change Type</label>
+                <div className="flex gap-2">
+                  {(['absence', 'extra'] as const).map(t => (
+                    <button key={t} onClick={() => setAvailForm(f => ({ ...f, type: t }))}
+                      className={`flex-1 py-2.5 text-sm font-semibold rounded-xl border transition-all ${availForm.type === t
+                        ? t === 'absence' ? 'bg-coral text-white border-coral' : 'bg-green text-white border-green'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}>
+                      {t === 'absence' ? '🚫 Sudden Absence' : '✅ Extra Availability'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Staff */}
+              <div>
+                <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Staff Member</label>
+                <select value={availForm.staffId} onChange={e => setAvailForm(f => ({ ...f, staffId: e.target.value }))}
+                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-navy/20">
+                  <option value="">Select teacher...</option>
+                  {staffList.filter(s => s.subject).map(s => <option key={s.id} value={s.id}>{s.name} — {s.subject}</option>)}
+                </select>
+              </div>
+
+              {/* Period */}
+              <div>
+                <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Duration</label>
+                <div className="flex gap-2">
+                  {(['full-day', 'partial', 'multi-day'] as const).map(p => (
+                    <button key={p} onClick={() => setAvailForm(f => ({ ...f, period: p }))}
+                      className={`flex-1 py-2 text-xs font-semibold rounded-xl border capitalize transition-all ${availForm.period === p ? 'bg-navy text-white border-navy' : 'bg-white text-gray-600 border-gray-200'}`}>
+                      {p === 'full-day' ? 'Full Day' : p === 'partial' ? 'Partial' : 'Multi-Day'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Date(s) */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-gray-700 mb-1.5 block">{availForm.period === 'multi-day' ? 'From' : 'Date'}</label>
+                  <input type="date" value={availForm.date} onChange={e => setAvailForm(f => ({ ...f, date: e.target.value }))}
+                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20" />
+                </div>
+                {availForm.period === 'multi-day' ? (
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700 mb-1.5 block">To</label>
+                    <input type="date" value={availForm.endDate} onChange={e => setAvailForm(f => ({ ...f, endDate: e.target.value }))}
+                      className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20" />
+                  </div>
+                ) : availForm.period === 'partial' ? (
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Until Time</label>
+                    <input type="time" value={availForm.timeTo} onChange={e => setAvailForm(f => ({ ...f, timeTo: e.target.value }))}
+                      className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20" />
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Reason */}
+              <div>
+                <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Reason</label>
+                <input type="text" placeholder="Brief reason..." value={availForm.reason} onChange={e => setAvailForm(f => ({ ...f, reason: e.target.value }))}
+                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20" />
+              </div>
+
+              {availForm.type === 'absence' && (
+                <div className="bg-teal/5 border border-teal/20 rounded-xl p-3 flex items-start gap-2">
+                  <Brain className="w-4 h-4 text-teal flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-gray-600">AI will automatically find a substitute from teachers with matching subject capacity and flag affected periods for reassignment.</p>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-3 p-5 border-t border-gray-100">
+              <button onClick={() => setShowAvailModal(false)} className="flex-1 py-2.5 text-sm font-semibold text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">Cancel</button>
+              <button
+                onClick={() => {
+                  if (!availForm.staffId || !availForm.date) { toast.error('Please fill in all required fields'); return; }
+                  const s = staffList.find(x => x.id === availForm.staffId)!;
+                  setAvailEntries(prev => [{
+                    id: `AV${Date.now()}`,
+                    staffId: availForm.staffId,
+                    name: s.name,
+                    type: availForm.type,
+                    date: availForm.date,
+                    endDate: availForm.endDate || undefined,
+                    timeTo: availForm.timeTo || undefined,
+                    period: availForm.period,
+                    reason: availForm.reason || 'Not specified',
+                    substitute: availForm.type === 'absence' ? 'AI-Assigned' : undefined,
+                  }, ...prev]);
+                  setShowAvailModal(false);
+                  setAvailForm({ staffId: '', type: 'absence', date: '', endDate: '', period: 'full-day', timeFrom: '', timeTo: '', reason: '' });
+                  toast.success(`${availForm.type === 'absence' ? 'Absence logged' : 'Availability logged'} for ${s.name}`, {
+                    description: availForm.type === 'absence' ? 'AI is finding substitute · Affected periods flagged' : 'Timetable updated with extra slots',
+                  });
+                }}
+                className="flex-1 py-2.5 text-sm font-semibold bg-navy text-white rounded-xl hover:bg-navyMid transition-colors">
+                Log Change
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </PageWrapper>
   );
 }

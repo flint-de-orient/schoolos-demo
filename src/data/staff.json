@@ -12,7 +12,13 @@
     "email": "principal@sundarbanacademy.edu.in",
     "salary": 95000,
     "leaveBalance": 18,
-    "status": "active"
+    "status": "active",
+    "employmentType": "full-time",
+    "teachingCapacity": [],
+    "weeklyAvailability": null,
+    "weeklyLoad": { "current": 0, "target": 0 },
+    "monthlyLoad": 0,
+    "annualLoad": 0
   },
   {
     "id": "STF002",
@@ -27,7 +33,13 @@
     "email": "vp@sundarbanacademy.edu.in",
     "salary": 75000,
     "leaveBalance": 14,
-    "status": "active"
+    "status": "active",
+    "employmentType": "full-time",
+    "teachingCapacity": ["English", "History", "Social Studies"],
+    "weeklyAvailability": null,
+    "weeklyLoad": { "current": 16, "target": 18 },
+    "monthlyLoad": 64,
+    "annualLoad": 448
   },
   {
     "id": "STF003",
@@ -42,7 +54,13 @@
     "email": "s.bose@sundarbanacademy.edu.in",
     "salary": 58000,
     "leaveBalance": 10,
-    "status": "active"
+    "status": "active",
+    "employmentType": "full-time",
+    "teachingCapacity": ["Mathematics", "Computer Science", "Statistics"],
+    "weeklyAvailability": null,
+    "weeklyLoad": { "current": 30, "target": 28 },
+    "monthlyLoad": 120,
+    "annualLoad": 840
   },
   {
     "id": "STF004",
@@ -57,7 +75,13 @@
     "email": "m.roy@sundarbanacademy.edu.in",
     "salary": 50000,
     "leaveBalance": 12,
-    "status": "active"
+    "status": "active",
+    "employmentType": "full-time",
+    "teachingCapacity": ["English", "Hindi", "Social Studies"],
+    "weeklyAvailability": null,
+    "weeklyLoad": { "current": 26, "target": 28 },
+    "monthlyLoad": 104,
+    "annualLoad": 728
   },
   {
     "id": "STF005",
@@ -72,7 +96,13 @@
     "email": "a.das@sundarbanacademy.edu.in",
     "salary": 54000,
     "leaveBalance": 8,
-    "status": "on-leave"
+    "status": "on-leave",
+    "employmentType": "full-time",
+    "teachingCapacity": ["Physics", "Mathematics", "Science", "Computer Science"],
+    "weeklyAvailability": null,
+    "weeklyLoad": { "current": 34, "target": 28 },
+    "monthlyLoad": 136,
+    "annualLoad": 952
   },
   {
     "id": "STF006",
@@ -87,7 +117,13 @@
     "email": "s.ghosh@sundarbanacademy.edu.in",
     "salary": 54000,
     "leaveBalance": 15,
-    "status": "active"
+    "status": "active",
+    "employmentType": "full-time",
+    "teachingCapacity": ["Chemistry", "Science", "Biology", "Environmental Science"],
+    "weeklyAvailability": null,
+    "weeklyLoad": { "current": 28, "target": 28 },
+    "monthlyLoad": 112,
+    "annualLoad": 784
   },
   {
     "id": "STF007",
@@ -102,7 +138,13 @@
     "email": "p.chatterjee@sundarbanacademy.edu.in",
     "salary": 50000,
     "leaveBalance": 11,
-    "status": "active"
+    "status": "active",
+    "employmentType": "full-time",
+    "teachingCapacity": ["Biology", "Science", "Geography", "Environmental Science"],
+    "weeklyAvailability": null,
+    "weeklyLoad": { "current": 22, "target": 28 },
+    "monthlyLoad": 88,
+    "annualLoad": 616
   },
   {
     "id": "STF008",
@@ -117,7 +159,13 @@
     "email": "p.sen@sundarbanacademy.edu.in",
     "salary": 48000,
     "leaveBalance": 13,
-    "status": "active"
+    "status": "active",
+    "employmentType": "full-time",
+    "teachingCapacity": ["History", "Geography", "Social Studies", "Civics"],
+    "weeklyAvailability": null,
+    "weeklyLoad": { "current": 20, "target": 28 },
+    "monthlyLoad": 80,
+    "annualLoad": 560
   },
   {
     "id": "STF009",
@@ -132,7 +180,13 @@
     "email": "t.mukherjee@sundarbanacademy.edu.in",
     "salary": 47000,
     "leaveBalance": 16,
-    "status": "active"
+    "status": "active",
+    "employmentType": "full-time",
+    "teachingCapacity": ["Geography", "History", "Environmental Science", "Social Studies"],
+    "weeklyAvailability": null,
+    "weeklyLoad": { "current": 30, "target": 28 },
+    "monthlyLoad": 120,
+    "annualLoad": 840
   },
   {
     "id": "STF010",
@@ -147,7 +201,13 @@
     "email": "s.dey@sundarbanacademy.edu.in",
     "salary": 49000,
     "leaveBalance": 9,
-    "status": "active"
+    "status": "active",
+    "employmentType": "full-time",
+    "teachingCapacity": ["Bengali", "Sanskrit", "Hindi", "English"],
+    "weeklyAvailability": null,
+    "weeklyLoad": { "current": 28, "target": 28 },
+    "monthlyLoad": 112,
+    "annualLoad": 784
   },
   {
     "id": "STF011",
@@ -162,7 +222,17 @@
     "email": "d.pal@sundarbanacademy.edu.in",
     "salary": 52000,
     "leaveBalance": 14,
-    "status": "active"
+    "status": "active",
+    "employmentType": "part-time",
+    "teachingCapacity": ["Computer Science", "Mathematics", "Statistics"],
+    "weeklyAvailability": [
+      { "day": "Monday",    "slots": ["09:00–11:00", "11:00–13:00"] },
+      { "day": "Wednesday", "slots": ["09:00–11:00", "11:00–13:00"] },
+      { "day": "Friday",    "slots": ["09:00–11:00", "11:00–13:00"] }
+    ],
+    "weeklyLoad": { "current": 14, "target": 15 },
+    "monthlyLoad": 56,
+    "annualLoad": 392
   },
   {
     "id": "STF012",
@@ -177,7 +247,17 @@
     "email": "r.bhaduri@sundarbanacademy.edu.in",
     "salary": 46000,
     "leaveBalance": 12,
-    "status": "active"
+    "status": "active",
+    "employmentType": "part-time",
+    "teachingCapacity": ["Sanskrit", "Bengali", "Hindi"],
+    "weeklyAvailability": [
+      { "day": "Tuesday",   "slots": ["09:00–11:00", "11:00–14:00"] },
+      { "day": "Thursday",  "slots": ["09:00–11:00", "11:00–14:00"] },
+      { "day": "Saturday",  "slots": ["09:00–12:00"] }
+    ],
+    "weeklyLoad": { "current": 10, "target": 12 },
+    "monthlyLoad": 40,
+    "annualLoad": 280
   },
   {
     "id": "STF013",
@@ -192,7 +272,17 @@
     "email": "k.mitra@sundarbanacademy.edu.in",
     "salary": 44000,
     "leaveBalance": 10,
-    "status": "active"
+    "status": "active",
+    "employmentType": "part-time",
+    "teachingCapacity": ["Physical Education", "Health & Fitness", "Sports"],
+    "weeklyAvailability": [
+      { "day": "Monday",    "slots": ["08:00–10:00", "10:00–12:00"] },
+      { "day": "Wednesday", "slots": ["08:00–10:00", "10:00–12:00"] },
+      { "day": "Friday",    "slots": ["08:00–10:00", "10:00–12:00"] }
+    ],
+    "weeklyLoad": { "current": 12, "target": 12 },
+    "monthlyLoad": 48,
+    "annualLoad": 336
   },
   {
     "id": "STF014",
@@ -207,7 +297,16 @@
     "email": "p.mondal@sundarbanacademy.edu.in",
     "salary": 42000,
     "leaveBalance": 15,
-    "status": "active"
+    "status": "active",
+    "employmentType": "part-time",
+    "teachingCapacity": ["Music", "Arts", "Cultural Activities"],
+    "weeklyAvailability": [
+      { "day": "Tuesday",   "slots": ["10:00–13:00", "13:00–15:00"] },
+      { "day": "Thursday",  "slots": ["10:00–13:00", "13:00–15:00"] }
+    ],
+    "weeklyLoad": { "current": 8, "target": 10 },
+    "monthlyLoad": 32,
+    "annualLoad": 224
   },
   {
     "id": "STF015",
@@ -222,7 +321,13 @@
     "email": "admin@sundarbanacademy.edu.in",
     "salary": 40000,
     "leaveBalance": 11,
-    "status": "active"
+    "status": "active",
+    "employmentType": "full-time",
+    "teachingCapacity": [],
+    "weeklyAvailability": null,
+    "weeklyLoad": { "current": 0, "target": 0 },
+    "monthlyLoad": 0,
+    "annualLoad": 0
   },
   {
     "id": "STF016",
@@ -237,7 +342,13 @@
     "email": "accounts@sundarbanacademy.edu.in",
     "salary": 32000,
     "leaveBalance": 13,
-    "status": "active"
+    "status": "active",
+    "employmentType": "full-time",
+    "teachingCapacity": [],
+    "weeklyAvailability": null,
+    "weeklyLoad": { "current": 0, "target": 0 },
+    "monthlyLoad": 0,
+    "annualLoad": 0
   },
   {
     "id": "STF017",
@@ -252,7 +363,13 @@
     "email": "bikash.c@sundarbanacademy.edu.in",
     "salary": 18000,
     "leaveBalance": 8,
-    "status": "active"
+    "status": "active",
+    "employmentType": "full-time",
+    "teachingCapacity": [],
+    "weeklyAvailability": null,
+    "weeklyLoad": { "current": 0, "target": 0 },
+    "monthlyLoad": 0,
+    "annualLoad": 0
   },
   {
     "id": "STF018",
@@ -267,7 +384,13 @@
     "email": "ramen.g@sundarbanacademy.edu.in",
     "salary": 16000,
     "leaveBalance": 6,
-    "status": "active"
+    "status": "active",
+    "employmentType": "full-time",
+    "teachingCapacity": [],
+    "weeklyAvailability": null,
+    "weeklyLoad": { "current": 0, "target": 0 },
+    "monthlyLoad": 0,
+    "annualLoad": 0
   },
   {
     "id": "STF019",
@@ -282,7 +405,13 @@
     "email": "library@sundarbanacademy.edu.in",
     "salary": 35000,
     "leaveBalance": 12,
-    "status": "active"
+    "status": "active",
+    "employmentType": "full-time",
+    "teachingCapacity": [],
+    "weeklyAvailability": null,
+    "weeklyLoad": { "current": 0, "target": 0 },
+    "monthlyLoad": 0,
+    "annualLoad": 0
   },
   {
     "id": "STF020",
@@ -297,6 +426,12 @@
     "email": "nurse@sundarbanacademy.edu.in",
     "salary": 30000,
     "leaveBalance": 10,
-    "status": "active"
+    "status": "active",
+    "employmentType": "full-time",
+    "teachingCapacity": [],
+    "weeklyAvailability": null,
+    "weeklyLoad": { "current": 0, "target": 0 },
+    "monthlyLoad": 0,
+    "annualLoad": 0
   }
 ]
