@@ -33,6 +33,7 @@ const navGroups = [
     label: 'Learning',
     items: [
       { href: '/academics', label: 'Academics', icon: GraduationCap },
+      { href: '/exam-engine', label: 'Exam Engine', icon: FileText, ai: true as const },
       { href: '/library', label: 'Library', icon: Library },
     ],
   },

@@ -1,0 +1,546 @@
+{
+  "plans": [
+    {
+      "id": "LP001",
+      "class": "Class X",
+      "subject": "Mathematics",
+      "chapter": "Quadratic Equations",
+      "topic": "Nature of Roots using Discriminant",
+      "duration": 45,
+      "objectives": [
+        "Students will be able to calculate the discriminant b²-4ac for any quadratic equation",
+        "Students will identify and interpret three types of roots: two distinct real roots, two equal real roots, no real roots",
+        "Students will apply discriminant to determine nature of roots without fully solving the equation",
+        "Students will solve problems where the discriminant is used to find unknown constants"
+      ],
+      "warmup": {
+        "activity": "Quick recall: solve x² - 5x + 6 = 0 by factorisation on mini whiteboards. Class discusses: what happens when an equation cannot be factorised? Two volunteers share attempts on the board.",
+        "duration": 5
+      },
+      "mainTeaching": [
+        {
+          "step": 1,
+          "content": "Derive the quadratic formula from ax² + bx + c = 0 by completing the square. Highlight the expression under the square root: b² - 4ac. Name it 'discriminant' (symbol D). Explain its role in determining what kind of roots exist.",
+          "duration": 8,
+          "method": "Direct instruction with derivation on board"
+        },
+        {
+          "step": 2,
+          "content": "Case 1: D > 0 — two distinct real roots (rational if D is a perfect square, irrational otherwise). Case 2: D = 0 — two equal real roots (one repeated root). Case 3: D < 0 — no real roots (complex/imaginary roots). Present as a clear table on the board.",
+          "duration": 7,
+          "method": "Board demonstration with colour-coded table"
+        },
+        {
+          "step": 3,
+          "content": "Worked Example 1: x² - 7x + 10 = 0. D = 49 - 40 = 9 > 0. Two distinct real roots. Verify by solving: roots 5 and 2.",
+          "duration": 4,
+          "method": "Guided worked example"
+        },
+        {
+          "step": 4,
+          "content": "Worked Example 2: x² - 4x + 4 = 0. D = 16 - 16 = 0. Equal real roots. Root = 4/2 = 2 (repeated).",
+          "duration": 4,
+          "method": "Guided worked example"
+        },
+        {
+          "step": 5,
+          "content": "Worked Example 3: x² + x + 1 = 0. D = 1 - 4 = -3 < 0. No real roots. Discuss why the parabola does not cross the x-axis (connect with graphing).",
+          "duration": 4,
+          "method": "Guided worked example with graph sketch"
+        },
+        {
+          "step": 6,
+          "content": "Inverse problem: For the equation 2x² - kx + 3 = 0 to have equal roots, find k. D = 0 → k² - 24 = 0 → k = ±2√6. Students attempt similar problem independently: 3x² - 6x + k = 0 has equal roots, find k.",
+          "duration": 8,
+          "method": "Scaffolded independent practice"
+        }
+      ],
+      "activity": {
+        "name": "Root Detective",
+        "description": "Students receive 6 equation cards (prepared on cardstock). Without solving, they classify each as having distinct real / equal real / no real roots using the discriminant and justify with calculations. Pairs compare and discuss any disagreements. Debrief: one pair presents each equation's classification with reasoning.",
+        "duration": 5,
+        "groupSize": "Pairs"
+      },
+      "formativeQuestion": "For kx² - 2x + 1 = 0 to have equal roots, find k. Write answer on sticky note and post on exit-ticket wall.",
+      "homework": "Exercise 5.3: Questions 1-10 (discriminant). Bonus challenge: create 2 equations of your own — one with real distinct roots and one with no real roots. State the discriminant for each.",
+      "resources": ["CISCE Mathematics Class X — Chapter 5 (Quadratic Equations)", "Mini whiteboards for warm-up", "Colour-coded equation cards for Root Detective activity", "Graph sketches (pre-drawn parabolas for visual link)"],
+      "bloomsDistribution": {"Remember": 10, "Understand": 20, "Apply": 45, "Analyse": 25, "Evaluate": 0, "Create": 0},
+      "difficultyLevel": "medium",
+      "estimatedPrep": 15,
+      "teacherName": "Mr. Subhashis Bose",
+      "createdBy": "AI",
+      "createdDate": "2025-04-08",
+      "status": "approved",
+      "tags": ["quadratic equations", "discriminant", "algebra", "nature of roots"]
+    },
+    {
+      "id": "LP002",
+      "class": "Class X",
+      "subject": "Mathematics",
+      "chapter": "Statistics",
+      "topic": "Ogive Construction and Reading Median",
+      "duration": 45,
+      "objectives": [
+        "Students will construct a less-than ogive from a given frequency distribution table",
+        "Students will correctly plot cumulative frequency against upper class boundaries",
+        "Students will read the median, quartiles (Q1, Q3) and inter-quartile range from an ogive",
+        "Students will compare less-than and more-than ogives and identify their intersection point"
+      ],
+      "warmup": {
+        "activity": "Recap: Students identify mean, median and mode from a small ungrouped dataset written on the board. Class votes: 'Which average is most useful for grouped data?' — brief discussion to motivate the ogive method.",
+        "duration": 5
+      },
+      "mainTeaching": [
+        {
+          "step": 1,
+          "content": "Define ogive (cumulative frequency curve). Distinguish between less-than and more-than types. Show a completed example ogive on chart paper — point out shape (S-curve), axes labels, and scale selection.",
+          "duration": 6,
+          "method": "Direct instruction with pre-prepared chart"
+        },
+        {
+          "step": 2,
+          "content": "Demonstrate constructing the cumulative frequency table from a given class-interval table (daily wages example: 200-250, 250-300, 300-350, 350-400, 400-450 with frequencies 6, 10, 14, 12, 8). Compute running totals on the board, narrating each step aloud.",
+          "duration": 6,
+          "method": "Teacher demonstration with student participation"
+        },
+        {
+          "step": 3,
+          "content": "Plot the less-than ogive on the board using graph paper (projected or on chart). Mark points using upper class boundaries on x-axis and cumulative frequencies on y-axis. Connect with a smooth freehand curve. Emphasise that points are NOT connected with straight lines.",
+          "duration": 8,
+          "method": "Board demonstration — step-by-step plotting"
+        },
+        {
+          "step": 4,
+          "content": "Reading the median: n = 50, so median is at cumulative frequency = 25. Draw a horizontal line from cf = 25 to the curve, then a vertical line to x-axis. Read off the value (~₹337). Explain this as the value below which 50% of data lies.",
+          "duration": 5,
+          "method": "Guided reading with board compass and ruler"
+        },
+        {
+          "step": 5,
+          "content": "Extension: Reading Q1 (at n/4 = 12.5) and Q3 (at 3n/4 = 37.5). Calculate inter-quartile range. Show how more-than ogive intersects less-than at the median — plot 2-3 more-than points on same graph to demonstrate.",
+          "duration": 7,
+          "method": "Extension demonstration for advanced students"
+        }
+      ],
+      "activity": {
+        "name": "Plot Your Own Ogive",
+        "description": "Each student receives a fresh frequency distribution table on a worksheet (ages of visitors at a museum or marks in a class test). Students individually construct cumulative frequency tables, plot less-than ogives on graph paper, and read off the median. They then swap with a partner to check ogive accuracy and median reading. Teacher circulates checking scale choices and curve smoothness.",
+        "duration": 8,
+        "groupSize": "Individual then pairs for checking"
+      },
+      "formativeQuestion": "Exit ticket: A student draws a less-than ogive with 80 observations and reads the median as the value at cumulative frequency 40. Is this correct? Justify your answer.",
+      "homework": "Statistics Exercise 24.3 Questions 1-5. For Q3 and Q4: also find Q1 and Q3 in addition to the median. Bring completed graph-paper work to next class for checking.",
+      "resources": ["CISCE Mathematics Class X — Chapter 24 (Statistics)", "Graph paper (at least 2 sheets per student)", "Rulers and pencils", "Pre-prepared frequency distribution worksheets", "Chart paper with completed sample ogive"],
+      "bloomsDistribution": {"Remember": 5, "Understand": 15, "Apply": 50, "Analyse": 20, "Evaluate": 10, "Create": 0},
+      "difficultyLevel": "medium",
+      "estimatedPrep": 20,
+      "teacherName": "Mr. Subhashis Bose",
+      "createdBy": "AI",
+      "createdDate": "2025-04-09",
+      "status": "approved",
+      "tags": ["statistics", "ogive", "cumulative frequency", "median", "quartiles"]
+    },
+    {
+      "id": "LP003",
+      "class": "Class X",
+      "subject": "Science",
+      "chapter": "Light",
+      "topic": "Refraction at Curved Surfaces — Lens Formula and Magnification",
+      "duration": 45,
+      "objectives": [
+        "Students will state and apply the lens formula 1/f = 1/v - 1/u using the new Cartesian sign convention",
+        "Students will calculate image position, nature and size for convex and concave lenses",
+        "Students will define and calculate linear magnification",
+        "Students will construct ray diagrams for at least three object positions for a convex lens"
+      ],
+      "warmup": {
+        "activity": "Demonstration: Hold a convex lens in sunlight to converge rays at the focal point on a white sheet. Ask: 'Why do reading glasses help people see? What kind of lens is used?' Students share prior knowledge. Briefly recap refraction laws from previous lesson.",
+        "duration": 5
+      },
+      "mainTeaching": [
+        {
+          "step": 1,
+          "content": "Introduce New Cartesian Sign Convention: incident ray direction is positive. All distances measured from optical centre O. Distances in direction of incident light = positive; against = negative. Present as a clear diagram. Common pitfall: u is always negative for real objects.",
+          "duration": 6,
+          "method": "Direct instruction with diagram"
+        },
+        {
+          "step": 2,
+          "content": "State the lens formula: 1/f = 1/v - 1/u. Distinguish from mirror formula. Focal length convention: convex lens f > 0, concave lens f < 0. Work through Example 1: Object at 30 cm from convex lens of f = 20 cm. Find image distance v. (Ans: v = 60 cm, real inverted image)",
+          "duration": 8,
+          "method": "Guided worked example"
+        },
+        {
+          "step": 3,
+          "content": "Ray diagram rules for lenses: (a) Ray parallel to principal axis — refracts through F₂. (b) Ray through optical centre — passes undeviated. (c) Ray through F₁ — emerges parallel to principal axis. Demonstrate drawing each ray carefully on the board for object beyond 2F.",
+          "duration": 8,
+          "method": "Board demonstration with coloured chalk/markers"
+        },
+        {
+          "step": 4,
+          "content": "Systematic treatment of all 6 object positions for convex lens: beyond 2F, at 2F, between F and 2F, at F, between F and O. For each: draw ray diagram, state image position/nature/size. Students copy a summary table.",
+          "duration": 7,
+          "method": "Interactive table-building with student inputs"
+        },
+        {
+          "step": 5,
+          "content": "Linear magnification m = v/u = height of image / height of object. Sign of m gives orientation (positive = erect, negative = inverted). Magnitude gives size comparison. Work Example 2: Object 4 cm tall at 15 cm. f = 20 cm. Find image height. (First find v, then m, then height = m × object height)",
+          "duration": 6,
+          "method": "Guided worked example"
+        }
+      ],
+      "activity": {
+        "name": "Lens Problem Sprint",
+        "description": "Groups of 3 receive a problem card with 4 numerical problems (2 convex, 1 concave, 1 magnification). Each member solves one problem independently, then all verify together. Groups that finish early are given a bonus challenge: design a lens arrangement (two lenses) to produce a specific image. Groups present one solution each to the class.",
+        "duration": 5,
+        "groupSize": "Groups of 3"
+      },
+      "formativeQuestion": "A concave lens of focal length 15 cm forms a virtual erect image at 10 cm from the lens. Where is the object? Is the image magnified or diminished?",
+      "homework": "Chapter Light: Numerical Problems 1-8 from ICSE Physics textbook. Draw ray diagrams for Q5 and Q6. Research: How do spectacle lenses correct myopia and hypermetropia? Write 5 lines.",
+      "resources": ["CISCE Physics Class X textbook", "Optical bench with convex and concave lenses (for demo)", "Coloured markers/chalk for ray diagrams", "Printed lens problem cards for activity", "Summary table handout (blank, to be filled in during lesson)"],
+      "bloomsDistribution": {"Remember": 10, "Understand": 25, "Apply": 45, "Analyse": 15, "Evaluate": 5, "Create": 0},
+      "difficultyLevel": "medium",
+      "estimatedPrep": 20,
+      "teacherName": "Mr. Arijit Das",
+      "createdBy": "AI",
+      "createdDate": "2025-04-07",
+      "status": "approved",
+      "tags": ["light", "lens formula", "refraction", "magnification", "ray diagrams"]
+    },
+    {
+      "id": "LP004",
+      "class": "Class X",
+      "subject": "Science",
+      "chapter": "Electrolysis",
+      "topic": "Electrolysis — Principles, Faraday's Laws and Applications",
+      "duration": 45,
+      "objectives": [
+        "Students will define electrolysis and identify its key components: electrolyte, electrodes, cathode and anode",
+        "Students will predict the products of electrolysis for given electrolytes using selective discharge theory",
+        "Students will state Faraday's First and Second Laws of Electrolysis",
+        "Students will describe the industrial application of electrolysis in electroplating and extraction of aluminium"
+      ],
+      "warmup": {
+        "activity": "Show a copper-plated iron key or spoon. Ask: 'How was the copper layer applied?' Students speculate. Reveal that this is electroplating — a form of electrolysis. Connect to prior knowledge of ionic compounds and conductivity.",
+        "duration": 4
+      },
+      "mainTeaching": [
+        {
+          "step": 1,
+          "content": "Define electrolysis: decomposition of a compound in molten or aqueous state by passing electricity through it. Key terms: electrolyte (ionic conductor), electrodes (cathode = negative, anode = positive), anions (go to anode), cations (go to cathode). Memory hook: 'PANIC' — Positive Anode, Negative is Cathode.",
+          "duration": 6,
+          "method": "Direct instruction with labelled diagram"
+        },
+        {
+          "step": 2,
+          "content": "Electrolysis of dilute sulphuric acid: ions present: H⁺, SO₄²⁻, OH⁻ (from water). Selective discharge: H⁺ discharged at cathode (H₂ gas). OH⁻ discharged at anode (O₂ gas, not SO₄²⁻). Volume ratio H₂:O₂ = 2:1. Write half-equations for each electrode. Draw the Hofmann voltameter diagram.",
+          "duration": 8,
+          "method": "Board work with half-equation writing"
+        },
+        {
+          "step": 3,
+          "content": "Electrolysis of copper sulphate solution with platinum vs copper electrodes. Platinum electrodes: cathode deposits Cu, anode releases O₂. Copper electrodes: cathode deposits Cu, anode dissolves Cu — concentration stays constant. This is the basis of copper refining.",
+          "duration": 7,
+          "method": "Comparative demonstration / virtual lab video (2 min)"
+        },
+        {
+          "step": 4,
+          "content": "Faraday's First Law: mass of substance deposited ∝ quantity of electricity (Q = It). Faraday's Second Law: for same charge, masses deposited ∝ equivalent masses. Introduce electrochemical equivalent (ECE). Numerical: Find mass of copper deposited when 2A flows for 30 min. (ECE of Cu = 0.000329 g/C)",
+          "duration": 8,
+          "method": "Lecture with worked numerical"
+        },
+        {
+          "step": 5,
+          "content": "Applications: (i) Electroplating — process, choice of electrolyte, uses in jewellery/cutlery/electronics; how to plate an iron spoon with silver. (ii) Purification of copper — blister copper vs electrolytic copper. (iii) Extraction of aluminium (Hall-Héroult process — brief). Relate back to opening key/spoon demo.",
+          "duration": 7,
+          "method": "Discussion with industrial photographs"
+        }
+      ],
+      "activity": {
+        "name": "Electroplating Design Challenge",
+        "description": "Groups of 4 are given a scenario card: 'You are asked to design an electroplating process to coat a brass bracelet with gold.' They must identify: electrolyte, electrodes, power supply settings, safety precautions. Groups present their design as a labelled diagram with brief justification. Class evaluates each design for completeness.",
+        "duration": 5,
+        "groupSize": "Groups of 4"
+      },
+      "formativeQuestion": "If a current of 3A is passed for 20 minutes through silver nitrate solution (ECE of silver = 0.001118 g/C), what mass of silver is deposited at the cathode?",
+      "homework": "CISCE Chemistry textbook — Electrolysis numericals 1-6. Write a short note (10 lines) on the importance of electrolysis in the modern electronics industry.",
+      "resources": ["CISCE Chemistry Class X textbook", "Electroplating kit for demo (or video)", "Hofmann voltameter diagram (printed)", "Scenario cards for design challenge activity", "Calculator"],
+      "bloomsDistribution": {"Remember": 15, "Understand": 20, "Apply": 40, "Analyse": 15, "Evaluate": 10, "Create": 0},
+      "difficultyLevel": "medium",
+      "estimatedPrep": 25,
+      "teacherName": "Mrs. Suchitra Ghosh",
+      "createdBy": "AI",
+      "createdDate": "2025-04-06",
+      "status": "approved",
+      "tags": ["electrolysis", "Faraday's laws", "electroplating", "copper sulphate", "chemistry"]
+    },
+    {
+      "id": "LP005",
+      "class": "Class X",
+      "subject": "Science",
+      "chapter": "Cell Division",
+      "topic": "Mitosis and Meiosis — A Comparative Study",
+      "duration": 45,
+      "objectives": [
+        "Students will recall the stages of mitosis and describe the key events at each stage",
+        "Students will describe the two divisions of meiosis (Meiosis I and Meiosis II) and their significance",
+        "Students will compare and contrast mitosis and meiosis under at least five headings",
+        "Students will explain the biological significance of each type of cell division and relate to human health and reproduction"
+      ],
+      "warmup": {
+        "activity": "Quick-fire question round: Show 4 photographs — a healing wound, a growing seedling, a sperm cell, an egg cell. Students call out which involves mitosis and which involves meiosis and why. This immediately activates prior knowledge and reveals misconceptions.",
+        "duration": 5
+      },
+      "mainTeaching": [
+        {
+          "step": 1,
+          "content": "Recap cell cycle: Interphase (G1, S, G2) → Mitosis → Cytokinesis. DNA replication in S phase is the preparation for division. Introduce key vocabulary: chromosome, chromatid, centromere, spindle fibres, ploidy (2n = diploid, n = haploid). Human chromosome number: 2n = 46.",
+          "duration": 5,
+          "method": "Direct instruction with cell cycle diagram"
+        },
+        {
+          "step": 2,
+          "content": "Mitosis stages — PMAT: Prophase (chromosomes condense, nuclear envelope breaks down), Metaphase (chromosomes align at metaphase plate), Anaphase (sister chromatids separate, pulled to poles), Telophase (new nuclear envelopes form, chromosomes decondense) + Cytokinesis. Draw and label each stage. Mnemonic: 'People Meet And Talk'.",
+          "duration": 8,
+          "method": "Annotated diagram on board, students sketch each stage"
+        },
+        {
+          "step": 3,
+          "content": "Meiosis I (Reductive Division): Prophase I — crossing over (genetic variation!), Metaphase I, Anaphase I (homologous chromosomes separate, NOT sister chromatids), Telophase I. Key concept: ploidy halved here (2n → n). Brief interkinesis — no DNA replication.",
+          "duration": 7,
+          "method": "Diagram with emphasis on crossing over"
+        },
+        {
+          "step": 4,
+          "content": "Meiosis II (Equational Division): Similar to mitosis but in haploid cells. Sister chromatids separate. Result: 4 haploid daughter cells. Spermatogenesis: 4 sperms. Oogenesis: 1 egg + 3 polar bodies (to conserve cytoplasm for the egg).",
+          "duration": 7,
+          "method": "Diagram with spermatogenesis vs oogenesis comparison"
+        },
+        {
+          "step": 5,
+          "content": "Construct comparison table on board with student inputs: Location, Divisions, DNA replication, Ploidy of products, Number of products, Significance. Fill in together. Significance: Mitosis = growth, repair, asexual reproduction. Meiosis = gamete formation, maintains chromosome number, generates variation via crossing over.",
+          "duration": 8,
+          "method": "Interactive table-building"
+        }
+      ],
+      "activity": {
+        "name": "Chromosome Model Simulation",
+        "description": "Students use coloured pipe cleaners (2 colours = 2 homologous chromosomes, twisted = sister chromatids) to physically simulate: (1) Mitosis — arrange at metaphase plate, pull apart sister chromatids, count chromosomes in daughter cells. (2) Meiosis I — pair homologs, show crossing over exchange, separate to poles. This kinesthetic activity makes abstract chromosome behaviour concrete.",
+        "duration": 5,
+        "groupSize": "Groups of 4"
+      },
+      "formativeQuestion": "A cell has 2n = 12 chromosomes. After meiosis, how many chromosomes will each daughter cell have? How many cells will be produced? If crossing over occurs, does this change the chromosome number?",
+      "homework": "CISCE Biology textbook — Cell Division exercises 1-7. Draw and label all stages of meiosis I on a single diagram. Research: What is Down Syndrome? How is it related to errors in meiosis? Write 8 lines.",
+      "resources": ["CISCE Biology Class X textbook", "Coloured pipe cleaners (blue and red, 2 per student pair)", "Pre-drawn blank mitosis/meiosis stage diagrams for students to label", "Photographs of actual cells under microscope (prophase I crossing over)", "Comparison table template (printed)"],
+      "bloomsDistribution": {"Remember": 20, "Understand": 30, "Apply": 25, "Analyse": 20, "Evaluate": 5, "Create": 0},
+      "difficultyLevel": "medium",
+      "estimatedPrep": 25,
+      "teacherName": "Mr. Prosenjit Chatterjee",
+      "createdBy": "AI",
+      "createdDate": "2025-04-05",
+      "status": "approved",
+      "tags": ["cell division", "mitosis", "meiosis", "chromosomes", "crossing over"]
+    },
+    {
+      "id": "LP006",
+      "class": "Class X",
+      "subject": "English",
+      "chapter": "Writing Skills",
+      "topic": "Formal Letter Writing — Format, Register and Structure",
+      "duration": 45,
+      "objectives": [
+        "Students will identify and apply the correct format of a formal letter including all seven components",
+        "Students will distinguish between formal and informal register and use appropriate vocabulary",
+        "Students will write a complete formal letter to the Editor of a newspaper on a given topic",
+        "Students will evaluate letters written by peers and provide structured feedback"
+      ],
+      "warmup": {
+        "activity": "Display two versions of the same letter on the board — one informal (using casual language, missing format elements) and one formal. Students work in pairs for 2 minutes to spot all the differences. Quick class debrief: list differences on board. This sets up the lesson's purpose.",
+        "duration": 5
+      },
+      "mainTeaching": [
+        {
+          "step": 1,
+          "content": "The 7 components of a formal letter: (1) Sender's address (no name) — top right. (2) Date — below address. (3) Receiver's designation and address — left. (4) Salutation (Dear Sir/Madam). (5) Subject line (Re:). (6) Body — paragraphs. (7) Closing (Yours faithfully + signature). Display annotated template on board.",
+          "duration": 7,
+          "method": "Direct instruction with annotated model letter"
+        },
+        {
+          "step": 2,
+          "content": "Formal register: avoid contractions (don't → do not), slang, colloquialisms. Prefer passive voice and formal vocabulary. Examples: 'I want to...' → 'I wish to bring to your kind notice...'. 'Please do something about it' → 'I respectfully request that appropriate measures be taken'. Students suggest formal alternatives for 5 informal phrases.",
+          "duration": 6,
+          "method": "Interactive substitution exercise"
+        },
+        {
+          "step": 3,
+          "content": "Structure of the body: Para 1 — State purpose and identify yourself briefly. Para 2 — Elaborate on the issue with specific details and evidence. Para 3 — Provide suggestions or state what action you expect. Para 4 (optional) — Polite closing statement ('I hope this matter will receive your prompt attention.'). Show how each paragraph serves a different purpose.",
+          "duration": 6,
+          "method": "Paragraph-purpose mapping with model letter"
+        },
+        {
+          "step": 4,
+          "content": "Walk through a complete model letter — Letter to the Editor about traffic congestion near a school. Teacher writes the letter on the board step by step, narrating choices made: why this phrase? Why this structure? Students annotate their own copy. Identify: purpose, evidence, suggestion, register, format.",
+          "duration": 8,
+          "method": "Think-aloud modelling"
+        },
+        {
+          "step": 5,
+          "content": "Discuss common ICSE examiner comments on letters: missing subject line, wrong closing (Yours sincerely instead of Yours faithfully for unknown recipient), sender's name included in address, too informal in places. Show 'before and after' sample excerpts and how marks are allocated per format element vs content.",
+          "duration": 4,
+          "method": "Marking scheme analysis"
+        }
+      ],
+      "activity": {
+        "name": "Live Letter Writing",
+        "description": "Students write a formal letter to the Editor of The Telegraph newspaper on the topic: 'Increasing Air Pollution in Kolkata — Causes and Suggested Solutions.' Time limit: 15 minutes. After writing, students swap with a partner who uses a checklist (format, register, structure, content) to give 2 stars (things done well) and 1 wish (one improvement). Both letters and feedback sheets are collected.",
+        "duration": 10,
+        "groupSize": "Individual writing, then pairs for peer feedback"
+      },
+      "formativeQuestion": "Name the correct closing phrase for: (a) a letter to someone you know by name, (b) a letter to an unknown authority. What is the rule?",
+      "homework": "Write TWO formal letters: (1) To the Principal requesting permission to organise an inter-school debate competition. (2) To the Municipal Commissioner about a broken street light near your home. For each, use the 7-component format and underline every element with its label.",
+      "resources": ["CISCE English Language coursebook — Letter Writing chapter", "Annotated model letter (laminated copies for desk reference)", "Peer feedback checklist (printed, one per student)", "'Before and After' sample letter excerpts handout"],
+      "bloomsDistribution": {"Remember": 10, "Understand": 20, "Apply": 40, "Analyse": 15, "Evaluate": 15, "Create": 0},
+      "difficultyLevel": "easy",
+      "estimatedPrep": 15,
+      "teacherName": "Mrs. Jayashree Nair",
+      "createdBy": "AI",
+      "createdDate": "2025-04-04",
+      "status": "approved",
+      "tags": ["formal letter", "letter writing", "English", "composition", "register"]
+    },
+    {
+      "id": "LP007",
+      "class": "Class X",
+      "subject": "History",
+      "chapter": "The First World War",
+      "topic": "Causes of World War I — Underlying and Immediate",
+      "duration": 45,
+      "objectives": [
+        "Students will identify and explain the four underlying causes of WWI using the MAIN acronym",
+        "Students will describe the chain of events following the assassination at Sarajevo",
+        "Students will analyse how the alliance system transformed a regional conflict into a world war",
+        "Students will evaluate which cause was most significant using historical evidence"
+      ],
+      "warmup": {
+        "activity": "Show students a photograph of Archduke Franz Ferdinand and the 1914 newspaper headline 'Heir to Austria-Hungary throne shot dead.' Ask: 'How could one assassination lead to the deaths of 20 million people?' Students speculate in pairs for 2 minutes. Collect predictions — revisit at end of lesson.",
+        "duration": 5
+      },
+      "mainTeaching": [
+        {
+          "step": 1,
+          "content": "MAIN acronym for underlying causes. M — Militarism: Arms race especially between Britain and Germany (Dreadnought naval race). European powers tripled military spending 1870-1914. Culture glorified military power. A — Alliance System: Triple Alliance (Germany, Austria-Hungary, Italy 1882) vs Triple Entente (France, Russia, Britain 1907). A war involving one member would drag in all. I — Imperialism: Competition for African and Asian colonies created rivalries — Morocco Crisis 1905, 1911. N — Nationalism: Pan-Slavism in Balkans ('Powder Keg of Europe'), Serbian nationalism threatening Austria-Hungary.",
+          "duration": 10,
+          "method": "MAIN framework — teacher-led with student note-taking"
+        },
+        {
+          "step": 2,
+          "content": "The Balkans crisis: Ottoman Empire declining — 'Sick Man of Europe.' Austria-Hungary and Russia competing for influence in Balkans. Bosnia-Herzegovina annexed by Austria-Hungary (1908) — Serbia furious. Formation of Black Hand secret society — Serbian nationalists including Gavrilo Princip.",
+          "duration": 6,
+          "method": "Map analysis — Balkans 1914"
+        },
+        {
+          "step": 3,
+          "content": "The trigger: 28 June 1914, Sarajevo. Archduke Franz Ferdinand (heir to Austro-Hungarian throne) and wife Sophie assassinated by Gavrilo Princip. Austro-Hungary blames Serbia. Issues ultimatum — 10 demands in 48 hours. Serbia accepts 8, rejects 2. Austria-Hungary declares war on Serbia (28 July 1914).",
+          "duration": 6,
+          "method": "Narrative timeline on board"
+        },
+        {
+          "step": 4,
+          "content": "Domino effect through alliances: Russia mobilises to support Serbia → Germany declares war on Russia (1 Aug) → Germany declares war on France (3 Aug) → Germany invades Belgium (Schlieffen Plan) → Britain declares war on Germany (4 Aug, violation of Belgian neutrality). By August 1914, all major powers at war.",
+          "duration": 6,
+          "method": "Cause-effect chain diagram — 'Domino wall' visual"
+        },
+        {
+          "step": 5,
+          "content": "Historian debate: Was the assassination the 'cause' or just the trigger? Were underlying causes (militarism, imperialism, nationalism, alliances) more significant? Briefly introduce the 'Fischer Controversy' (German war guilt) vs the argument that all powers shared blame. Class takes a position.",
+          "duration": 5,
+          "method": "Structured class discussion"
+        }
+      ],
+      "activity": {
+        "name": "Blame Game — Who Started WWI?",
+        "description": "Each group of 4 is assigned a country: Germany, Austria-Hungary, Serbia, Britain, France, Russia. They receive a card with key arguments from their country's perspective. Groups have 5 minutes to prepare a 1-minute 'defence' — why their country is NOT most to blame. After presentations, class votes on who bears most responsibility. Teacher debriefs: historians still debate this today.",
+        "duration": 7,
+        "groupSize": "Groups of 4"
+      },
+      "formativeQuestion": "Without looking at notes: write down 3 underlying causes of WWI with one specific example for each. Exchange with a neighbour to check accuracy.",
+      "homework": "CISCE History textbook — Chapter on World War I. Write a 200-word essay: 'Was the Alliance System the most important cause of World War I? Justify your view with evidence.' Also: Create a timeline of events from 28 June 1914 to 4 August 1914.",
+      "resources": ["CISCE History Class X textbook (Modern History)", "Map of Europe 1914 (printed or projected)", "Photograph of Archduke Ferdinand and 1914 newspaper front pages", "Country perspective cards for 'Blame Game' activity", "Domino chain diagram template"],
+      "bloomsDistribution": {"Remember": 15, "Understand": 25, "Apply": 20, "Analyse": 25, "Evaluate": 15, "Create": 0},
+      "difficultyLevel": "medium",
+      "estimatedPrep": 20,
+      "teacherName": "Mrs. Pamela Sen",
+      "createdBy": "AI",
+      "createdDate": "2025-04-03",
+      "status": "approved",
+      "tags": ["World War I", "causes", "MAIN", "alliance system", "Sarajevo assassination"]
+    },
+    {
+      "id": "LP008",
+      "class": "Class X",
+      "subject": "Bengali",
+      "chapter": "ব্যাকরণ",
+      "topic": "কারক ও বিভক্তি — পরিচয়, প্রকারভেদ ও প্রয়োগ",
+      "duration": 45,
+      "objectives": [
+        "শিক্ষার্থীরা কারক ও বিভক্তির সংজ্ঞা বলতে পারবে এবং উভয়ের মধ্যে পার্থক্য করতে পারবে",
+        "শিক্ষার্থীরা ছয়টি কারক (কর্তৃ, কর্ম, করণ, সম্প্রদান, অপাদান, অধিকরণ) চিহ্নিত করতে পারবে",
+        "শিক্ষার্থীরা বাক্যে কারক নির্ণয় করে সংশ্লিষ্ট বিভক্তি উল্লেখ করতে পারবে",
+        "শিক্ষার্থীরা সম্বন্ধ পদ এবং সম্বোধন পদ সম্পর্কে জানবে এবং এদের কারক থেকে আলাদা করতে পারবে"
+      ],
+      "warmup": {
+        "activity": "বোর্ডে লেখো: 'রাম বনে যায়।' শিক্ষার্থীদের জিজ্ঞেস করো — কে যায়? কোথায় যায়? এই প্রশ্নগুলির উত্তর কীভাবে ক্রিয়ার সাথে যুক্ত? কারক শব্দটি এসেছে 'কৃ' ধাতু থেকে — যার অর্থ করা। কারক মানে যা ক্রিয়া সম্পাদনে সাহায্য করে।",
+        "duration": 5
+      },
+      "mainTeaching": [
+        {
+          "step": 1,
+          "content": "সংজ্ঞা ও পার্থক্য: কারক — বাক্যে বিশেষ্য বা সর্বনামের সাথে ক্রিয়ার সম্পর্ক। বিভক্তি — শব্দের শেষে যুক্ত প্রত্যয় যা সেই সম্পর্ক প্রকাশ করে। উদাহরণ: 'রাম বনে যায়' — 'বন' হলো অধিকরণ কারক, 'এ' হলো বিভক্তি। বিভক্তিগুলি: শূন্য (০), এ/তে/য়, কে/রে, দিয়ে/দ্বারা, হতে/থেকে, র/এর।",
+          "duration": 7,
+          "method": "প্রত্যক্ষ উপদেশ এবং বোর্ড উদাহরণ"
+        },
+        {
+          "step": 2,
+          "content": "কর্তৃ কারক: যে কাজ করে। প্রশ্ন: 'কে' বা 'কারা'। উদাহরণ: 'সীতা গান গায়' — সীতা = কর্তৃ। বিভক্তি: শূন্য (0)। বিশেষ ক্ষেত্রে 'এ' বিভক্তি: 'তোমার দ্বারা কাজ হবে না।' কর্ম কারক: যাকে উদ্দেশ্য করে কাজ করা হয়। প্রশ্ন: 'কাকে' বা 'কী'। উদাহরণ: 'মাকে ডাকো' — মাকে = কর্ম কারক। বিভক্তি: কে, রে, শূন্য।",
+          "duration": 7,
+          "method": "উদাহরণসহ আলোচনা"
+        },
+        {
+          "step": 3,
+          "content": "করণ কারক: যার সাহায্যে কাজ সম্পন্ন হয়। প্রশ্ন: 'কী দিয়ে' বা 'কীভাবে'। উদাহরণ: 'কলম দিয়ে লেখো' — কলম = করণ। বিভক্তি: দিয়ে, দ্বারা, কর্তৃক। সম্প্রদান কারক: যাকে কিছু দেওয়া হয়। প্রশ্ন: 'কাকে'। উদাহরণ: 'গরিবকে ভিক্ষা দাও' — গরিবকে = সম্প্রদান। বিভক্তি: কে, তে। কর্ম ও সম্প্রদানের পার্থক্য: সম্প্রদানে দান বা প্রদানের ভাব থাকে।",
+          "duration": 7,
+          "method": "তুলনামূলক আলোচনা, বোর্ডে পার্শ্ববর্তী উদাহরণ"
+        },
+        {
+          "step": 4,
+          "content": "অপাদান কারক: যেখান থেকে বিচ্যুতি বা উৎপত্তি। প্রশ্ন: 'কোথা থেকে' বা 'কী থেকে'। উদাহরণ: 'গাছ থেকে ফল পড়ে' — গাছ = অপাদান। বিভক্তি: হতে, থেকে, চেয়ে। অধিকরণ কারক: ক্রিয়া সংঘটনের আধার বা স্থান-কাল। প্রশ্ন: 'কোথায়' বা 'কখন'। উদাহরণ: 'নদীতে মাছ আছে' — নদীতে = অধিকরণ। বিভক্তি: এ, তে, য়।",
+          "duration": 7,
+          "method": "বোর্ড কাজ, শিক্ষার্থীরা নিজেরা উদাহরণ তৈরি করে"
+        },
+        {
+          "step": 5,
+          "content": "সম্বন্ধ পদ ও সম্বোধন পদ — কারক নয়। সম্বন্ধ পদ: ক্রিয়ার সাথে সরাসরি সম্পর্ক নেই। 'রামের বাড়ি কোথায়?' — রামের = সম্বন্ধ পদ, বিভক্তি র/এর। সম্বোধন পদ: সম্বোধনে ব্যবহৃত। 'হে বন্ধু, এসো।' — বন্ধু = সম্বোধন পদ। সারণি: ছয় কারক + সম্বন্ধ + সম্বোধন = এক পাতায় সংক্ষেপ।",
+          "duration": 7,
+          "method": "সারণি তৈরি ও সংক্ষেপণ"
+        }
+      ],
+      "activity": {
+        "name": "কারক খেলা",
+        "description": "প্রতিটি শিক্ষার্থী একটি কার্ড পায় যাতে একটি বাক্য লেখা আছে এবং একটি নির্দিষ্ট পদ আন্ডারলাইন করা। তাকে বলতে হবে: (১) কারকের নাম, (২) বিভক্তির নাম, (৩) কারক নির্ণয়ের কারণ। সঠিক উত্তর দিলে পরের শিক্ষার্থীকে তাদের কার্ড দেওয়া হয়। শিক্ষক ভুল হলে সংশোধন করেন এবং ক্লাসকে ব্যাখ্যা করেন।",
+        "duration": 5,
+        "groupSize": "ব্যক্তিগত (শ্রেণি কার্যক্রম)"
+      },
+      "formativeQuestion": "নিচের বাক্যটিতে প্রতিটি পদের কারক নির্ণয় করো: 'সুব্রত কলম দিয়ে খাতায় বাংলা লেখে।'",
+      "homework": "বাংলা ব্যাকরণ পুস্তক — কারক ও বিভক্তি অনুশীলনী ১-১০। দশটি বাক্য নিজে লেখো এবং প্রতিটি বাক্যের সমস্ত কারক ও বিভক্তি চিহ্নিত করো। নিজের পরিবারের দৈনন্দিন কথোপকথন থেকে পাঁচটি উদাহরণ নাও।",
+      "resources": ["CISCE বাংলা ব্যাকরণ পুস্তক", "কারক সারণি (রঙিন চার্ট পেপারে মুদ্রিত)", "কারক নির্ণয় কার্ড সেট (২৫টি বাক্য কার্ড)", "ক্লাস অনুশীলন পত্র"],
+      "bloomsDistribution": {"Remember": 20, "Understand": 25, "Apply": 40, "Analyse": 15, "Evaluate": 0, "Create": 0},
+      "difficultyLevel": "medium",
+      "estimatedPrep": 20,
+      "teacherName": "Mrs. Swapna Dey",
+      "createdBy": "AI",
+      "createdDate": "2025-04-02",
+      "status": "approved",
+      "tags": ["Bengali", "grammar", "Karak", "Bibhakti", "parts of sentence"]
+    }
+  ]
+}

@@ -1,0 +1,200 @@
+{
+  "boards": {
+    "CISCE": {
+      "classes": {
+        "Class VI": {
+          "subjects": ["Mathematics", "Science", "English", "History", "Geography", "Bengali"]
+        },
+        "Class VII": {
+          "subjects": ["Mathematics", "Science", "English", "History", "Geography", "Bengali"]
+        },
+        "Class VIII": {
+          "subjects": ["Mathematics", "Science", "English", "History", "Geography", "Bengali"]
+        },
+        "Class IX": {
+          "subjects": ["Mathematics", "Physics", "Chemistry", "Biology", "English", "History", "Bengali", "Geography"]
+        },
+        "Class X": {
+          "subjects": ["Mathematics", "Physics", "Chemistry", "Biology", "English", "History", "Bengali", "Geography"],
+          "chapters": {
+            "Mathematics": [
+              "Commercial Mathematics",
+              "Algebra",
+              "Geometry",
+              "Mensuration",
+              "Trigonometry",
+              "Statistics",
+              "Probability"
+            ],
+            "Physics": [
+              "Force, Work and Energy",
+              "Light",
+              "Sound",
+              "Electricity",
+              "Electromagnetism",
+              "Modern Physics"
+            ],
+            "Chemistry": [
+              "Periodic Table",
+              "Chemical Bonding",
+              "Acids, Bases and Salts",
+              "Electrolysis",
+              "Metallurgy",
+              "Organic Chemistry"
+            ],
+            "Biology": [
+              "Cell Division",
+              "Genetics",
+              "Nervous System",
+              "Endocrine System",
+              "Photosynthesis",
+              "Ecosystem"
+            ],
+            "English": [
+              "Reading Comprehension",
+              "Composition",
+              "Letter Writing",
+              "Grammar",
+              "Literature"
+            ],
+            "History": [
+              "The French Revolution",
+              "World War I",
+              "The Russian Revolution",
+              "Indian National Movement",
+              "The United Nations",
+              "The Cold War"
+            ],
+            "Bengali": [
+              "গদ্য পাঠ",
+              "কবিতা",
+              "ব্যাকরণ",
+              "রচনা",
+              "পত্র রচনা"
+            ],
+            "Geography": [
+              "Map Work",
+              "Weather and Climate",
+              "Natural Resources",
+              "Agriculture",
+              "Industries"
+            ]
+          }
+        },
+        "Class XI": {
+          "subjects": ["Mathematics", "Physics", "Chemistry", "Biology", "English", "Bengali"]
+        },
+        "Class XII": {
+          "subjects": ["Mathematics", "Physics", "Chemistry", "Biology", "English", "Bengali"]
+        }
+      }
+    },
+    "CBSE": {
+      "classes": {
+        "Class VI": {
+          "subjects": ["Mathematics", "Science", "English", "Social Science", "Hindi"]
+        },
+        "Class VII": {
+          "subjects": ["Mathematics", "Science", "English", "Social Science", "Hindi"]
+        },
+        "Class VIII": {
+          "subjects": ["Mathematics", "Science", "English", "Social Science", "Hindi"]
+        },
+        "Class IX": {
+          "subjects": ["Mathematics", "Science", "English", "Social Science", "Hindi"]
+        },
+        "Class X": {
+          "subjects": ["Mathematics", "Science", "English", "Social Science", "Hindi"],
+          "chapters": {
+            "Mathematics": [
+              "Real Numbers",
+              "Polynomials",
+              "Linear Equations in Two Variables",
+              "Quadratic Equations",
+              "Arithmetic Progressions",
+              "Triangles",
+              "Circles",
+              "Coordinate Geometry",
+              "Introduction to Trigonometry",
+              "Statistics",
+              "Probability"
+            ],
+            "Science": [
+              "Chemical Reactions",
+              "Acids Bases and Salts",
+              "Metals and Non-metals",
+              "Carbon and its Compounds",
+              "Life Processes",
+              "Control and Coordination",
+              "Heredity and Evolution",
+              "Light",
+              "Electricity",
+              "Magnetic Effects of Electric Current"
+            ]
+          }
+        },
+        "Class XI": {
+          "subjects": ["Mathematics", "Physics", "Chemistry", "Biology", "English"]
+        },
+        "Class XII": {
+          "subjects": ["Mathematics", "Physics", "Chemistry", "Biology", "English"]
+        }
+      }
+    },
+    "WB": {
+      "classes": {
+        "Class VI": {
+          "subjects": ["Mathematics", "Science", "English", "History", "Geography", "Bengali"]
+        },
+        "Class VII": {
+          "subjects": ["Mathematics", "Science", "English", "History", "Geography", "Bengali"]
+        },
+        "Class VIII": {
+          "subjects": ["Mathematics", "Science", "English", "History", "Geography", "Bengali"]
+        },
+        "Class IX": {
+          "subjects": ["Mathematics", "Physical Science", "Life Science", "English", "History", "Bengali", "Geography"]
+        },
+        "Class X": {
+          "subjects": ["Mathematics", "Physical Science", "Life Science", "English", "History", "Bengali", "Geography"],
+          "chapters": {
+            "Mathematics": [
+              "Real Numbers and Irrational Numbers",
+              "Polynomials",
+              "Factorisation",
+              "Simultaneous Linear Equations",
+              "Quadratic Equations with one Variable",
+              "Simple Interest",
+              "Theorems on Circles",
+              "Rectangular Parallelogram",
+              "Trigonometry",
+              "Statistics"
+            ],
+            "Physical Science": [
+              "Periodic Table and Periodic Properties",
+              "Ionic and Covalent Bonding",
+              "Behaviour of Gases",
+              "Light",
+              "Electricity"
+            ],
+            "Life Science": [
+              "Photosynthesis",
+              "Respiration",
+              "Control and Co-ordination",
+              "Genetics",
+              "Cell Division",
+              "Environment",
+              "Adaptation"
+            ]
+          }
+        },
+        "Class XI": {
+          "subjects": ["Mathematics", "Physics", "Chemistry", "Biology", "English", "Bengali"]
+        },
+        "Class XII": {
+          "subjects": ["Mathematics", "Physics", "Chemistry", "Biology", "English", "Bengali"]
+        }
+      }
+    }
+  }
+}

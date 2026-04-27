@@ -1,0 +1,320 @@
+{
+  "masteryScale": {
+    "0": {"label": "Not Started", "color": "bg-gray-200 text-gray-500"},
+    "1": {"label": "Struggling", "color": "bg-red-100 text-red-700"},
+    "2": {"label": "Developing", "color": "bg-amber-100 text-amber-700"},
+    "3": {"label": "Proficient", "color": "bg-teal/20 text-teal"},
+    "4": {"label": "Mastered", "color": "bg-green/20 text-green"}
+  },
+  "subjects": {
+    "Mathematics": {
+      "topics": ["Commercial Maths", "Linear Inequations", "Quadratic Equations", "Circles & Tangents", "Trigonometry", "Statistics"],
+      "icon": "calculator"
+    },
+    "Science": {
+      "topics": ["Chemical Reactions", "Acids & Bases", "Electricity", "Light & Optics", "Cell Division", "Genetics"],
+      "icon": "flask"
+    },
+    "English": {
+      "topics": ["Reading Comprehension", "Essay Writing", "Grammar", "Literature", "Poetry"],
+      "icon": "book"
+    },
+    "History": {
+      "topics": ["French Revolution", "World War I", "Russian Revolution", "Indian Independence"],
+      "icon": "scroll"
+    },
+    "Bengali": {
+      "topics": ["Prose", "Poetry", "Grammar", "Composition"],
+      "icon": "pen"
+    }
+  },
+  "classData": {
+    "Class X": {
+      "students": [
+        {
+          "studentId": "STU001",
+          "studentName": "Arjun Chatterjee",
+          "section": "A",
+          "mastery": {
+            "Mathematics": [4, 4, 3, 4, 4, 4],
+            "Science": [4, 3, 4, 3, 4, 3],
+            "English": [3, 4, 4, 3, 4],
+            "History": [3, 2, 4, 3],
+            "Bengali": [4, 3, 4, 4]
+          }
+        },
+        {
+          "studentId": "STU002",
+          "studentName": "Priya Sen",
+          "section": "A",
+          "mastery": {
+            "Mathematics": [2, 1, 1, 2, 2, 2],
+            "Science": [2, 2, 1, 2, 2, 1],
+            "English": [3, 2, 2, 3, 3],
+            "History": [2, 2, 1, 2],
+            "Bengali": [3, 2, 2, 3]
+          }
+        },
+        {
+          "studentId": "STU005",
+          "studentName": "Arnab Das",
+          "section": "B",
+          "mastery": {
+            "Mathematics": [3, 3, 2, 3, 3, 3],
+            "Science": [3, 2, 2, 3, 3, 2],
+            "English": [3, 2, 3, 2, 3],
+            "History": [2, 1, 2, 2],
+            "Bengali": [3, 3, 2, 3]
+          }
+        },
+        {
+          "studentId": "STU013",
+          "studentName": "Debrup Majumdar",
+          "section": "A",
+          "mastery": {
+            "Mathematics": [4, 3, 3, 4, 3, 4],
+            "Science": [3, 3, 4, 3, 3, 4],
+            "English": [3, 3, 4, 3, 3],
+            "History": [3, 3, 3, 2],
+            "Bengali": [3, 3, 4, 3]
+          }
+        },
+        {
+          "studentId": "STU020",
+          "studentName": "Priyanka Biswas",
+          "section": "B",
+          "mastery": {
+            "Mathematics": [4, 3, 3, 3, 4, 4],
+            "Science": [4, 4, 3, 4, 3, 3],
+            "English": [4, 4, 4, 4, 4],
+            "History": [3, 3, 3, 4],
+            "Bengali": [4, 4, 3, 4]
+          }
+        },
+        {
+          "studentId": "STU025",
+          "studentName": "Sayan Ghosh",
+          "section": "A",
+          "mastery": {
+            "Mathematics": [4, 4, 3, 3, 4, 3],
+            "Science": [3, 3, 4, 4, 3, 3],
+            "English": [4, 3, 4, 3, 4],
+            "History": [3, 3, 3, 3],
+            "Bengali": [4, 3, 4, 4]
+          }
+        },
+        {
+          "studentId": "STU031",
+          "studentName": "Prantik Sen",
+          "section": "B",
+          "mastery": {
+            "Mathematics": [3, 2, 2, 3, 2, 3],
+            "Science": [2, 3, 2, 2, 3, 2],
+            "English": [3, 2, 2, 3, 2],
+            "History": [2, 2, 2, 2],
+            "Bengali": [3, 2, 2, 3]
+          }
+        },
+        {
+          "studentId": "STU037",
+          "studentName": "Souvik Ghosal",
+          "section": "A",
+          "mastery": {
+            "Mathematics": [4, 3, 3, 3, 4, 4],
+            "Science": [3, 3, 4, 3, 3, 3],
+            "English": [3, 3, 3, 4, 3],
+            "History": [3, 3, 2, 3],
+            "Bengali": [4, 3, 3, 3]
+          }
+        }
+      ]
+    },
+    "Class IX": {
+      "students": [
+        {
+          "studentId": "STU007",
+          "studentName": "Ritika Banerjee",
+          "section": "A",
+          "mastery": {
+            "Mathematics": [3, 4, 3, 3, 3, 4],
+            "Science": [4, 3, 3, 4, 3, 3],
+            "English": [4, 3, 4, 3, 4],
+            "History": [3, 3, 3, 4],
+            "Bengali": [4, 4, 3, 3]
+          }
+        },
+        {
+          "studentId": "STU011",
+          "studentName": "Soumyadeep Bose",
+          "section": "A",
+          "mastery": {
+            "Mathematics": [2, 2, 1, 3, 2, 2],
+            "Science": [2, 3, 2, 2, 3, 2],
+            "English": [3, 2, 3, 2, 2],
+            "History": [2, 2, 2, 1],
+            "Bengali": [2, 2, 2, 3]
+          }
+        },
+        {
+          "studentId": "STU017",
+          "studentName": "Ankita Roy",
+          "section": "B",
+          "mastery": {
+            "Mathematics": [4, 3, 4, 4, 3, 4],
+            "Science": [3, 4, 4, 3, 4, 3],
+            "English": [4, 4, 3, 4, 4],
+            "History": [3, 4, 3, 3],
+            "Bengali": [3, 4, 4, 4]
+          }
+        },
+        {
+          "studentId": "STU023",
+          "studentName": "Prithwish Dutta",
+          "section": "B",
+          "mastery": {
+            "Mathematics": [3, 3, 2, 3, 3, 3],
+            "Science": [3, 2, 3, 3, 2, 3],
+            "English": [3, 3, 2, 3, 3],
+            "History": [2, 3, 2, 3],
+            "Bengali": [3, 3, 3, 3]
+          }
+        },
+        {
+          "studentId": "STU029",
+          "studentName": "Swarnali Mukherjee",
+          "section": "A",
+          "mastery": {
+            "Mathematics": [4, 3, 3, 4, 4, 3],
+            "Science": [4, 3, 4, 4, 3, 4],
+            "English": [3, 4, 4, 3, 3],
+            "History": [4, 3, 3, 3],
+            "Bengali": [4, 3, 4, 4]
+          }
+        },
+        {
+          "studentId": "STU036",
+          "studentName": "Ayan Chakraborty",
+          "section": "B",
+          "mastery": {
+            "Mathematics": [2, 1, 2, 2, 2, 1],
+            "Science": [2, 2, 1, 2, 3, 2],
+            "English": [2, 2, 3, 2, 2],
+            "History": [1, 2, 2, 2],
+            "Bengali": [3, 2, 2, 2]
+          }
+        }
+      ]
+    },
+    "Class VIII": {
+      "students": [
+        {
+          "studentId": "STU004",
+          "studentName": "Debasmita Pal",
+          "section": "A",
+          "mastery": {
+            "Mathematics": [4, 3, 4, 3, 4, 3],
+            "Science": [4, 4, 3, 4, 4, 3],
+            "English": [4, 3, 4, 4, 3],
+            "History": [3, 4, 3, 4],
+            "Bengali": [4, 4, 3, 4]
+          }
+        },
+        {
+          "studentId": "STU012",
+          "studentName": "Subhro Ganguly",
+          "section": "A",
+          "mastery": {
+            "Mathematics": [2, 2, 1, 2, 2, 2],
+            "Science": [2, 1, 2, 2, 2, 1],
+            "English": [3, 2, 2, 2, 2],
+            "History": [2, 1, 2, 2],
+            "Bengali": [2, 2, 1, 2]
+          }
+        },
+        {
+          "studentId": "STU018",
+          "studentName": "Ishita Sarkar",
+          "section": "B",
+          "mastery": {
+            "Mathematics": [3, 3, 3, 4, 3, 3],
+            "Science": [3, 3, 3, 3, 4, 3],
+            "English": [3, 4, 3, 3, 4],
+            "History": [3, 3, 4, 3],
+            "Bengali": [3, 3, 4, 3]
+          }
+        },
+        {
+          "studentId": "STU026",
+          "studentName": "Rohan Mitra",
+          "section": "B",
+          "mastery": {
+            "Mathematics": [3, 4, 3, 3, 3, 4],
+            "Science": [3, 3, 4, 3, 3, 4],
+            "English": [3, 3, 4, 3, 3],
+            "History": [3, 3, 3, 3],
+            "Bengali": [3, 3, 3, 4]
+          }
+        },
+        {
+          "studentId": "STU033",
+          "studentName": "Madhurima Ghosh",
+          "section": "A",
+          "mastery": {
+            "Mathematics": [1, 2, 1, 2, 1, 2],
+            "Science": [2, 1, 2, 1, 2, 2],
+            "English": [2, 2, 2, 2, 2],
+            "History": [2, 1, 2, 1],
+            "Bengali": [2, 2, 2, 2]
+          }
+        }
+      ]
+    }
+  },
+  "reteachAlerts": [
+    {
+      "class": "Class X",
+      "subject": "Mathematics",
+      "topic": "Quadratic Equations",
+      "studentsStruggling": 3,
+      "totalStudents": 8,
+      "recommendation": "Schedule 2 extra periods. Focus on discriminant method, finding nature of roots, and word problems involving quadratic equations. STU002 and STU031 need one-on-one support.",
+      "severity": "high"
+    },
+    {
+      "class": "Class X",
+      "subject": "Science",
+      "topic": "Acids & Bases",
+      "studentsStruggling": 3,
+      "totalStudents": 8,
+      "recommendation": "Conduct a lab demonstration on pH indicators and acid-base reactions. STU002 is struggling significantly. Peer teaching pairing with STU001 or STU025 recommended.",
+      "severity": "medium"
+    },
+    {
+      "class": "Class X",
+      "subject": "History",
+      "topic": "Russian Revolution",
+      "studentsStruggling": 4,
+      "totalStudents": 8,
+      "recommendation": "Use timeline diagrams and visual aids. Create a comparison chart for February vs October Revolutions. Half the class shows developing or struggling mastery — revise before unit test.",
+      "severity": "high"
+    },
+    {
+      "class": "Class IX",
+      "subject": "Mathematics",
+      "topic": "Quadratic Equations",
+      "studentsStruggling": 2,
+      "totalStudents": 6,
+      "recommendation": "STU011 and STU036 need foundational support with factorisation before moving to discriminant. Assign additional practice worksheets.",
+      "severity": "medium"
+    },
+    {
+      "class": "Class VIII",
+      "subject": "Science",
+      "topic": "Acids & Bases",
+      "studentsStruggling": 3,
+      "totalStudents": 5,
+      "recommendation": "STU012 and STU033 are struggling. Use practical demonstrations with litmus paper and common household acids and bases (vinegar, baking soda) to build conceptual understanding before theory.",
+      "severity": "high"
+    }
+  ]
+}
