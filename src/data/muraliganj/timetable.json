@@ -1,0 +1,721 @@
+{
+  "meta": {
+    "generatedAt": "2026-05-03T08:15:00",
+    "academicYear": "2026-27",
+    "status": "published",
+    "qualityScore": { "overall": 94, "conflictFree": 100, "teacherFatigue": 89, "pedagogy": 92 },
+    "conflictsFound": 0,
+    "totalSlotsFilled": 534,
+    "aiModel": "SchoolOS Timetable Engine v2.1"
+  },
+  "schedule": {
+    "V-A": {
+      "Mon": [
+        { "subject": "Mathematics",       "teacher": "T008" },
+        { "subject": "Bengali",           "teacher": "T002" },
+        { "subject": "English",           "teacher": "T005" },
+        { "subject": "History",           "teacher": "T014" },
+        { "subject": "Geography",         "teacher": "T016" },
+        { "subject": "Science",           "teacher": "T012" },
+        { "subject": "Mathematics",       "teacher": "T008" },
+        { "subject": "Physical Education","teacher": "T018" }
+      ],
+      "Tue": [
+        { "subject": "Bengali",    "teacher": "T002" },
+        { "subject": "Geography",  "teacher": "T016" },
+        { "subject": "Mathematics","teacher": "T008" },
+        { "subject": "Science",    "teacher": "T012" },
+        { "subject": "English",    "teacher": "T005" },
+        { "subject": "Bengali",    "teacher": "T002" },
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "Free Period","teacher": null   }
+      ],
+      "Wed": [
+        { "subject": "English",    "teacher": "T005" },
+        { "subject": "Mathematics","teacher": "T008" },
+        { "subject": "Bengali",    "teacher": "T002" },
+        { "subject": "Geography",  "teacher": "T016" },
+        { "subject": "Science",    "teacher": "T012" },
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "Mathematics","teacher": "T008" },
+        { "subject": "Free Period","teacher": null   }
+      ],
+      "Thu": [
+        { "subject": "Science",           "teacher": "T012" },
+        { "subject": "English",           "teacher": "T005" },
+        { "subject": "Geography",         "teacher": "T016" },
+        { "subject": "Mathematics",       "teacher": "T008" },
+        { "subject": "Bengali",           "teacher": "T002" },
+        { "subject": "History",           "teacher": "T014" },
+        { "subject": "English",           "teacher": "T005" },
+        { "subject": "Physical Education","teacher": "T018" }
+      ],
+      "Fri": [
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "Bengali",    "teacher": "T002" },
+        { "subject": "Science",    "teacher": "T012" },
+        { "subject": "English",    "teacher": "T005" },
+        { "subject": "Mathematics","teacher": "T008" },
+        { "subject": "Geography",  "teacher": "T016" },
+        { "subject": "Free Period","teacher": null   },
+        { "subject": "Science",    "teacher": "T012" }
+      ],
+      "Sat": [
+        { "subject": "Bengali",    "teacher": "T002" },
+        { "subject": "Mathematics","teacher": "T008" },
+        { "subject": "English",    "teacher": "T005" },
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "Geography",  "teacher": "T016" }
+      ]
+    },
+    "V-B": {
+      "Mon": [
+        { "subject": "Bengali",           "teacher": "T002" },
+        { "subject": "Mathematics",       "teacher": "T008" },
+        { "subject": "Geography",         "teacher": "T016" },
+        { "subject": "English",           "teacher": "T005" },
+        { "subject": "Science",           "teacher": "T012" },
+        { "subject": "History",           "teacher": "T014" },
+        { "subject": "Free Period",       "teacher": null   },
+        { "subject": "Mathematics",       "teacher": "T008" }
+      ],
+      "Tue": [
+        { "subject": "English",           "teacher": "T005" },
+        { "subject": "History",           "teacher": "T014" },
+        { "subject": "Mathematics",       "teacher": "T008" },
+        { "subject": "Bengali",           "teacher": "T002" },
+        { "subject": "Physical Education","teacher": "T018" },
+        { "subject": "Mathematics",       "teacher": "T008" },
+        { "subject": "Science",           "teacher": "T012" },
+        { "subject": "English",           "teacher": "T005" }
+      ],
+      "Wed": [
+        { "subject": "Mathematics","teacher": "T008" },
+        { "subject": "Bengali",    "teacher": "T002" },
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "Geography",  "teacher": "T016" },
+        { "subject": "Mathematics","teacher": "T008" },
+        { "subject": "Science",    "teacher": "T012" },
+        { "subject": "English",    "teacher": "T005" },
+        { "subject": "Physical Education","teacher": "T018" }
+      ],
+      "Thu": [
+        { "subject": "Geography",  "teacher": "T016" },
+        { "subject": "Bengali",    "teacher": "T002" },
+        { "subject": "English",    "teacher": "T005" },
+        { "subject": "Science",    "teacher": "T012" },
+        { "subject": "Mathematics","teacher": "T008" },
+        { "subject": "Free Period","teacher": null   },
+        { "subject": "Mathematics","teacher": "T008" },
+        { "subject": "History",    "teacher": "T014" }
+      ],
+      "Fri": [
+        { "subject": "Science",    "teacher": "T012" },
+        { "subject": "English",    "teacher": "T005" },
+        { "subject": "Bengali",    "teacher": "T002" },
+        { "subject": "Mathematics","teacher": "T008" },
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "Bengali",    "teacher": "T002" },
+        { "subject": "Geography",  "teacher": "T016" },
+        { "subject": "Free Period","teacher": null   }
+      ],
+      "Sat": [
+        { "subject": "English",    "teacher": "T005" },
+        { "subject": "Bengali",    "teacher": "T002" },
+        { "subject": "Mathematics","teacher": "T008" },
+        { "subject": "Geography",  "teacher": "T016" },
+        { "subject": "History",    "teacher": "T014" }
+      ]
+    },
+    "VI-A": {
+      "Mon": [
+        { "subject": "English",    "teacher": "T005" },
+        { "subject": "Mathematics","teacher": "T008" },
+        { "subject": "Bengali",    "teacher": "T002" },
+        { "subject": "Science",    "teacher": "T012" },
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "Geography",  "teacher": "T016" },
+        { "subject": "English",    "teacher": "T005" },
+        { "subject": "Mathematics","teacher": "T008" }
+      ],
+      "Tue": [
+        { "subject": "Science",           "teacher": "T012" },
+        { "subject": "Bengali",           "teacher": "T002" },
+        { "subject": "Geography",         "teacher": "T016" },
+        { "subject": "Mathematics",       "teacher": "T008" },
+        { "subject": "Bengali",           "teacher": "T002" },
+        { "subject": "English",           "teacher": "T005" },
+        { "subject": "History",           "teacher": "T014" },
+        { "subject": "Physical Education","teacher": "T018" }
+      ],
+      "Wed": [
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "Science",    "teacher": "T012" },
+        { "subject": "Mathematics","teacher": "T008" },
+        { "subject": "English",    "teacher": "T005" },
+        { "subject": "Bengali",    "teacher": "T002" },
+        { "subject": "Mathematics","teacher": "T008" },
+        { "subject": "Geography",  "teacher": "T016" },
+        { "subject": "Free Period","teacher": null   }
+      ],
+      "Thu": [
+        { "subject": "Bengali",           "teacher": "T002" },
+        { "subject": "Geography",         "teacher": "T016" },
+        { "subject": "English",           "teacher": "T005" },
+        { "subject": "History",           "teacher": "T014" },
+        { "subject": "Mathematics",       "teacher": "T008" },
+        { "subject": "Science",           "teacher": "T012" },
+        { "subject": "Mathematics",       "teacher": "T008" },
+        { "subject": "Physical Education","teacher": "T018" }
+      ],
+      "Fri": [
+        { "subject": "Mathematics","teacher": "T008" },
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "Bengali",    "teacher": "T002" },
+        { "subject": "Geography",  "teacher": "T016" },
+        { "subject": "Science",    "teacher": "T012" },
+        { "subject": "English",    "teacher": "T005" },
+        { "subject": "Free Period","teacher": null   },
+        { "subject": "Science",    "teacher": "T012" }
+      ],
+      "Sat": [
+        { "subject": "Bengali",    "teacher": "T002" },
+        { "subject": "English",    "teacher": "T005" },
+        { "subject": "Mathematics","teacher": "T008" },
+        { "subject": "Science",    "teacher": "T012" },
+        { "subject": "History",    "teacher": "T014" }
+      ]
+    },
+    "VI-B": {
+      "Mon": [
+        { "subject": "Geography",         "teacher": "T016" },
+        { "subject": "Bengali",           "teacher": "T002" },
+        { "subject": "Mathematics",       "teacher": "T008" },
+        { "subject": "English",           "teacher": "T005" },
+        { "subject": "Bengali",           "teacher": "T002" },
+        { "subject": "Science",           "teacher": "T012" },
+        { "subject": "History",           "teacher": "T014" },
+        { "subject": "Mathematics",       "teacher": "T008" }
+      ],
+      "Tue": [
+        { "subject": "Mathematics","teacher": "T008" },
+        { "subject": "English",    "teacher": "T005" },
+        { "subject": "Bengali",    "teacher": "T002" },
+        { "subject": "Geography",  "teacher": "T016" },
+        { "subject": "Science",    "teacher": "T012" },
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "Free Period","teacher": null   },
+        { "subject": "English",    "teacher": "T005" }
+      ],
+      "Wed": [
+        { "subject": "Bengali",           "teacher": "T002" },
+        { "subject": "Geography",         "teacher": "T016" },
+        { "subject": "Science",           "teacher": "T012" },
+        { "subject": "Mathematics",       "teacher": "T008" },
+        { "subject": "History",           "teacher": "T014" },
+        { "subject": "English",           "teacher": "T005" },
+        { "subject": "Mathematics",       "teacher": "T008" },
+        { "subject": "Physical Education","teacher": "T018" }
+      ],
+      "Thu": [
+        { "subject": "English",           "teacher": "T005" },
+        { "subject": "Science",           "teacher": "T012" },
+        { "subject": "History",           "teacher": "T014" },
+        { "subject": "Bengali",           "teacher": "T002" },
+        { "subject": "Geography",         "teacher": "T016" },
+        { "subject": "Mathematics",       "teacher": "T008" },
+        { "subject": "Science",           "teacher": "T012" },
+        { "subject": "Physical Education","teacher": "T018" }
+      ],
+      "Fri": [
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "Mathematics","teacher": "T008" },
+        { "subject": "English",    "teacher": "T005" },
+        { "subject": "Bengali",    "teacher": "T002" },
+        { "subject": "Free Period","teacher": null   },
+        { "subject": "Geography",  "teacher": "T016" },
+        { "subject": "Bengali",    "teacher": "T002" },
+        { "subject": "Science",    "teacher": "T012" }
+      ],
+      "Sat": [
+        { "subject": "Mathematics","teacher": "T008" },
+        { "subject": "Bengali",    "teacher": "T002" },
+        { "subject": "Geography",  "teacher": "T016" },
+        { "subject": "English",    "teacher": "T005" },
+        { "subject": "Science",    "teacher": "T012" }
+      ]
+    },
+    "VII-A": {
+      "Mon": [
+        { "subject": "Mathematics","teacher": "T009" },
+        { "subject": "Bengali",    "teacher": "T003" },
+        { "subject": "English",    "teacher": "T006" },
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "Geography",  "teacher": "T016" },
+        { "subject": "Science",    "teacher": "T013" },
+        { "subject": "Mathematics","teacher": "T009" },
+        { "subject": "Physical Education","teacher": "T018" }
+      ],
+      "Tue": [
+        { "subject": "Bengali",    "teacher": "T003" },
+        { "subject": "Science",    "teacher": "T013" },
+        { "subject": "Mathematics","teacher": "T009" },
+        { "subject": "English",    "teacher": "T006" },
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "Bengali",    "teacher": "T003" },
+        { "subject": "Geography",  "teacher": "T016" },
+        { "subject": "Free Period","teacher": null   }
+      ],
+      "Wed": [
+        { "subject": "English",    "teacher": "T006" },
+        { "subject": "Geography",  "teacher": "T016" },
+        { "subject": "Bengali",    "teacher": "T003" },
+        { "subject": "Science",    "teacher": "T013" },
+        { "subject": "Mathematics","teacher": "T009" },
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "English",    "teacher": "T006" },
+        { "subject": "Mathematics","teacher": "T009" }
+      ],
+      "Thu": [
+        { "subject": "Science",           "teacher": "T013" },
+        { "subject": "English",           "teacher": "T006" },
+        { "subject": "Geography",         "teacher": "T016" },
+        { "subject": "Bengali",           "teacher": "T003" },
+        { "subject": "Mathematics",       "teacher": "T009" },
+        { "subject": "History",           "teacher": "T014" },
+        { "subject": "Science",           "teacher": "T013" },
+        { "subject": "Physical Education","teacher": "T018" }
+      ],
+      "Fri": [
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "Mathematics","teacher": "T009" },
+        { "subject": "Bengali",    "teacher": "T003" },
+        { "subject": "Geography",  "teacher": "T016" },
+        { "subject": "English",    "teacher": "T006" },
+        { "subject": "Science",    "teacher": "T013" },
+        { "subject": "Bengali",    "teacher": "T003" },
+        { "subject": "Free Period","teacher": null   }
+      ],
+      "Sat": [
+        { "subject": "Bengali",    "teacher": "T003" },
+        { "subject": "Mathematics","teacher": "T009" },
+        { "subject": "English",    "teacher": "T006" },
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "Geography",  "teacher": "T016" }
+      ]
+    },
+    "VII-B": {
+      "Mon": [
+        { "subject": "Bengali",           "teacher": "T003" },
+        { "subject": "Mathematics",       "teacher": "T009" },
+        { "subject": "Science",           "teacher": "T013" },
+        { "subject": "English",           "teacher": "T006" },
+        { "subject": "History",           "teacher": "T014" },
+        { "subject": "Mathematics",       "teacher": "T009" },
+        { "subject": "Geography",         "teacher": "T016" },
+        { "subject": "Physical Education","teacher": "T018" }
+      ],
+      "Tue": [
+        { "subject": "English",    "teacher": "T006" },
+        { "subject": "Bengali",    "teacher": "T003" },
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "Mathematics","teacher": "T009" },
+        { "subject": "Science",    "teacher": "T013" },
+        { "subject": "Geography",  "teacher": "T016" },
+        { "subject": "Bengali",    "teacher": "T003" },
+        { "subject": "Free Period","teacher": null   }
+      ],
+      "Wed": [
+        { "subject": "Science",    "teacher": "T013" },
+        { "subject": "English",    "teacher": "T006" },
+        { "subject": "Mathematics","teacher": "T009" },
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "Bengali",    "teacher": "T003" },
+        { "subject": "Science",    "teacher": "T013" },
+        { "subject": "Mathematics","teacher": "T009" },
+        { "subject": "Physical Education","teacher": "T018" }
+      ],
+      "Thu": [
+        { "subject": "Geography",  "teacher": "T016" },
+        { "subject": "Science",    "teacher": "T013" },
+        { "subject": "Bengali",    "teacher": "T003" },
+        { "subject": "English",    "teacher": "T006" },
+        { "subject": "Mathematics","teacher": "T009" },
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "English",    "teacher": "T006" },
+        { "subject": "Free Period","teacher": null   }
+      ],
+      "Fri": [
+        { "subject": "Mathematics","teacher": "T009" },
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "Geography",  "teacher": "T016" },
+        { "subject": "Bengali",    "teacher": "T003" },
+        { "subject": "English",    "teacher": "T006" },
+        { "subject": "Free Period","teacher": null   },
+        { "subject": "Science",    "teacher": "T013" },
+        { "subject": "Bengali",    "teacher": "T003" }
+      ],
+      "Sat": [
+        { "subject": "English",    "teacher": "T006" },
+        { "subject": "Bengali",    "teacher": "T003" },
+        { "subject": "Mathematics","teacher": "T009" },
+        { "subject": "Science",    "teacher": "T013" },
+        { "subject": "History",    "teacher": "T014" }
+      ]
+    },
+    "VIII-A": {
+      "Mon": [
+        { "subject": "Mathematics","teacher": "T009" },
+        { "subject": "Science",    "teacher": "T013" },
+        { "subject": "Bengali",    "teacher": "T003" },
+        { "subject": "English",    "teacher": "T006" },
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "Geography",  "teacher": "T016" },
+        { "subject": "Mathematics","teacher": "T009" },
+        { "subject": "Physical Education","teacher": "T018" }
+      ],
+      "Tue": [
+        { "subject": "English",    "teacher": "T006" },
+        { "subject": "Bengali",    "teacher": "T003" },
+        { "subject": "Geography",  "teacher": "T016" },
+        { "subject": "Mathematics","teacher": "T009" },
+        { "subject": "Science",    "teacher": "T013" },
+        { "subject": "Bengali",    "teacher": "T003" },
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "Free Period","teacher": null   }
+      ],
+      "Wed": [
+        { "subject": "Bengali",           "teacher": "T003" },
+        { "subject": "Mathematics",       "teacher": "T009" },
+        { "subject": "English",           "teacher": "T006" },
+        { "subject": "Science",           "teacher": "T013" },
+        { "subject": "Geography",         "teacher": "T016" },
+        { "subject": "Mathematics",       "teacher": "T009" },
+        { "subject": "History",           "teacher": "T014" },
+        { "subject": "Physical Education","teacher": "T018" }
+      ],
+      "Thu": [
+        { "subject": "Science",    "teacher": "T013" },
+        { "subject": "Geography",  "teacher": "T016" },
+        { "subject": "Bengali",    "teacher": "T003" },
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "English",    "teacher": "T006" },
+        { "subject": "Mathematics","teacher": "T009" },
+        { "subject": "Science",    "teacher": "T013" },
+        { "subject": "English",    "teacher": "T006" }
+      ],
+      "Fri": [
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "English",    "teacher": "T006" },
+        { "subject": "Mathematics","teacher": "T009" },
+        { "subject": "Bengali",    "teacher": "T003" },
+        { "subject": "Geography",  "teacher": "T016" },
+        { "subject": "Science",    "teacher": "T013" },
+        { "subject": "Bengali",    "teacher": "T003" },
+        { "subject": "Free Period","teacher": null   }
+      ],
+      "Sat": [
+        { "subject": "Mathematics","teacher": "T009" },
+        { "subject": "Bengali",    "teacher": "T003" },
+        { "subject": "Science",    "teacher": "T013" },
+        { "subject": "English",    "teacher": "T006" },
+        { "subject": "Geography",  "teacher": "T016" }
+      ]
+    },
+    "VIII-B": {
+      "Mon": [
+        { "subject": "Bengali",           "teacher": "T003" },
+        { "subject": "Geography",         "teacher": "T016" },
+        { "subject": "Mathematics",       "teacher": "T009" },
+        { "subject": "Science",           "teacher": "T013" },
+        { "subject": "English",           "teacher": "T006" },
+        { "subject": "History",           "teacher": "T014" },
+        { "subject": "Bengali",           "teacher": "T003" },
+        { "subject": "Mathematics",       "teacher": "T009" }
+      ],
+      "Tue": [
+        { "subject": "Mathematics",       "teacher": "T009" },
+        { "subject": "English",           "teacher": "T006" },
+        { "subject": "Bengali",           "teacher": "T003" },
+        { "subject": "History",           "teacher": "T014" },
+        { "subject": "Geography",         "teacher": "T016" },
+        { "subject": "Science",           "teacher": "T013" },
+        { "subject": "Mathematics",       "teacher": "T009" },
+        { "subject": "Physical Education","teacher": "T018" }
+      ],
+      "Wed": [
+        { "subject": "Science",    "teacher": "T013" },
+        { "subject": "Bengali",    "teacher": "T003" },
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "English",    "teacher": "T006" },
+        { "subject": "Mathematics","teacher": "T009" },
+        { "subject": "Bengali",    "teacher": "T003" },
+        { "subject": "Geography",  "teacher": "T016" },
+        { "subject": "Free Period","teacher": null   }
+      ],
+      "Thu": [
+        { "subject": "English",           "teacher": "T006" },
+        { "subject": "Science",           "teacher": "T013" },
+        { "subject": "Geography",         "teacher": "T016" },
+        { "subject": "Mathematics",       "teacher": "T009" },
+        { "subject": "Bengali",           "teacher": "T003" },
+        { "subject": "History",           "teacher": "T014" },
+        { "subject": "English",           "teacher": "T006" },
+        { "subject": "Physical Education","teacher": "T018" }
+      ],
+      "Fri": [
+        { "subject": "Geography",  "teacher": "T016" },
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "English",    "teacher": "T006" },
+        { "subject": "Bengali",    "teacher": "T003" },
+        { "subject": "Science",    "teacher": "T013" },
+        { "subject": "Mathematics","teacher": "T009" },
+        { "subject": "Free Period","teacher": null   },
+        { "subject": "Science",    "teacher": "T013" }
+      ],
+      "Sat": [
+        { "subject": "Bengali",    "teacher": "T003" },
+        { "subject": "Mathematics","teacher": "T009" },
+        { "subject": "English",    "teacher": "T006" },
+        { "subject": "History",    "teacher": "T014" },
+        { "subject": "Science",    "teacher": "T013" }
+      ]
+    },
+    "IX-A": {
+      "Mon": [
+        { "subject": "Mathematics",       "teacher": "T001" },
+        { "subject": "English",           "teacher": "T007" },
+        { "subject": "Bengali",           "teacher": "T004" },
+        { "subject": "Physical Science",  "teacher": "T010" },
+        { "subject": "Life Science",      "teacher": "T011" },
+        { "subject": "History",           "teacher": "T015" },
+        { "subject": "Geography",         "teacher": "T015" },
+        { "subject": "Computer Application","teacher": "T017" }
+      ],
+      "Tue": [
+        { "subject": "Bengali",           "teacher": "T004" },
+        { "subject": "Physical Science",  "teacher": "T010" },
+        { "subject": "Mathematics",       "teacher": "T001" },
+        { "subject": "English",           "teacher": "T007" },
+        { "subject": "Life Science",      "teacher": "T011" },
+        { "subject": "Geography",         "teacher": "T015" },
+        { "subject": "History",           "teacher": "T015" },
+        { "subject": "Physical Education","teacher": "T018" }
+      ],
+      "Wed": [
+        { "subject": "English",           "teacher": "T007" },
+        { "subject": "Mathematics",       "teacher": "T001" },
+        { "subject": "Life Science",      "teacher": "T011" },
+        { "subject": "History",           "teacher": "T015" },
+        { "subject": "Physical Science",  "teacher": "T010" },
+        { "subject": "Bengali",           "teacher": "T004" },
+        { "subject": "Computer Application","teacher": "T017" },
+        { "subject": "Free Period",       "teacher": null   }
+      ],
+      "Thu": [
+        { "subject": "Physical Science",  "teacher": "T010" },
+        { "subject": "Bengali",           "teacher": "T004" },
+        { "subject": "Mathematics",       "teacher": "T001" },
+        { "subject": "Life Science",      "teacher": "T011" },
+        { "subject": "English",           "teacher": "T007" },
+        { "subject": "Geography",         "teacher": "T015" },
+        { "subject": "Computer Application","teacher": "T017" },
+        { "subject": "Mathematics",       "teacher": "T001" }
+      ],
+      "Fri": [
+        { "subject": "Life Science",      "teacher": "T011" },
+        { "subject": "Mathematics",       "teacher": "T001" },
+        { "subject": "History",           "teacher": "T015" },
+        { "subject": "Bengali",           "teacher": "T004" },
+        { "subject": "Geography",         "teacher": "T015" },
+        { "subject": "English",           "teacher": "T007" },
+        { "subject": "Physical Science",  "teacher": "T010" },
+        { "subject": "Physical Education","teacher": "T018" }
+      ],
+      "Sat": [
+        { "subject": "Mathematics",      "teacher": "T001" },
+        { "subject": "Bengali",          "teacher": "T004" },
+        { "subject": "English",          "teacher": "T007" },
+        { "subject": "Life Science",     "teacher": "T011" },
+        { "subject": "Physical Science", "teacher": "T010" }
+      ]
+    },
+    "IX-B": {
+      "Mon": [
+        { "subject": "English",           "teacher": "T007" },
+        { "subject": "Bengali",           "teacher": "T004" },
+        { "subject": "Mathematics",       "teacher": "T001" },
+        { "subject": "Life Science",      "teacher": "T011" },
+        { "subject": "Physical Science",  "teacher": "T010" },
+        { "subject": "Computer Application","teacher": "T017" },
+        { "subject": "History",           "teacher": "T015" },
+        { "subject": "Geography",         "teacher": "T015" }
+      ],
+      "Tue": [
+        { "subject": "Mathematics",       "teacher": "T001" },
+        { "subject": "Life Science",      "teacher": "T011" },
+        { "subject": "English",           "teacher": "T007" },
+        { "subject": "Physical Science",  "teacher": "T010" },
+        { "subject": "Bengali",           "teacher": "T004" },
+        { "subject": "History",           "teacher": "T015" },
+        { "subject": "Mathematics",       "teacher": "T001" },
+        { "subject": "Physical Education","teacher": "T018" }
+      ],
+      "Wed": [
+        { "subject": "Bengali",           "teacher": "T004" },
+        { "subject": "Mathematics",       "teacher": "T001" },
+        { "subject": "Physical Science",  "teacher": "T010" },
+        { "subject": "English",           "teacher": "T007" },
+        { "subject": "Life Science",      "teacher": "T011" },
+        { "subject": "Geography",         "teacher": "T015" },
+        { "subject": "Free Period",       "teacher": null   },
+        { "subject": "Computer Application","teacher": "T017" }
+      ],
+      "Thu": [
+        { "subject": "Life Science",      "teacher": "T011" },
+        { "subject": "English",           "teacher": "T007" },
+        { "subject": "Bengali",           "teacher": "T004" },
+        { "subject": "Mathematics",       "teacher": "T001" },
+        { "subject": "Geography",         "teacher": "T015" },
+        { "subject": "Physical Science",  "teacher": "T010" },
+        { "subject": "History",           "teacher": "T015" },
+        { "subject": "Computer Application","teacher": "T017" }
+      ],
+      "Fri": [
+        { "subject": "Physical Science",  "teacher": "T010" },
+        { "subject": "History",           "teacher": "T015" },
+        { "subject": "Mathematics",       "teacher": "T001" },
+        { "subject": "Life Science",      "teacher": "T011" },
+        { "subject": "English",           "teacher": "T007" },
+        { "subject": "Bengali",           "teacher": "T004" },
+        { "subject": "Geography",         "teacher": "T015" },
+        { "subject": "Physical Education","teacher": "T018" }
+      ],
+      "Sat": [
+        { "subject": "Bengali",          "teacher": "T004" },
+        { "subject": "Mathematics",      "teacher": "T001" },
+        { "subject": "Physical Science", "teacher": "T010" },
+        { "subject": "English",          "teacher": "T007" },
+        { "subject": "Life Science",     "teacher": "T011" }
+      ]
+    },
+    "X-A": {
+      "Mon": [
+        { "subject": "Mathematics",       "teacher": "T009" },
+        { "subject": "English",           "teacher": "T007" },
+        { "subject": "Bengali",           "teacher": "T004" },
+        { "subject": "Physical Science",  "teacher": "T010" },
+        { "subject": "Life Science",      "teacher": "T011" },
+        { "subject": "History",           "teacher": "T015" },
+        { "subject": "Geography",         "teacher": "T015" },
+        { "subject": "Computer Application","teacher": "T017" }
+      ],
+      "Tue": [
+        { "subject": "Bengali",           "teacher": "T004" },
+        { "subject": "Physical Science",  "teacher": "T010" },
+        { "subject": "Mathematics",       "teacher": "T009" },
+        { "subject": "English",           "teacher": "T007" },
+        { "subject": "Life Science",      "teacher": "T011" },
+        { "subject": "Geography",         "teacher": "T015" },
+        { "subject": "History",           "teacher": "T015" },
+        { "subject": "Physical Education","teacher": "T018" }
+      ],
+      "Wed": [
+        { "subject": "English",           "teacher": "T007" },
+        { "subject": "Mathematics",       "teacher": "T009" },
+        { "subject": "Life Science",      "teacher": "T011" },
+        { "subject": "History",           "teacher": "T015" },
+        { "subject": "Physical Science",  "teacher": "T010" },
+        { "subject": "Bengali",           "teacher": "T004" },
+        { "subject": "Computer Application","teacher": "T017" },
+        { "subject": "Mathematics",       "teacher": "T009" }
+      ],
+      "Thu": [
+        { "subject": "Physical Science",  "teacher": "T010" },
+        { "subject": "Bengali",           "teacher": "T004" },
+        { "subject": "Mathematics",       "teacher": "T009" },
+        { "subject": "Life Science",      "teacher": "T011" },
+        { "subject": "English",           "teacher": "T007" },
+        { "subject": "Geography",         "teacher": "T015" },
+        { "subject": "Computer Application","teacher": "T017" },
+        { "subject": "History",           "teacher": "T015" }
+      ],
+      "Fri": [
+        { "subject": "Life Science",      "teacher": "T011" },
+        { "subject": "Mathematics",       "teacher": "T009" },
+        { "subject": "History",           "teacher": "T015" },
+        { "subject": "Bengali",           "teacher": "T004" },
+        { "subject": "Geography",         "teacher": "T015" },
+        { "subject": "English",           "teacher": "T007" },
+        { "subject": "Physical Science",  "teacher": "T010" },
+        { "subject": "Physical Education","teacher": "T018" }
+      ],
+      "Sat": [
+        { "subject": "Mathematics",      "teacher": "T009" },
+        { "subject": "Bengali",          "teacher": "T004" },
+        { "subject": "English",          "teacher": "T007" },
+        { "subject": "Life Science",     "teacher": "T011" },
+        { "subject": "Physical Science", "teacher": "T010" }
+      ]
+    },
+    "X-B": {
+      "Mon": [
+        { "subject": "Bengali",           "teacher": "T004" },
+        { "subject": "Mathematics",       "teacher": "T009" },
+        { "subject": "Physical Science",  "teacher": "T010" },
+        { "subject": "English",           "teacher": "T007" },
+        { "subject": "Computer Application","teacher": "T017" },
+        { "subject": "Life Science",      "teacher": "T011" },
+        { "subject": "History",           "teacher": "T015" },
+        { "subject": "Geography",         "teacher": "T015" }
+      ],
+      "Tue": [
+        { "subject": "Mathematics",       "teacher": "T009" },
+        { "subject": "Life Science",      "teacher": "T011" },
+        { "subject": "Bengali",           "teacher": "T004" },
+        { "subject": "Physical Science",  "teacher": "T010" },
+        { "subject": "History",           "teacher": "T015" },
+        { "subject": "English",           "teacher": "T007" },
+        { "subject": "Mathematics",       "teacher": "T009" },
+        { "subject": "Physical Education","teacher": "T018" }
+      ],
+      "Wed": [
+        { "subject": "Life Science",      "teacher": "T011" },
+        { "subject": "Bengali",           "teacher": "T004" },
+        { "subject": "English",           "teacher": "T007" },
+        { "subject": "Mathematics",       "teacher": "T009" },
+        { "subject": "Geography",         "teacher": "T015" },
+        { "subject": "Physical Science",  "teacher": "T010" },
+        { "subject": "History",           "teacher": "T015" },
+        { "subject": "Computer Application","teacher": "T017" }
+      ],
+      "Thu": [
+        { "subject": "English",           "teacher": "T007" },
+        { "subject": "Physical Science",  "teacher": "T010" },
+        { "subject": "Life Science",      "teacher": "T011" },
+        { "subject": "Bengali",           "teacher": "T004" },
+        { "subject": "Mathematics",       "teacher": "T009" },
+        { "subject": "History",           "teacher": "T015" },
+        { "subject": "Geography",         "teacher": "T015" },
+        { "subject": "Free Period",       "teacher": null   }
+      ],
+      "Fri": [
+        { "subject": "Mathematics",       "teacher": "T009" },
+        { "subject": "History",           "teacher": "T015" },
+        { "subject": "Bengali",           "teacher": "T004" },
+        { "subject": "Life Science",      "teacher": "T011" },
+        { "subject": "English",           "teacher": "T007" },
+        { "subject": "Computer Application","teacher": "T017" },
+        { "subject": "Physical Science",  "teacher": "T010" },
+        { "subject": "Physical Education","teacher": "T018" }
+      ],
+      "Sat": [
+        { "subject": "Bengali",          "teacher": "T004" },
+        { "subject": "English",          "teacher": "T007" },
+        { "subject": "Mathematics",      "teacher": "T009" },
+        { "subject": "Physical Science", "teacher": "T010" },
+        { "subject": "Life Science",     "teacher": "T011" }
+      ]
+    }
+  }
+}

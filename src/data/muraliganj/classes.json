@@ -1,0 +1,14 @@
+[
+  { "id": "V-A",    "class": "V",    "section": "A", "classTeacher": "T002", "students": 36, "room": "Room 1" },
+  { "id": "V-B",    "class": "V",    "section": "B", "classTeacher": "T005", "students": 34, "room": "Room 2" },
+  { "id": "VI-A",   "class": "VI",   "section": "A", "classTeacher": "T012", "students": 38, "room": "Room 3" },
+  { "id": "VI-B",   "class": "VI",   "section": "B", "classTeacher": "T014", "students": 36, "room": "Room 4" },
+  { "id": "VII-A",  "class": "VII",  "section": "A", "classTeacher": "T003", "students": 40, "room": "Room 5" },
+  { "id": "VII-B",  "class": "VII",  "section": "B", "classTeacher": "T016", "students": 38, "room": "Room 6" },
+  { "id": "VIII-A", "class": "VIII", "section": "A", "classTeacher": "T013", "students": 42, "room": "Room 7" },
+  { "id": "VIII-B", "class": "VIII", "section": "B", "classTeacher": "T009", "students": 40, "room": "Room 8" },
+  { "id": "IX-A",   "class": "IX",   "section": "A", "classTeacher": "T011", "students": 45, "room": "Room 9" },
+  { "id": "IX-B",   "class": "IX",   "section": "B", "classTeacher": "T015", "students": 43, "room": "Room 10" },
+  { "id": "X-A",    "class": "X",    "section": "A", "classTeacher": "T004", "students": 42, "room": "Room 11" },
+  { "id": "X-B",    "class": "X",    "section": "B", "classTeacher": "T007", "students": 40, "room": "Room 12" }
+]
