@@ -1,83 +1,103 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, UserPlus, CalendarCheck, Clock,
   FileText, CreditCard, Library, Bus, Heart, Users,
   Smartphone, ShoppingBag, Brain, BarChart3, Settings,
-  Sparkles, GraduationCap, ChevronRight, BookUser, IdCard, Globe
+  Sparkles, GraduationCap, ChevronRight, BookUser, IdCard, Globe,
+  LogOut,
 } from 'lucide-react';
+import { useTenantSafe } from '@/context/TenantContext';
+import { logoutTenant } from '@/lib/tenant';
 
-const navGroups = [
+const allNavGroups = [
   {
     label: 'Overview',
     items: [
-      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { moduleId: 'dashboard',    href: '/dashboard',    label: 'Dashboard',       icon: LayoutDashboard },
     ],
   },
   {
     label: 'School Operations',
     items: [
-      { href: '/students', label: 'Students', icon: BookUser },
-      { href: '/id-cards', label: 'ID Cards & Certs', icon: IdCard },
-      { href: '/admissions', label: 'Admissions', icon: UserPlus },
-      { href: '/attendance', label: 'Attendance', icon: CalendarCheck },
-      { href: '/timetable', label: 'Timetable', icon: Clock },
-      { href: '/examinations', label: 'Examinations', icon: FileText },
-      { href: '/transport', label: 'Transport', icon: Bus },
-      { href: '/health', label: 'Health', icon: Heart },
+      { moduleId: 'students',     href: '/students',     label: 'Students',        icon: BookUser },
+      { moduleId: 'id-cards',     href: '/id-cards',     label: 'ID Cards & Certs',icon: IdCard },
+      { moduleId: 'admissions',   href: '/admissions',   label: 'Admissions',      icon: UserPlus },
+      { moduleId: 'attendance',   href: '/attendance',   label: 'Attendance',      icon: CalendarCheck },
+      { moduleId: 'timetable',    href: '/timetable',    label: 'AI Timetable Engine', icon: Clock, ai: true as const },
+      { moduleId: 'examinations', href: '/examinations', label: 'Examinations',    icon: FileText },
+      { moduleId: 'transport',    href: '/transport',    label: 'Transport',       icon: Bus },
+      { moduleId: 'health',       href: '/health',       label: 'Health',          icon: Heart },
     ],
   },
   {
     label: 'Learning',
     items: [
-      { href: '/academics', label: 'Academics', icon: GraduationCap },
-      { href: '/exam-engine', label: 'Exam Engine', icon: FileText, ai: true as const },
-      { href: '/library', label: 'Library', icon: Library },
+      { moduleId: 'academics',    href: '/academics',    label: 'Academics',       icon: GraduationCap },
+      { moduleId: 'exam-engine',  href: '/exam-engine',  label: 'Exam Engine',     icon: FileText, ai: true as const },
+      { moduleId: 'library',      href: '/library',      label: 'Library',         icon: Library },
     ],
   },
   {
     label: 'People',
     items: [
-      { href: '/hr', label: 'HR & Staff', icon: Users },
+      { moduleId: 'hr',           href: '/hr',           label: 'HR & Staff',      icon: Users },
     ],
   },
   {
     label: 'Finance',
     items: [
-      { href: '/fee', label: 'Fee Management', icon: CreditCard },
+      { moduleId: 'fee',          href: '/fee',          label: 'Fee Management',  icon: CreditCard },
     ],
   },
   {
     label: 'AI & Insights',
     items: [
-      { href: '/ai-advisor', label: 'AI Advisor', icon: Brain, ai: true as const },
-      { href: '/analytics', label: 'Analytics', icon: BarChart3, ai: true as const },
+      { moduleId: 'ai-advisor',   href: '/ai-advisor',   label: 'AI Advisor',      icon: Brain,    ai: true as const },
+      { moduleId: 'analytics',    href: '/analytics',    label: 'Analytics',       icon: BarChart3, ai: true as const },
     ],
   },
   {
     label: 'Parent Connect',
     items: [
-      { href: '/parent-portal', label: 'Parent Portal', icon: Globe },
-      { href: '/parent-app', label: 'Parent App', icon: Smartphone },
-      { href: '/school-shop', label: 'School Shop', icon: ShoppingBag },
+      { moduleId: 'parent-portal',href: '/parent-portal',label: 'Parent Portal',   icon: Globe },
+      { moduleId: 'parent-app',   href: '/parent-app',   label: 'Parent App',      icon: Smartphone },
+      { moduleId: 'school-shop',  href: '/school-shop',  label: 'School Shop',     icon: ShoppingBag },
     ],
   },
   {
     label: 'System',
     items: [
-      { href: '/settings', label: 'Settings', icon: Settings },
+      { moduleId: 'settings',     href: '/settings',     label: 'Settings',        icon: Settings },
     ],
   },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router   = useRouter();
+  const tenant   = useTenantSafe();
+
+  const allowedModules = new Set(tenant?.modules ?? []);
+
+  const visibleGroups = allNavGroups
+    .map(group => ({
+      ...group,
+      items: group.items.filter(item => allowedModules.has(item.moduleId)),
+    }))
+    .filter(group => group.items.length > 0);
+
+  function handleLogout() {
+    logoutTenant();
+    router.replace('/login');
+  }
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 gradient-navy flex flex-col z-40 shadow-2xl">
-      {/* Logo */}
+      {/* Logo + School */}
       <div className="px-5 py-5 border-b border-white/10">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 bg-gold rounded-xl flex items-center justify-center shadow-lg">
@@ -88,11 +108,17 @@ export default function Sidebar() {
             <div className="text-ice/60 text-[10px] font-dm-sans tracking-wide">AI-Powered ERP</div>
           </div>
         </div>
+        {tenant && (
+          <div className="mt-3 px-3 py-2 bg-white/8 rounded-lg border border-white/10">
+            <div className="text-gold text-[11px] font-sora font-semibold leading-tight truncate">{tenant.name}</div>
+            <div className="text-ice/50 text-[10px] mt-0.5">{tenant.city} · {tenant.board}</div>
+          </div>
+        )}
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-3 scrollbar-thin">
-        {navGroups.map((group) => (
+        {visibleGroups.map((group) => (
           <div key={group.label} className="mb-1">
             <div className="px-5 py-2 text-[10px] font-sora font-semibold tracking-widest text-ice/40 uppercase">
               {group.label}
@@ -125,17 +151,23 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* Footer */}
-      <div className="p-4 border-t border-white/10">
+      {/* Footer — user + logout */}
+      <div className="p-4 border-t border-white/10 space-y-2">
         <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white/5">
-          <div className="w-7 h-7 rounded-full bg-gold flex items-center justify-center text-navy font-bold text-xs font-sora">
-            PS
+          <div className="w-7 h-7 rounded-full bg-gold flex items-center justify-center text-navy font-bold text-xs font-sora flex-shrink-0">
+            {tenant?.headInitials ?? '?'}
           </div>
-          <div className="min-w-0">
-            <div className="text-white text-xs font-semibold truncate">Principal Sharma</div>
-            <div className="text-ice/50 text-[10px]">Administrator</div>
+          <div className="min-w-0 flex-1">
+            <div className="text-white text-xs font-semibold truncate">{tenant?.headName ?? 'Admin'}</div>
+            <div className="text-ice/50 text-[10px]">{tenant?.headTitle ?? 'Administrator'}</div>
           </div>
         </div>
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-ice/60 hover:bg-white/8 hover:text-white text-xs font-dm-sans transition-colors"
+        >
+          <LogOut className="w-3.5 h-3.5" /> Sign Out
+        </button>
       </div>
     </aside>
   );

@@ -18,6 +18,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid
 } from 'recharts';
 import staffData from '@/data/staff.json';
+import { useTenantSafe } from '@/context/TenantContext';
+import MHSHRPage from '@/components/mhs/MHSHRPage';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -460,6 +462,11 @@ function ApplyLeaveModal({ staff, onClose, onApply }: { staff: Staff[]; onClose:
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function HRPage() {
+  const tenant = useTenantSafe();
+  return tenant?.id === 'muraliganj' ? <MHSHRPage /> : <SundarbanaHRContent />;
+}
+
+function SundarbanaHRContent() {
   const [activeTab, setActiveTab] = useState<Tab>('directory');
   const [staffList, setStaffList] = useState<Staff[]>(staffData as Staff[]);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>(seedLeave);

@@ -5,6 +5,8 @@ import PageWrapper from '@/components/layout/PageWrapper';
 import StatCard from '@/components/shared/StatCard';
 import AIBadge from '@/components/shared/AIBadge';
 import { Users, CalendarCheck, CreditCard, UserCheck, Brain, AlertTriangle, TrendingDown, Trophy, ChevronRight, Clock } from 'lucide-react';
+import { useTenantSafe } from '@/context/TenantContext';
+import MHSDashboard from '@/components/mhs/MHSDashboard';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 import attendanceData from '@/data/attendance.json';
@@ -23,6 +25,11 @@ const stageBadgeColor: Record<string, string> = {
 };
 
 export default function DashboardPage() {
+  const tenant = useTenantSafe();
+  return tenant?.id === 'muraliganj' ? <MHSDashboard /> : <SundarbanaDashboardContent />;
+}
+
+function SundarbanaDashboardContent() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

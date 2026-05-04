@@ -7,6 +7,8 @@ import AIBadge from '@/components/shared/AIBadge';
 import EmptyState from '@/components/shared/EmptyState';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { useTenantSafe } from '@/context/TenantContext';
+import MHSAcademicsPage from '@/components/mhs/MHSAcademicsPage';
 import {
   Search, TrendingUp, TrendingDown, FileText, Download,
   BookOpen, BarChart3, ClipboardList, ChevronRight, CheckCircle2,
@@ -39,6 +41,11 @@ const MASTERY_CONFIG: Record<number, { label: string; bg: string; text: string }
 type Tab = 'syllabus' | 'results' | 'report' | 'mastery' | 'lessons';
 
 export default function AcademicsPage() {
+  const tenant = useTenantSafe();
+  return tenant?.id === 'muraliganj' ? <MHSAcademicsPage /> : <SundarbanaAcademicsContent />;
+}
+
+function SundarbanaAcademicsContent() {
   const [activeTab, setActiveTab] = useState<Tab>('syllabus');
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState('Class X');

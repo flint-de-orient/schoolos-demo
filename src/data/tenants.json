@@ -1,0 +1,40 @@
+[
+  {
+    "id": "sundarban",
+    "name": "Sundarban Academy",
+    "shortName": "SA",
+    "city": "Kolkata",
+    "state": "West Bengal",
+    "board": "CISCE",
+    "headTitle": "Principal",
+    "headName": "Principal Sharma",
+    "headInitials": "PS",
+    "email": "admin@sundarbanacademy.edu.in",
+    "password": "sundarban2026",
+    "modules": [
+      "dashboard", "students", "id-cards", "admissions", "attendance",
+      "timetable", "examinations", "transport", "health",
+      "academics", "exam-engine", "library",
+      "hr", "fee",
+      "ai-advisor", "analytics",
+      "parent-portal", "parent-app", "school-shop",
+      "settings"
+    ]
+  },
+  {
+    "id": "muraliganj",
+    "name": "Muraliganj High School (H.S)",
+    "shortName": "MHS",
+    "city": "Murshidabad",
+    "state": "West Bengal",
+    "board": "WBBSE",
+    "headTitle": "Head Master",
+    "headName": "Mr. Samsul Alam",
+    "headInitials": "SA",
+    "email": "admin@muraliganjhs.edu.in",
+    "password": "muraliganj2026",
+    "modules": [
+      "dashboard", "timetable", "academics", "hr", "settings"
+    ]
+  }
+]

@@ -20,6 +20,8 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import timetableData from '@/data/timetable.json';
+import { useTenantSafe } from '@/context/TenantContext';
+import MHSTimetablePage from '@/components/mhs/MHSTimetablePage';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -139,6 +141,11 @@ function TimetableGrid({
 // ─── Main Page ──────────────────────────────────────────────────────────────
 
 export default function TimetablePage() {
+  const tenant = useTenantSafe();
+  return tenant?.id === 'muraliganj' ? <MHSTimetablePage /> : <SundarbantimetableContent />;
+}
+
+function SundarbantimetableContent() {
   const [activeTab, setActiveTab] = useState<'timetable' | 'generator' | 'substitution'>('timetable');
   const [selectedClass, setSelectedClass] = useState('Class X-A');
   const [genState, setGenState] = useState<GenerationState>('idle');
