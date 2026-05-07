@@ -1,25 +1,58 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import PageWrapper from '@/components/layout/PageWrapper';
 import AIBadge from '@/components/shared/AIBadge';
 import { TrendingUp, DollarSign, Users, Smartphone } from 'lucide-react';
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend
+  PieChart, Pie, Cell, Legend,
 } from 'recharts';
-import analyticsData from '@/data/analytics.json';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const SUBJECT_COLORS = ['#1E2761', '#F5C542', '#028090', '#534AB7', '#D85A30', '#3B6D11'];
 
-export default function AnalyticsPage() {
-  const subjectChartData = Object.entries(analyticsData.subjectPerformance).map(([cls, scores]) => ({
-    class: cls.replace('Class ', 'Cl.'),
-    ...scores,
-  }));
+const STATIC_SUBJECT_PERF = [
+  { class: 'Cl. VIII', english: 78, mathematics: 82, science: 80, history: 72, geography: 74, bengali: 81 },
+  { class: 'Cl. IX', english: 76, mathematics: 84, science: 79, history: 70, geography: 73, bengali: 79 },
+  { class: 'Cl. X', english: 80, mathematics: 88, science: 85, history: 74, geography: 77, bengali: 83 },
+  { class: 'Cl. XI', english: 74, mathematics: 81, science: 83, history: 69, geography: 71, bengali: 77 },
+  { class: 'Cl. XII', english: 77, mathematics: 83, science: 82, history: 71, geography: 72, bengali: 78 },
+];
 
+export default function AnalyticsPage() {
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<any>(null);
+
+  useEffect(() => {
+    fetch('/api/analytics')
+      .then(r => r.json())
+      .then(res => { setData(res); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <PageWrapper>
+        <div className="grid grid-cols-2 gap-5 mb-5">
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-64 rounded-xl" />)}
+        </div>
+        <Skeleton className="h-28 rounded-xl" />
+      </PageWrapper>
+    );
+  }
+
+  const enrollmentTrend = data?.enrollmentTrend ?? [];
+  const feeByMonth = (data?.feeByMonth ?? []).map((m: any) => ({
+    month: m.month,
+    amount: m.collected,
+  }));
+  const parentPct = data?.parentAppAdoption ?? 73;
+  const totalStudents = data?.overview?.totalStudents ?? 520;
+  const activatedCount = Math.round(totalStudents * (parentPct / 100));
   const donutData = [
-    { name: 'Activated', value: analyticsData.parentAppAdoption.activated },
-    { name: 'Not Activated', value: analyticsData.parentAppAdoption.total - analyticsData.parentAppAdoption.activated },
+    { name: 'Activated', value: activatedCount },
+    { name: 'Not Activated', value: totalStudents - activatedCount },
   ];
 
   return (
@@ -29,14 +62,14 @@ export default function AnalyticsPage() {
         {/* Enrollment Trend */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-sora font-semibold text-navy">Enrollment Trend (2019–2025)</h3>
+            <h3 className="font-sora font-semibold text-navy">Enrollment Trend (2021–2026)</h3>
             <TrendingUp className="w-4 h-4 text-gold" />
           </div>
           <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={analyticsData.enrollmentTrend} margin={{ top: 4, right: 4, left: -20 }}>
+            <LineChart data={enrollmentTrend} margin={{ top: 4, right: 4, left: -20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="year" tick={{ fontSize: 11, fontFamily: 'DM Sans' }} />
-              <YAxis domain={[400, 540]} tick={{ fontSize: 11, fontFamily: 'DM Sans' }} />
+              <YAxis domain={[400, 560]} tick={{ fontSize: 11, fontFamily: 'DM Sans' }} />
               <Tooltip contentStyle={{ fontFamily: 'DM Sans', fontSize: 12, borderRadius: 8 }} />
               <Line type="monotone" dataKey="students" stroke="#F5C542" strokeWidth={3} dot={{ fill: '#1E2761', r: 5 }} name="Students" />
             </LineChart>
@@ -46,11 +79,11 @@ export default function AnalyticsPage() {
         {/* Fee Collection */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-sora font-semibold text-navy">Monthly Fee Collection (2024-25)</h3>
+            <h3 className="font-sora font-semibold text-navy">Monthly Fee Collection</h3>
             <DollarSign className="w-4 h-4 text-green" />
           </div>
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={analyticsData.feeCollectionByMonth} margin={{ top: 4, right: 4, left: -10 }}>
+            <BarChart data={feeByMonth} margin={{ top: 4, right: 4, left: -10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="month" tick={{ fontSize: 10, fontFamily: 'DM Sans' }} />
               <YAxis tick={{ fontSize: 10, fontFamily: 'DM Sans' }} tickFormatter={v => `₹${(v / 100000).toFixed(1)}L`} />
@@ -70,10 +103,10 @@ export default function AnalyticsPage() {
             <Users className="w-4 h-4 text-purple" />
           </div>
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={subjectChartData} margin={{ top: 4, right: 4, left: -20 }}>
+            <BarChart data={STATIC_SUBJECT_PERF} margin={{ top: 4, right: 4, left: -20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="class" tick={{ fontSize: 10, fontFamily: 'DM Sans' }} />
-              <YAxis domain={[65, 90]} tick={{ fontSize: 10, fontFamily: 'DM Sans' }} />
+              <YAxis domain={[65, 95]} tick={{ fontSize: 10, fontFamily: 'DM Sans' }} />
               <Tooltip contentStyle={{ fontFamily: 'DM Sans', fontSize: 12, borderRadius: 8 }} />
               <Legend wrapperStyle={{ fontFamily: 'DM Sans', fontSize: 11 }} />
               {['english', 'mathematics', 'science', 'history', 'geography', 'bengali'].map((sub, i) => (
@@ -99,11 +132,11 @@ export default function AnalyticsPage() {
               </PieChart>
             </ResponsiveContainer>
             <div>
-              <div className="text-5xl font-sora font-bold text-navy mb-1">{analyticsData.parentAppAdoption.percent}%</div>
-              <p className="text-sm text-gray-500">{analyticsData.parentAppAdoption.activated} of {analyticsData.parentAppAdoption.total} families</p>
+              <div className="text-5xl font-sora font-bold text-navy mb-1">{parentPct}%</div>
+              <p className="text-sm text-gray-500">{activatedCount} of {totalStudents} families</p>
               <div className="mt-4 space-y-1.5">
-                <div className="flex items-center gap-2 text-xs"><div className="w-3 h-3 rounded-full bg-teal" /><span>Activated: {analyticsData.parentAppAdoption.activated}</span></div>
-                <div className="flex items-center gap-2 text-xs"><div className="w-3 h-3 rounded-full bg-iceLight border border-ice" /><span>Pending: {analyticsData.parentAppAdoption.total - analyticsData.parentAppAdoption.activated}</span></div>
+                <div className="flex items-center gap-2 text-xs"><div className="w-3 h-3 rounded-full bg-teal" /><span>Activated: {activatedCount}</span></div>
+                <div className="flex items-center gap-2 text-xs"><div className="w-3 h-3 rounded-full bg-iceLight border border-ice" /><span>Pending: {totalStudents - activatedCount}</span></div>
               </div>
             </div>
           </div>
@@ -113,10 +146,10 @@ export default function AnalyticsPage() {
       {/* Forecast Cards */}
       <div className="grid grid-cols-4 gap-4">
         {[
-          { title: 'Enrollment Forecast FY 2025-26', value: `${analyticsData.forecasts.enrollment2026} students`, sub: `↑ ${analyticsData.forecasts.enrollmentGrowth}% growth projected`, icon: TrendingUp },
+          { title: 'Enrollment Forecast FY 2025-26', value: `${Math.round((data?.overview?.totalStudents ?? 520) * 1.048)} students`, sub: '↑ 4.8% growth projected', icon: TrendingUp },
           { title: 'Projected Fee Revenue', value: '₹1.24 Cr', sub: 'Based on current collection rate', icon: DollarSign },
-          { title: 'Teacher Attendance Rate', value: `${analyticsData.teacherAttendance.percent}%`, sub: `${analyticsData.teacherAttendance.present}/${analyticsData.teacherAttendance.total} staff today`, icon: Users },
-          { title: 'Teacher Attrition Risk', value: `${analyticsData.forecasts.attritionRisk} staff`, sub: 'AI flagged for retention review', icon: TrendingUp },
+          { title: 'Teacher Attendance Rate', value: `${data?.teacherAttendance ?? 96}%`, sub: 'Staff present today', icon: Users },
+          { title: 'Teacher Attrition Risk', value: '2 staff', sub: 'AI flagged for retention review', icon: TrendingUp },
         ].map(card => {
           const Icon = card.icon;
           return (

@@ -1,14 +1,12 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import PageWrapper from '@/components/layout/PageWrapper';
 import { Input } from '@/components/ui/input';
 import AIBadge from '@/components/shared/AIBadge';
 import EmptyState from '@/components/shared/EmptyState';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import { useTenantSafe } from '@/context/TenantContext';
-import MHSAcademicsPage from '@/components/mhs/MHSAcademicsPage';
 import {
   Search, TrendingUp, TrendingDown, FileText, Download,
   BookOpen, BarChart3, ClipboardList, ChevronRight, CheckCircle2,
@@ -18,6 +16,16 @@ import {
 import studentsData from '@/data/students.json';
 import conceptMasteryData from '@/data/concept-mastery.json';
 import lessonPlansData from '@/data/lesson-plans.json';
+
+type ApiStudent = {
+  id: string;
+  name: string;
+  rollNo: string | null;
+  attendancePercent: number;
+  grade: { name: string };
+  section: { name: string };
+  boardPredictions: { predictedScore: number }[];
+};
 
 const syllabusData = [
   { subject: 'Mathematics',  teacher: 'Mr. Subhashis Bose',       total: 24, covered: 19, color: 'bg-blue-500',   dot: 'bg-blue-500' },
@@ -41,11 +49,6 @@ const MASTERY_CONFIG: Record<number, { label: string; bg: string; text: string }
 type Tab = 'syllabus' | 'results' | 'report' | 'mastery' | 'lessons';
 
 export default function AcademicsPage() {
-  const tenant = useTenantSafe();
-  return tenant?.id === 'muraliganj' ? <MHSAcademicsPage /> : <SundarbanaAcademicsContent />;
-}
-
-function SundarbanaAcademicsContent() {
   const [activeTab, setActiveTab] = useState<Tab>('syllabus');
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState('Class X');
@@ -58,9 +61,27 @@ function SundarbanaAcademicsContent() {
   const [generating, setGenerating] = useState(false);
   const router = useRouter();
 
+  // Fetch real students from API (used for profile navigation with correct DB IDs)
+  const [apiStudents, setApiStudents] = useState<ApiStudent[]>([]);
+  useEffect(() => {
+    fetch('/api/students?limit=200')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setApiStudents(Array.isArray(d) ? d : (d.data ?? [])); })
+      .catch(() => {});
+  }, []);
+
   const classes = [...new Set(studentsData.map(s => s.class))].sort();
 
-  const filtered = studentsData
+  // For the results table: merge static JSON scores with API IDs
+  const mergedStudents = useMemo(() => {
+    if (!apiStudents.length) return studentsData.map(s => ({ ...s, realId: s.id }));
+    return studentsData.map(s => {
+      const match = apiStudents.find(a => a.name === s.name);
+      return { ...s, realId: match?.id ?? s.id };
+    });
+  }, [apiStudents]);
+
+  const filtered = mergedStudents
     .filter(s => s.class === classFilter && s.name.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
       const avgA = Object.values(a.academicScore).reduce((x, y) => x + y, 0) / 6;
@@ -259,7 +280,7 @@ function SundarbanaAcademicsContent() {
                   return (
                     <button
                       key={s.id}
-                      onClick={() => router.push(`/academics/${s.id}`)}
+                      onClick={() => router.push(`/academics/${s.realId}`)}
                       className="w-full text-left bg-gray-50 hover:bg-white border border-gray-100 hover:border-gray-200 hover:shadow-md rounded-2xl p-4 transition-all"
                     >
                       <div className="flex items-center justify-between mb-3">
@@ -287,7 +308,7 @@ function SundarbanaAcademicsContent() {
                       </div>
                       <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-gray-100">
                         <div className="flex items-center gap-1 text-xs">
-                          <span className="font-semibold text-gold">{s.predictedBoardScore}%</span>
+                          <span className="font-semibold text-amber">{s.predictedBoardScore}%</span>
                           <AIBadge />
                         </div>
                         <span className="text-xs text-teal font-semibold flex items-center gap-0.5">View Profile <ChevronRight className="w-3 h-3" /></span>
@@ -320,7 +341,7 @@ function SundarbanaAcademicsContent() {
                         <tr
                           key={s.id}
                           className={`border-b border-gray-50 hover:bg-iceLight/60 transition-colors cursor-pointer ${i % 2 !== 0 ? 'bg-gray-50/30' : ''}`}
-                          onClick={() => router.push(`/academics/${s.id}`)}
+                          onClick={() => router.push(`/academics/${s.realId}`)}
                         >
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2.5">
@@ -346,7 +367,7 @@ function SundarbanaAcademicsContent() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1">
-                              <span className="text-sm font-bold text-gold">{s.predictedBoardScore}%</span>
+                              <span className="text-sm font-bold text-amber">{s.predictedBoardScore}%</span>
                               <AIBadge />
                             </div>
                           </td>
@@ -377,7 +398,7 @@ function SundarbanaAcademicsContent() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {studentsData.filter(s => s.class === classFilter).map((s, i) => {
+                {mergedStudents.filter(s => s.class === classFilter).map((s, i) => {
                   const avg = Math.round(Object.values(s.academicScore).reduce((a, b) => a + b, 0) / 6);
                   const isGenerated = i === 0;
                   return (

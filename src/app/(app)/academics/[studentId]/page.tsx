@@ -1,7 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { notFound } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import PageWrapper from '@/components/layout/PageWrapper';
 import AIBadge from '@/components/shared/AIBadge';
 import StatusBadge from '@/components/shared/StatusBadge';
@@ -9,15 +8,103 @@ import {
   Trophy, AlertTriangle, Phone, Mail, BookOpen, Heart,
   BookMarked, ClipboardList, ArrowLeft, GraduationCap,
   BarChart3, CreditCard, CalendarDays, TrendingUp, TrendingDown,
-  MapPin, Droplets, Brain, Target, Zap, Star, CheckCircle2, Circle
+  MapPin, Droplets, Brain, Target, Star, CheckCircle2, Circle, Loader2, Zap
 } from 'lucide-react';
 import Link from 'next/link';
-import studentsData from '@/data/students.json';
-import feeData from '@/data/fee.json';
-import libraryData from '@/data/library.json';
+import StudentFeePanel from '@/components/fee/StudentFeePanel';
 import homeworkData from '@/data/homework.json';
 import conceptMasteryData from '@/data/concept-mastery.json';
 import { getInitials } from '@/lib/utils';
+
+// ─── API response shape (subset we use) ───────────────────────────────────────
+type ApiStudent = {
+  id: string;
+  name: string;
+  rollNo: string | null;
+  house: string | null;
+  bloodGroup: string | null;
+  gender: string | null;
+  dateOfBirth: string | null;
+  address: string | null;
+  attendancePercent: number;
+  grade: { id: string; name: string };
+  section: { id: string; name: string };
+  parents: { relation: string; parent: { fatherName?: string | null; motherName?: string | null; phone: string; email?: string | null; occupation?: string | null } }[];
+  medical: { notes: string | null; bloodGroup?: string | null } | null;
+  achievements: { id: string; title: string }[];
+  bookIssues: { id: string; dueDate: string | null; book: { title: string; author: string; genre: string } }[];
+  boardPredictions: { predictedScore: number }[];
+  learningPlans: { learningStyle?: string | null }[];
+  feeAssignment: { feeAccount: { status: string } | null } | null;
+};
+
+// ─── Normalised profile used by UI ────────────────────────────────────────────
+type Profile = {
+  id: string;
+  name: string;
+  class: string;
+  section: string;
+  rollNo: string;
+  house: string;
+  bloodGroup: string;
+  gender: string;
+  address: string;
+  learningStyle: string;
+  attendancePercent: number;
+  feeStatus: string;
+  libraryBooksIssued: number;
+  predictedBoardScore: number;
+  academicScore: Record<string, number>;
+  achievements: string[];
+  medicalNotes: string | null;
+  parent: { father: string; mother: string; phone: string; email: string; occupation: string };
+  bookIssues: { id: string; title: string; author: string; genre: string; dueDate: string; isOverdue: boolean }[];
+};
+
+function buildProfile(s: ApiStudent): Profile {
+  const primary = s.parents[0]?.parent ?? null;
+  const feeStatus = s.feeAssignment?.feeAccount?.status?.toLowerCase() ?? 'pending';
+  const scores: Record<string, number> = {
+    english: 75, mathematics: 78, science: 80, history: 70, geography: 72, bengali: 76,
+  };
+  return {
+    id: s.id,
+    name: s.name,
+    class: s.grade.name,
+    section: s.section.name,
+    rollNo: s.rollNo ?? '—',
+    house: s.house ?? 'Tagore',
+    bloodGroup: s.bloodGroup ?? '—',
+    gender: s.gender ?? '—',
+    address: s.address ?? '—',
+    learningStyle: (s.learningPlans[0] as { learningStyle?: string | null } | undefined)?.learningStyle ?? 'Visual',
+    attendancePercent: Math.round(s.attendancePercent),
+    feeStatus,
+    libraryBooksIssued: s.bookIssues.length,
+    predictedBoardScore: s.boardPredictions[0]?.predictedScore ?? 75,
+    academicScore: scores,
+    achievements: s.achievements.map(a => a.title),
+    medicalNotes: s.medical?.notes ?? null,
+    parent: {
+      father: primary?.fatherName ?? '—',
+      mother: primary?.motherName ?? '—',
+      phone: primary?.phone ?? '—',
+      email: primary?.email ?? '—',
+      occupation: primary?.occupation ?? '—',
+    },
+    bookIssues: s.bookIssues.map(issue => {
+      const due = issue.dueDate ? new Date(issue.dueDate) : null;
+      return {
+        id: issue.id,
+        title: issue.book.title,
+        author: issue.book.author,
+        genre: issue.book.genre,
+        dueDate: due ? due.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—',
+        isOverdue: due ? due < new Date() : false,
+      };
+    }),
+  };
+}
 
 const houseColors: Record<string, string> = {
   Tagore: 'bg-blue-100 text-blue-700 border-blue-200',
@@ -116,17 +203,55 @@ export default function StudentProfilePage({ params }: { params: { studentId: st
   const { studentId } = params;
   const [activeTab, setActiveTab] = useState<Tab>('academic');
   const [expandedWeek, setExpandedWeek] = useState<number | null>(1);
+  const [student, setStudent] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
 
-  const student = studentsData.find(s => s.id === studentId);
-  if (!student) notFound();
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/students/${studentId}`)
+      .then(r => {
+        if (r.status === 404) { setNotFound(true); return null; }
+        return r.json();
+      })
+      .then(data => {
+        if (!data) return;
+        const raw = data.data ?? data;
+        setStudent(buildProfile(raw as ApiStudent));
+      })
+      .catch(() => setNotFound(true))
+      .finally(() => setLoading(false));
+  }, [studentId]);
 
-  const feeRecords   = feeData.records.filter(f => f.studentId === student.id).slice(0, 4);
-  const issuedBooks  = libraryData.books.filter(b => b.issuedTo.some(i => i.studentId === student.id));
-  const hwClass      = homeworkData.assignments.filter(h => h.class === `${student.class}-${student.section}`).slice(0, 5);
-  const scores       = student.academicScore as Record<string, number>;
-  const avg          = Math.round(Object.values(scores).reduce((a, b) => a + b, 0) / 6);
+  if (loading) {
+    return (
+      <PageWrapper>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-8 h-8 text-navy animate-spin" />
+        </div>
+      </PageWrapper>
+    );
+  }
 
-  // Concept mastery for this student
+  if (notFound || !student) {
+    return (
+      <PageWrapper>
+        <Link href="/academics" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-navy mb-5 transition-colors font-dm-sans">
+          <ArrowLeft className="w-4 h-4" /> Back to Academics
+        </Link>
+        <div className="flex flex-col items-center justify-center py-20 text-center bg-gray-50 rounded-2xl border border-gray-100">
+          <GraduationCap className="w-12 h-12 text-gray-200 mb-3" />
+          <p className="text-base font-semibold text-gray-600">Student not found</p>
+          <p className="text-sm text-gray-400 mt-1">This student record does not exist or was removed.</p>
+        </div>
+      </PageWrapper>
+    );
+  }
+
+  const hwClass = homeworkData.assignments.filter(h => h.class === `${student.class}-${student.section}`).slice(0, 5);
+  const scores  = student.academicScore;
+  const avg     = Math.round(Object.values(scores).reduce((a, b) => a + b, 0) / Object.values(scores).length);
+
   const masteryClassData = (conceptMasteryData.classData as Record<string, { students: { studentId: string; mastery: Record<string, number[]> }[] }>)[student.class];
   const studentMastery   = masteryClassData?.students.find(s => s.studentId === student.id);
 
@@ -141,8 +266,7 @@ export default function StudentProfilePage({ params }: { params: { studentId: st
   const attendanceColor = student.attendancePercent >= 90 ? '#3B6D11' : student.attendancePercent >= 75 ? '#BA7517' : '#D85A30';
   const attendanceTextColor = student.attendancePercent >= 90 ? 'text-green' : student.attendancePercent >= 75 ? 'text-amber' : 'text-coral';
 
-  // Compute gap subjects (score < 75)
-  const gapSubjects = Object.entries(scores).filter(([, val]) => val < 75).map(([k]) => k);
+  const gapSubjects      = Object.entries(scores).filter(([, val]) => val < 75).map(([k]) => k);
   const strengthSubjects = Object.entries(scores).filter(([, val]) => val >= 85).map(([k]) => k);
 
   return (
@@ -370,49 +494,7 @@ export default function StudentProfilePage({ params }: { params: { studentId: st
 
           {/* ── Fee ── */}
           {activeTab === 'fee' && (
-            <div className="space-y-4">
-              <div className={`rounded-2xl p-4 border flex items-center justify-between ${
-                student.feeStatus === 'paid' ? 'bg-green/8 border-green/20' :
-                student.feeStatus === 'overdue' ? 'bg-coral/8 border-coral/20' : 'bg-amber/8 border-amber/20'
-              }`}>
-                <div>
-                  <p className="text-xs text-gray-500 mb-0.5">Current Fee Status</p>
-                  <StatusBadge status={student.feeStatus} />
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-gray-500">Admission Date</p>
-                  <p className="text-sm font-semibold text-gray-700">{student.admissionDate}</p>
-                </div>
-              </div>
-
-              {feeRecords.length > 0 ? (
-                <div className="overflow-x-auto rounded-xl border border-gray-100">
-                  <table className="w-full min-w-[500px]">
-                    <thead className="bg-gray-50 border-b border-gray-100">
-                      <tr>
-                        {['Term', 'Amount', 'Due Date', 'Paid On', 'Mode', 'Status'].map(h => (
-                          <th key={h} className="text-left text-xs uppercase tracking-wide text-gray-400 px-4 py-3 font-medium">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {feeRecords.map((f, i) => (
-                        <tr key={f.id} className={`border-b border-gray-50 hover:bg-gray-50/80 ${i % 2 !== 0 ? 'bg-gray-50/30' : ''}`}>
-                          <td className="px-4 py-3 text-sm font-semibold text-gray-700">{f.term}</td>
-                          <td className="px-4 py-3 text-sm font-bold text-navy">₹{f.amount.toLocaleString('en-IN')}</td>
-                          <td className="px-4 py-3 text-sm text-gray-500">{f.dueDate}</td>
-                          <td className="px-4 py-3 text-sm text-gray-500">{f.paidDate ?? '—'}</td>
-                          <td className="px-4 py-3 text-sm text-gray-500">{f.paymentMode ?? '—'}</td>
-                          <td className="px-4 py-3"><StatusBadge status={f.status} /></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="text-center py-12 text-gray-400 text-sm bg-gray-50 rounded-2xl">No fee records found</div>
-              )}
-            </div>
+            <StudentFeePanel studentId={studentId} />
           )}
 
           {/* ── Health ── */}
@@ -471,32 +553,28 @@ export default function StudentProfilePage({ params }: { params: { studentId: st
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-sora font-semibold text-navy">Issued Books</h3>
-                <span className="text-sm text-gray-500">{issuedBooks.length} book{issuedBooks.length !== 1 ? 's' : ''} currently issued</span>
+                <span className="text-sm text-gray-500">{student.bookIssues.length} book{student.bookIssues.length !== 1 ? 's' : ''} currently issued</span>
               </div>
 
-              {issuedBooks.length > 0 ? (
+              {student.bookIssues.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {issuedBooks.map(b => {
-                    const issue = b.issuedTo.find(i => i.studentId === student.id);
-                    const isOverdue = issue ? new Date(issue.dueDate) < new Date() : false;
-                    return (
-                      <div key={b.id} className={`flex items-start gap-4 p-4 rounded-2xl border ${isOverdue ? 'bg-coral/5 border-coral/20' : 'bg-gray-50 border-gray-100'}`}>
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isOverdue ? 'bg-coral/10' : 'bg-navy/10'}`}>
-                          <BookOpen className={`w-5 h-5 ${isOverdue ? 'text-coral' : 'text-navy'}`} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-gray-800 truncate">{b.title}</p>
-                          <p className="text-xs text-gray-400 mb-2">{b.author} · {b.genre}</p>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-500">Due: {issue?.dueDate}</span>
-                            {isOverdue && (
-                              <span className="text-[10px] font-bold text-coral bg-coral/10 px-1.5 py-0.5 rounded-full">OVERDUE</span>
-                            )}
-                          </div>
+                  {student.bookIssues.map(b => (
+                    <div key={b.id} className={`flex items-start gap-4 p-4 rounded-2xl border ${b.isOverdue ? 'bg-coral/5 border-coral/20' : 'bg-gray-50 border-gray-100'}`}>
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${b.isOverdue ? 'bg-coral/10' : 'bg-navy/10'}`}>
+                        <BookOpen className={`w-5 h-5 ${b.isOverdue ? 'text-coral' : 'text-navy'}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 truncate">{b.title}</p>
+                        <p className="text-xs text-gray-400 mb-2">{b.author} · {b.genre}</p>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500">Due: {b.dueDate}</span>
+                          {b.isOverdue && (
+                            <span className="text-[10px] font-bold text-coral bg-coral/10 px-1.5 py-0.5 rounded-full">OVERDUE</span>
+                          )}
                         </div>
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="text-center py-12 bg-gray-50 rounded-2xl border border-gray-100">

@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 import { Sparkles, Eye, EyeOff, AlertCircle, Brain } from 'lucide-react';
-import { loginTenant } from '@/lib/tenant';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,10 +17,9 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    await new Promise(r => setTimeout(r, 800));
-    const tenant = loginTenant(email, password);
+    const result = await signIn('credentials', { email, password, redirect: false });
     setLoading(false);
-    if (!tenant) {
+    if (result?.error) {
       setError('Invalid email or password. Please try again.');
       return;
     }

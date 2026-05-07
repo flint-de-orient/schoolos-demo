@@ -20,8 +20,6 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import timetableData from '@/data/timetable.json';
-import { useTenantSafe } from '@/context/TenantContext';
-import MHSTimetablePage from '@/components/mhs/MHSTimetablePage';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -141,11 +139,6 @@ function TimetableGrid({
 // ─── Main Page ──────────────────────────────────────────────────────────────
 
 export default function TimetablePage() {
-  const tenant = useTenantSafe();
-  return tenant?.id === 'muraliganj' ? <MHSTimetablePage /> : <SundarbantimetableContent />;
-}
-
-function SundarbantimetableContent() {
   const [activeTab, setActiveTab] = useState<'timetable' | 'generator' | 'substitution'>('timetable');
   const [selectedClass, setSelectedClass] = useState('Class X-A');
   const [genState, setGenState] = useState<GenerationState>('idle');
@@ -578,7 +571,7 @@ function SundarbantimetableContent() {
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm font-sora font-semibold text-navy">Generated Timetable Preview</h3>
                   <AIBadge />
-                  <span className="text-xs text-gold font-semibold bg-goldLight px-2 py-0.5 rounded-full">3 periods changed</span>
+                  <span className="text-xs text-amber font-semibold bg-goldLight px-2 py-0.5 rounded-full">3 periods changed</span>
                 </div>
                 <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-500 font-dm-sans">
                   <input

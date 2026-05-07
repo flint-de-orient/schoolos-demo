@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1E2761"/>
+      <stop offset="100%" stop-color="#2E3E8C"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F5C542"/>
+      <stop offset="100%" stop-color="#E0A820"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="192" fill="url(#bg)"/>
+
+  <!-- Subtle grid dots for tech feel -->
+  <g opacity="0.07">
+    <circle cx="180" cy="180" r="5" fill="#CADCFC"/>
+    <circle cx="300" cy="180" r="5" fill="#CADCFC"/>
+    <circle cx="420" cy="180" r="5" fill="#CADCFC"/>
+    <circle cx="724" cy="180" r="5" fill="#CADCFC"/>
+    <circle cx="844" cy="180" r="5" fill="#CADCFC"/>
+    <circle cx="180" cy="300" r="5" fill="#CADCFC"/>
+    <circle cx="844" cy="300" r="5" fill="#CADCFC"/>
+    <circle cx="180" cy="724" r="5" fill="#CADCFC"/>
+    <circle cx="844" cy="724" r="5" fill="#CADCFC"/>
+    <circle cx="180" cy="844" r="5" fill="#CADCFC"/>
+    <circle cx="300" cy="844" r="5" fill="#CADCFC"/>
+    <circle cx="724" cy="844" r="5" fill="#CADCFC"/>
+    <circle cx="844" cy="844" r="5" fill="#CADCFC"/>
+  </g>
+
+  <!-- Graduation cap board (mortarboard top) -->
+  <polygon points="512,210 780,330 512,450 244,330" fill="url(#gold)"/>
+
+  <!-- Cap center button -->
+  <circle cx="512" cy="210" r="22" fill="#E0A820"/>
+
+  <!-- Cap tassel string -->
+  <line x1="512" y1="210" x2="512" y2="300" stroke="#E0A820" stroke-width="6"/>
+  <line x1="512" y1="300" x2="590" y2="360" stroke="#E0A820" stroke-width="6"/>
+  <!-- Tassel end -->
+  <line x1="590" y1="360" x2="590" y2="420" stroke="#E0A820" stroke-width="4"/>
+  <line x1="575" y1="360" x2="575" y2="415" stroke="#E0A820" stroke-width="4"/>
+  <line x1="605" y1="360" x2="605" y2="412" stroke="#E0A820" stroke-width="4"/>
+
+  <!-- Cap stand/cylinder -->
+  <rect x="432" y="448" width="160" height="36" rx="10" fill="#D4931A" opacity="0.9"/>
+
+  <!-- SchoolOS wordmark -->
+  <text
+    x="512"
+    y="620"
+    font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif"
+    font-size="148"
+    font-weight="900"
+    fill="#FFFFFF"
+    text-anchor="middle"
+    letter-spacing="-4"
+  >School</text>
+
+  <!-- "OS" in gold -->
+  <text
+    x="512"
+    y="760"
+    font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif"
+    font-size="148"
+    font-weight="900"
+    fill="url(#gold)"
+    text-anchor="middle"
+    letter-spacing="-4"
+  >OS</text>
+
+  <!-- AI badge pill -->
+  <rect x="382" y="800" width="260" height="64" rx="32" fill="#F5C542" opacity="0.15"/>
+  <rect x="382" y="800" width="260" height="64" rx="32" fill="none" stroke="#F5C542" stroke-width="2" opacity="0.6"/>
+  <text
+    x="512"
+    y="843"
+    font-family="Arial, sans-serif"
+    font-size="30"
+    font-weight="600"
+    fill="#F5C542"
+    text-anchor="middle"
+    letter-spacing="4"
+  >AI-POWERED ERP</text>
+</svg>

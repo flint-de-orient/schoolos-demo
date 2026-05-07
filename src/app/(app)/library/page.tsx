@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import PageWrapper from '@/components/layout/PageWrapper';
 import AIBadge from '@/components/shared/AIBadge';
 import { toast } from 'sonner';
@@ -270,6 +270,44 @@ export default function LibraryPage() {
       })
     )
   );
+
+  // Fetch live data from API
+  useEffect(() => {
+    fetch('/api/library')
+      .then(r => r.json())
+      .then(data => {
+        if (!data.books) return;
+        const mapped: Book[] = data.books.map((b: any) => ({
+          id: b.id, title: b.title, author: b.author, genre: b.genre ?? 'General',
+          isbn: b.isbn ?? '', copies: b.copies, available: b.available,
+          issuedTo: (b.issues ?? []).map((i: any) => ({
+            studentId: i.student?.id ?? '',
+            dueDate: i.dueDate?.split('T')[0] ?? '',
+          })),
+        }));
+        if (mapped.length > 0) setBooks(mapped);
+      })
+      .catch(() => {});
+
+    fetch('/api/library/issues')
+      .then(r => r.json())
+      .then((data: any[]) => {
+        if (!Array.isArray(data) || data.length === 0) return;
+        const mapped: Transaction[] = data.map((i: any) => ({
+          id: i.id,
+          bookId: i.book?.id ?? '',
+          bookTitle: i.book?.title ?? '—',
+          studentId: i.student?.id ?? '',
+          studentName: i.student?.name ?? '—',
+          studentClass: '',
+          issueDate: i.issuedAt?.split('T')[0] ?? '',
+          dueDate: i.dueDate?.split('T')[0] ?? '',
+          returned: i.status === 'RETURNED',
+        }));
+        setTransactions(mapped);
+      })
+      .catch(() => {});
+  }, []);
 
   // Catalogue filters
   const [search, setSearch] = useState('');

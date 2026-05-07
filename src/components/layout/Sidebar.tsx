@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, UserPlus, CalendarCheck, Clock,
@@ -11,74 +10,73 @@ import {
   LogOut,
 } from 'lucide-react';
 import { useTenantSafe } from '@/context/TenantContext';
-import { logoutTenant } from '@/lib/tenant';
+import { signOut } from 'next-auth/react';
 
 const allNavGroups = [
   {
     label: 'Overview',
     items: [
-      { moduleId: 'dashboard',    href: '/dashboard',    label: 'Dashboard',       icon: LayoutDashboard },
+      { moduleId: 'dashboard',    href: '/dashboard',    label: 'Dashboard',           icon: LayoutDashboard },
     ],
   },
   {
     label: 'School Operations',
     items: [
-      { moduleId: 'students',     href: '/students',     label: 'Students',        icon: BookUser },
-      { moduleId: 'id-cards',     href: '/id-cards',     label: 'ID Cards & Certs',icon: IdCard },
-      { moduleId: 'admissions',   href: '/admissions',   label: 'Admissions',      icon: UserPlus },
-      { moduleId: 'attendance',   href: '/attendance',   label: 'Attendance',      icon: CalendarCheck },
-      { moduleId: 'timetable',    href: '/timetable',    label: 'AI Timetable Engine', icon: Clock, ai: true as const },
-      { moduleId: 'examinations', href: '/examinations', label: 'Examinations',    icon: FileText },
-      { moduleId: 'transport',    href: '/transport',    label: 'Transport',       icon: Bus },
-      { moduleId: 'health',       href: '/health',       label: 'Health',          icon: Heart },
+      { moduleId: 'students',     href: '/students',     label: 'Students',            icon: BookUser },
+      { moduleId: 'id_cards',     href: '/id-cards',     label: 'ID Cards & Certs',    icon: IdCard },
+      { moduleId: 'admissions',   href: '/admissions',   label: 'Admissions',          icon: UserPlus },
+      { moduleId: 'attendance',   href: '/attendance',   label: 'Attendance',          icon: CalendarCheck },
+      { moduleId: 'timetable',    href: '/timetable',    label: 'AI Timetable',        icon: Clock, ai: true as const },
+      { moduleId: 'examinations', href: '/examinations', label: 'Examinations',        icon: FileText },
+      { moduleId: 'transport',    href: '/transport',    label: 'Transport',           icon: Bus },
+      { moduleId: 'health',       href: '/health',       label: 'Health',              icon: Heart },
     ],
   },
   {
     label: 'Learning',
     items: [
-      { moduleId: 'academics',    href: '/academics',    label: 'Academics',       icon: GraduationCap },
-      { moduleId: 'exam-engine',  href: '/exam-engine',  label: 'Exam Engine',     icon: FileText, ai: true as const },
-      { moduleId: 'library',      href: '/library',      label: 'Library',         icon: Library },
+      { moduleId: 'academics',    href: '/academics',    label: 'Academics',           icon: GraduationCap },
+      { moduleId: 'exam_engine',  href: '/exam-engine',  label: 'Exam Engine',         icon: FileText, ai: true as const },
+      { moduleId: 'library',      href: '/library',      label: 'Library',             icon: Library },
     ],
   },
   {
     label: 'People',
     items: [
-      { moduleId: 'hr',           href: '/hr',           label: 'HR & Staff',      icon: Users },
+      { moduleId: 'hr',           href: '/hr',           label: 'HR & Staff',          icon: Users },
     ],
   },
   {
     label: 'Finance',
     items: [
-      { moduleId: 'fee',          href: '/fee',          label: 'Fee Management',  icon: CreditCard },
+      { moduleId: 'fee',          href: '/fee',          label: 'Fee Management',      icon: CreditCard },
     ],
   },
   {
     label: 'AI & Insights',
     items: [
-      { moduleId: 'ai-advisor',   href: '/ai-advisor',   label: 'AI Advisor',      icon: Brain,    ai: true as const },
-      { moduleId: 'analytics',    href: '/analytics',    label: 'Analytics',       icon: BarChart3, ai: true as const },
+      { moduleId: 'ai_advisor',   href: '/ai-advisor',   label: 'AI Advisor',          icon: Brain,    ai: true as const },
+      { moduleId: 'analytics',    href: '/analytics',    label: 'Analytics',           icon: BarChart3, ai: true as const },
     ],
   },
   {
     label: 'Parent Connect',
     items: [
-      { moduleId: 'parent-portal',href: '/parent-portal',label: 'Parent Portal',   icon: Globe },
-      { moduleId: 'parent-app',   href: '/parent-app',   label: 'Parent App',      icon: Smartphone },
-      { moduleId: 'school-shop',  href: '/school-shop',  label: 'School Shop',     icon: ShoppingBag },
+      { moduleId: 'parent_portal',href: '/parent-portal',label: 'Parent Portal',       icon: Globe },
+      { moduleId: 'parent_app',   href: '/parent-app',   label: 'Parent App',          icon: Smartphone },
+      { moduleId: 'school_shop',  href: '/school-shop',  label: 'School Shop',         icon: ShoppingBag },
     ],
   },
   {
     label: 'System',
     items: [
-      { moduleId: 'settings',     href: '/settings',     label: 'Settings',        icon: Settings },
+      { moduleId: 'settings',     href: '/settings',     label: 'Settings',            icon: Settings },
     ],
   },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const router   = useRouter();
   const tenant   = useTenantSafe();
 
   const allowedModules = new Set(tenant?.modules ?? []);
@@ -91,8 +89,7 @@ export default function Sidebar() {
     .filter(group => group.items.length > 0);
 
   function handleLogout() {
-    logoutTenant();
-    router.replace('/login');
+    signOut({ callbackUrl: '/login' });
   }
 
   return (
@@ -155,7 +152,7 @@ export default function Sidebar() {
       <div className="p-4 border-t border-white/10 space-y-2">
         <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white/5">
           <div className="w-7 h-7 rounded-full bg-gold flex items-center justify-center text-navy font-bold text-xs font-sora flex-shrink-0">
-            {tenant?.headInitials ?? '?'}
+            {tenant?.headName?.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase() ?? '?'}
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-white text-xs font-semibold truncate">{tenant?.headName ?? 'Admin'}</div>

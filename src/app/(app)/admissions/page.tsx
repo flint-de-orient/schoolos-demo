@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PageWrapper from '@/components/layout/PageWrapper';
 import { Input } from '@/components/ui/input';
 import EmptyState from '@/components/shared/EmptyState';
@@ -9,14 +9,14 @@ import {
   Search, Plus, UserPlus, CheckCircle2, Clock, FileCheck,
   Handshake, XCircle, ChevronRight, TrendingUp, Users,
   LayoutGrid, List, X, Phone, BookOpen, CalendarCheck,
-  BadgeCheck, AlertTriangle
+  BadgeCheck, AlertTriangle, CalendarDays
 } from 'lucide-react';
+import InterviewScheduleModal from '@/components/admissions/InterviewScheduleModal';
+import InterviewScheduleTab from '@/components/admissions/InterviewScheduleTab';
 import {
   PieChart, Pie, Cell, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
-import admissionsData from '@/data/admissions.json';
-
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type Applicant = {
@@ -31,6 +31,33 @@ type Applicant = {
   daysInStage: number;
 };
 
+// ─── DB ↔ UI mappings ────────────────────────────────────────────────────────
+
+const STAGE_FROM_DB: Record<string, string> = {
+  INQUIRY:              'Inquiry',
+  APPLICATION_RECEIVED: 'Application Received',
+  DOCUMENTS_VERIFIED:   'Documents Verified',
+  INTERVIEW_SCHEDULED:  'Interview Scheduled',
+  OFFER_MADE:           'Offer Made',
+  ENROLLED:             'Enrolled',
+  REJECTED:             'Rejected',
+};
+const STAGE_TO_DB: Record<string, string> = Object.fromEntries(
+  Object.entries(STAGE_FROM_DB).map(([k, v]) => [v, k])
+);
+
+const SOURCE_FROM_DB: Record<string, string> = {
+  WALK_IN:       'Walk-in',
+  SCHOOL_WEBSITE:'School website',
+  REFERRAL:      'Referral',
+  CAMPAIGN:      'Campaign',
+  SOCIAL_MEDIA:  'Social media',
+  OTHER:         'Other',
+};
+const SOURCE_TO_DB: Record<string, string> = Object.fromEntries(
+  Object.entries(SOURCE_FROM_DB).map(([k, v]) => [v, k])
+);
+
 // ─── Stage Config ─────────────────────────────────────────────────────────────
 
 const stageConfig: Record<string, {
@@ -38,10 +65,10 @@ const stageConfig: Record<string, {
   action?: string; actionIcon?: React.ElementType; actionColor?: string;
   rejectable?: boolean;
 }> = {
-  'Inquiry':              { color: 'text-gray-600',   bg: 'bg-gray-100',    border: 'border-gray-200',   icon: UserPlus,    action: 'Submit Application', actionIcon: FileCheck,   actionColor: 'bg-navy text-white hover:bg-navyMid' },
-  'Application Received': { color: 'text-blue-700',   bg: 'bg-blue-50',     border: 'border-blue-200',   icon: FileCheck,   action: 'Verify Documents',   actionIcon: BadgeCheck,  actionColor: 'bg-blue-600 text-white hover:bg-blue-700' },
-  'Documents Verified':   { color: 'text-purple-700', bg: 'bg-purple-50',   border: 'border-purple-200', icon: BadgeCheck,  action: 'Schedule Interview', actionIcon: CalendarCheck, actionColor: 'bg-purple-600 text-white hover:bg-purple-700' },
-  'Interview Scheduled':  { color: 'text-amber-700',  bg: 'bg-amber-50',    border: 'border-amber-200',  icon: CalendarCheck, action: 'Make Offer',       actionIcon: Handshake,   actionColor: 'bg-amber-600 text-white hover:bg-amber-700', rejectable: true },
+  'Inquiry':              { color: 'text-gray-600',  bg: 'bg-gray-100',   border: 'border-gray-200',  icon: UserPlus,      action: 'Submit Application', actionIcon: FileCheck,    actionColor: 'bg-navy text-white hover:bg-navyMid' },
+  'Application Received': { color: 'text-teal',      bg: 'bg-teal/10',    border: 'border-teal/30',   icon: FileCheck,     action: 'Verify Documents',   actionIcon: BadgeCheck,  actionColor: 'bg-teal text-white hover:bg-teal/80' },
+  'Documents Verified':   { color: 'text-purple',    bg: 'bg-purple/10',  border: 'border-purple/30', icon: BadgeCheck,    action: 'Schedule Interview', actionIcon: CalendarCheck, actionColor: 'bg-purple text-white hover:bg-purple/80' },
+  'Interview Scheduled':  { color: 'text-amber',     bg: 'bg-amber/10',   border: 'border-amber/30',  icon: CalendarCheck, action: 'Make Offer',         actionIcon: Handshake,   actionColor: 'bg-amber text-white hover:bg-amber/80', rejectable: true },
   'Offer Made':           { color: 'text-teal',        bg: 'bg-teal/10',     border: 'border-teal/30',    icon: Handshake,   action: 'Confirm Enrollment', actionIcon: CheckCircle2, actionColor: 'bg-teal text-white hover:bg-teal/80', rejectable: true },
   'Enrolled':             { color: 'text-green',       bg: 'bg-green/10',    border: 'border-green/30',   icon: CheckCircle2 },
   'Rejected':             { color: 'text-coral',       bg: 'bg-coral/10',    border: 'border-coral/30',   icon: XCircle },
@@ -55,19 +82,20 @@ const actionMessages: Record<string, string> = {
   'Offer Made':           'Enrollment confirmed — welcome to Sundarban Academy!',
 };
 
-const stageOrder = admissionsData.stages;
+const stageOrder = ['Inquiry', 'Application Received', 'Documents Verified', 'Interview Scheduled', 'Offer Made', 'Enrolled', 'Rejected'];
 const sourceColors: Record<string, string> = {
   'Walk-in': '#1E2761', 'School website': '#F5C542', 'Referral': '#028090', 'Campaign': '#534AB7',
 };
 const classOptions = ['Nursery', 'LKG', 'UKG', 'Class I', 'Class II', 'Class III', 'Class IV', 'Class V', 'Class VI', 'Class VII', 'Class VIII', 'Class IX', 'Class X', 'Class XI', 'Class XII'];
 
-type Tab = 'pipeline' | 'table' | 'analytics';
+type Tab = 'pipeline' | 'table' | 'analytics' | 'interviews';
 
 // ─── New Inquiry Modal ────────────────────────────────────────────────────────
 
-function NewInquiryModal({ onClose, onAdd }: { onClose: () => void; onAdd: (a: Applicant) => void }) {
+function NewInquiryModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [form, setForm] = useState({ name: '', applyingForClass: '', parentName: '', phone: '', source: 'Walk-in' });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -79,22 +107,32 @@ function NewInquiryModal({ onClose, onAdd }: { onClose: () => void; onAdd: (a: A
     return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validate()) return;
-    const newApplicant: Applicant = {
-      id: `ADM${Date.now()}`,
-      name: form.name.trim(),
-      applyingForClass: form.applyingForClass,
-      parentName: form.parentName.trim(),
-      phone: form.phone.trim(),
-      stage: 'Inquiry',
-      inquiryDate: new Date().toISOString().split('T')[0],
-      source: form.source,
-      daysInStage: 0,
-    };
-    onAdd(newApplicant);
-    toast.success(`New inquiry created for ${form.name}`, { description: 'Added to Inquiry stage' });
-    onClose();
+    setSaving(true);
+    try {
+      const res = await fetch('/api/admissions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentName:     form.name.trim(),
+          parentName:      form.parentName.trim(),
+          phone:           form.phone.trim(),
+          applyingForGrade: form.applyingForClass,
+          source:          SOURCE_TO_DB[form.source] ?? 'WALK_IN',
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error ?? 'Failed to create inquiry');
+        return;
+      }
+      toast.success(`New inquiry created for ${form.name}`, { description: 'Added to Inquiry stage' });
+      onCreated();
+      onClose();
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -201,8 +239,8 @@ function NewInquiryModal({ onClose, onAdd }: { onClose: () => void; onAdd: (a: A
           <button onClick={onClose} className="flex-1 py-2.5 text-sm font-semibold text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
             Cancel
           </button>
-          <button onClick={handleSubmit} className="flex-1 py-2.5 text-sm font-semibold bg-gold text-navy rounded-xl hover:bg-gold/90 transition-colors">
-            Create Inquiry
+          <button onClick={handleSubmit} disabled={saving} className="flex-1 py-2.5 text-sm font-semibold bg-gold text-navy rounded-xl hover:bg-gold/90 transition-colors disabled:opacity-60">
+            {saving ? 'Creating…' : 'Create Inquiry'}
           </button>
         </div>
       </div>
@@ -213,12 +251,13 @@ function NewInquiryModal({ onClose, onAdd }: { onClose: () => void; onAdd: (a: A
 // ─── Applicant Detail Drawer ──────────────────────────────────────────────────
 
 function ApplicantDrawer({
-  applicant, stage, onClose, onAction, onReject
+  applicant, stage, onClose, onAction, onReject, onScheduleInterview
 }: {
   applicant: Applicant; stage: string;
   onClose: () => void;
   onAction: () => void;
   onReject: () => void;
+  onScheduleInterview?: () => void;
 }) {
   const cfg = stageConfig[stage];
   const ActionIcon = cfg.actionIcon ?? ChevronRight;
@@ -228,7 +267,11 @@ function ApplicantDrawer({
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex justify-end" onClick={onClose}>
-      <div className="bg-white w-full max-w-sm h-full overflow-y-auto shadow-2xl animate-slideIn" onClick={e => e.stopPropagation()}>
+      <div className="bg-white w-full max-w-sm h-full flex flex-col shadow-2xl animate-slideIn" onClick={e => e.stopPropagation()}>
+
+        {/* ── Scrollable content ── */}
+        <div className="flex-1 overflow-y-auto">
+
         {/* Header */}
         <div className="gradient-navy text-white p-5">
           <div className="flex items-center justify-between mb-4">
@@ -250,7 +293,6 @@ function ApplicantDrawer({
         <div className="p-4 border-b border-gray-100">
           <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Application Progress</p>
           <div className="relative">
-            {/* Track */}
             <div className="absolute left-3.5 top-0 bottom-0 w-0.5 bg-gray-100" />
             <div className="space-y-3">
               {timeline.map((s, idx) => {
@@ -295,36 +337,14 @@ function ApplicantDrawer({
         </div>
 
         {/* Current Stage Badge */}
-        <div className="p-4 border-b border-gray-100">
+        <div className="p-4">
           <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${cfg.bg} ${cfg.border}`}>
             <StageIcon className={`w-4 h-4 ${cfg.color}`} />
             <span className={`text-xs font-semibold ${cfg.color}`}>{stage}</span>
           </div>
         </div>
 
-        {/* Actions */}
-        {cfg.action && (
-          <div className="p-4 space-y-2">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Next Action</p>
-            <button
-              onClick={onAction}
-              className={`w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold rounded-xl transition-colors ${cfg.actionColor}`}
-            >
-              <ActionIcon className="w-4 h-4" />
-              {cfg.action}
-            </button>
-            {cfg.rejectable && (
-              <button
-                onClick={onReject}
-                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-coral border border-coral/30 bg-coral/5 rounded-xl hover:bg-coral/10 transition-colors"
-              >
-                <XCircle className="w-4 h-4" />
-                Reject Application
-              </button>
-            )}
-          </div>
-        )}
-
+        {/* Terminal states — inside scroll area */}
         {stage === 'Enrolled' && (
           <div className="p-4">
             <div className="bg-green/10 border border-green/20 rounded-xl p-3 text-center">
@@ -343,6 +363,32 @@ function ApplicantDrawer({
             </div>
           </div>
         )}
+
+        </div>{/* end scrollable */}
+
+        {/* ── Sticky action footer — always visible ── */}
+        {cfg.action && (
+          <div className="border-t border-gray-100 bg-white p-4 space-y-2 flex-shrink-0">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Next Action</p>
+            <button
+              onClick={stage === 'Documents Verified' && onScheduleInterview ? onScheduleInterview : onAction}
+              className={`w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold rounded-xl transition-colors ${cfg.actionColor}`}
+            >
+              <ActionIcon className="w-4 h-4" />
+              {cfg.action}
+            </button>
+            {cfg.rejectable && (
+              <button
+                onClick={onReject}
+                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-coral border border-coral/30 bg-coral/5 rounded-xl hover:bg-coral/10 transition-colors"
+              >
+                <XCircle className="w-4 h-4" />
+                Reject Application
+              </button>
+            )}
+          </div>
+        )}
+
       </div>
     </div>
   );
@@ -353,33 +399,94 @@ function ApplicantDrawer({
 export default function AdmissionsPage() {
   const [activeTab, setActiveTab] = useState<Tab>('pipeline');
   const [search, setSearch] = useState('');
-  const [stageUpdates, setStageUpdates] = useState<Record<string, string>>({});
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showNewModal, setShowNewModal] = useState(false);
-  const [newApplicants, setNewApplicants] = useState<Applicant[]>([]);
   const [selectedApplicant, setSelectedApplicant] = useState<Applicant | null>(null);
+  const [interviewTarget, setInterviewTarget] = useState<Applicant | null>(null);
+  const [applicants, setApplicants] = useState<Applicant[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const allApplicants: Applicant[] = [...admissionsData.applicants as Applicant[], ...newApplicants];
+  function mapApplicant(a: Record<string, string>): Applicant {
+    const date = a.inquiryDate ? new Date(a.inquiryDate) : new Date();
+    const updated = a.updatedAt ? new Date(a.updatedAt) : date;
+    const daysInStage = Math.max(0, Math.floor((Date.now() - updated.getTime()) / 86_400_000));
+    return {
+      id: a.id,
+      name: a.studentName,
+      applyingForClass: a.applyingForGrade ?? a.applyingForClass ?? 'Class I',
+      parentName: a.parentName,
+      phone: a.phone,
+      source: SOURCE_FROM_DB[a.source] ?? a.source ?? 'Walk-in',
+      stage: STAGE_FROM_DB[a.stage] ?? a.stage ?? 'Inquiry',
+      inquiryDate: date.toISOString().split('T')[0],
+      daysInStage,
+    };
+  }
 
-  const getStage = (id: string, original: string) => stageUpdates[id] ?? original;
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admissions?limit=100');
+      if (!res.ok) return;
+      const data = await res.json();
+      setApplicants((data.data ?? []).map(mapApplicant));
+    } catch {
+      // leave empty
+    } finally {
+      setLoading(false);
+    }
+  }
 
-  const advanceStage = (applicant: Applicant) => {
-    const current = getStage(applicant.id, applicant.stage);
+  useEffect(() => { load(); }, []);
+
+  const allApplicants = applicants;
+
+  const getStage = (id: string, original: string) => {
+    const a = applicants.find(x => x.id === id);
+    return a ? a.stage : original;
+  };
+
+  const advanceStage = async (applicant: Applicant) => {
+    const current = applicant.stage;
     const idx = stageOrder.indexOf(current);
-    if (idx < stageOrder.length - 2) {
-      const next = stageOrder[idx + 1];
-      setStageUpdates(prev => ({ ...prev, [applicant.id]: next }));
-      toast.success(actionMessages[current] ?? `Moved to ${next}`, {
-        description: `${applicant.name} → ${next}`,
+    if (idx < 0 || idx >= stageOrder.length - 2) return;
+    const next = stageOrder[idx + 1];
+    // Optimistic update
+    setApplicants(prev => prev.map(a => a.id === applicant.id ? { ...a, stage: next } : a));
+    setSelectedApplicant(null);
+    toast.success(actionMessages[current] ?? `Moved to ${next}`, { description: `${applicant.name} → ${next}` });
+    try {
+      const res = await fetch('/api/admissions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: applicant.id, stage: STAGE_TO_DB[next] }),
       });
-      setSelectedApplicant(null);
+      if (!res.ok) {
+        // Roll back on failure
+        setApplicants(prev => prev.map(a => a.id === applicant.id ? { ...a, stage: current } : a));
+        toast.error('Failed to update stage');
+      }
+    } catch {
+      setApplicants(prev => prev.map(a => a.id === applicant.id ? { ...a, stage: current } : a));
     }
   };
 
-  const rejectApplicant = (applicant: Applicant) => {
-    setStageUpdates(prev => ({ ...prev, [applicant.id]: 'Rejected' }));
-    toast.error(`Application rejected`, { description: applicant.name });
+  const rejectApplicant = async (applicant: Applicant) => {
+    setApplicants(prev => prev.map(a => a.id === applicant.id ? { ...a, stage: 'Rejected' } : a));
     setSelectedApplicant(null);
+    toast.error('Application rejected', { description: applicant.name });
+    try {
+      const res = await fetch('/api/admissions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: applicant.id, stage: 'REJECTED' }),
+      });
+      if (!res.ok) {
+        setApplicants(prev => prev.map(a => a.id === applicant.id ? { ...a, stage: applicant.stage } : a));
+      }
+    } catch {
+      setApplicants(prev => prev.map(a => a.id === applicant.id ? { ...a, stage: applicant.stage } : a));
+    }
   };
 
   const filtered = allApplicants.filter(a =>
@@ -389,9 +496,9 @@ export default function AdmissionsPage() {
   );
 
   // Stats
-  const enrolled = allApplicants.filter(a => getStage(a.id, a.stage) === 'Enrolled').length;
-  const inProgress = allApplicants.filter(a => !['Enrolled', 'Rejected'].includes(getStage(a.id, a.stage))).length;
-  const rejected = allApplicants.filter(a => getStage(a.id, a.stage) === 'Rejected').length;
+  const enrolled   = allApplicants.filter(a => a.stage === 'Enrolled').length;
+  const inProgress = allApplicants.filter(a => !['Enrolled', 'Rejected'].includes(a.stage)).length;
+  const rejected   = allApplicants.filter(a => a.stage === 'Rejected').length;
 
   // Chart data
   const sourceData = Object.entries(
@@ -403,17 +510,18 @@ export default function AdmissionsPage() {
   ).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 8);
 
   const funnelData = [
-    { stage: 'Inquiry', count: allApplicants.filter(a => getStage(a.id, a.stage) === 'Inquiry').length + 5 },
-    { stage: 'Applied', count: allApplicants.filter(a => ['Application Received', 'Documents Verified'].includes(getStage(a.id, a.stage))).length + 3 },
-    { stage: 'Interview', count: allApplicants.filter(a => getStage(a.id, a.stage) === 'Interview Scheduled').length + 2 },
-    { stage: 'Offered', count: allApplicants.filter(a => getStage(a.id, a.stage) === 'Offer Made').length },
-    { stage: 'Enrolled', count: enrolled },
+    { stage: 'Inquiry',   count: allApplicants.filter(a => a.stage === 'Inquiry').length },
+    { stage: 'Applied',   count: allApplicants.filter(a => ['Application Received', 'Documents Verified'].includes(a.stage)).length },
+    { stage: 'Interview', count: allApplicants.filter(a => a.stage === 'Interview Scheduled').length },
+    { stage: 'Offered',   count: allApplicants.filter(a => a.stage === 'Offer Made').length },
+    { stage: 'Enrolled',  count: enrolled },
   ];
 
   const tabs = [
     { id: 'pipeline' as Tab, label: 'Pipeline', icon: LayoutGrid },
     { id: 'table' as Tab, label: 'All Applicants', icon: List },
     { id: 'analytics' as Tab, label: 'Analytics', icon: TrendingUp },
+    { id: 'interviews' as Tab, label: 'Interview Schedule', icon: CalendarDays },
   ];
 
   return (
@@ -480,8 +588,17 @@ export default function AdmissionsPage() {
 
         <div className="p-4 sm:p-5">
 
+          {/* ── Loading skeleton ── */}
+          {loading && (
+            <div className="space-y-3 py-2">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-16 bg-gray-100 rounded-xl animate-pulse" />
+              ))}
+            </div>
+          )}
+
           {/* ── Pipeline Tab ── */}
-          {activeTab === 'pipeline' && (
+          {!loading && activeTab === 'pipeline' && (
             <div>
               <p className="text-xs text-gray-400 mb-4 font-dm-sans">Click any card to view details and take action at each stage.</p>
               <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
@@ -489,7 +606,7 @@ export default function AdmissionsPage() {
                   {stageOrder.map(stage => {
                     const cfg = stageConfig[stage];
                     const StageIcon = cfg.icon;
-                    const cards = allApplicants.filter(a => getStage(a.id, a.stage) === stage);
+                    const cards = allApplicants.filter(a => a.stage === stage);
                     return (
                       <div key={stage} className="w-48 flex-shrink-0">
                         {/* Stage Header */}
@@ -546,7 +663,7 @@ export default function AdmissionsPage() {
           )}
 
           {/* ── All Applicants Tab ── */}
-          {activeTab === 'table' && (
+          {!loading && activeTab === 'table' && (
             <div>
               <div className="flex flex-col sm:flex-row gap-3 mb-4">
                 <div className="relative flex-1">
@@ -573,7 +690,7 @@ export default function AdmissionsPage() {
               ) : viewMode === 'grid' ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {filtered.map(a => {
-                    const currentStage = getStage(a.id, a.stage);
+                    const currentStage = a.stage;
                     const cfg = stageConfig[currentStage];
                     const StageIcon = cfg.icon;
                     return (
@@ -620,7 +737,7 @@ export default function AdmissionsPage() {
                     </thead>
                     <tbody>
                       {filtered.map((a, i) => {
-                        const currentStage = getStage(a.id, a.stage);
+                        const currentStage = a.stage;
                         const cfg = stageConfig[currentStage];
                         const StageIcon = cfg.icon;
                         return (
@@ -666,8 +783,11 @@ export default function AdmissionsPage() {
             </div>
           )}
 
+          {/* ── Interview Schedule Tab ── */}
+          {activeTab === 'interviews' && <InterviewScheduleTab />}
+
           {/* ── Analytics Tab ── */}
-          {activeTab === 'analytics' && (
+          {!loading && activeTab === 'analytics' && (
             <div className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
@@ -752,18 +872,44 @@ export default function AdmissionsPage() {
       {showNewModal && (
         <NewInquiryModal
           onClose={() => setShowNewModal(false)}
-          onAdd={a => setNewApplicants(prev => [a, ...prev])}
+          onCreated={load}
         />
       )}
 
       {/* Applicant Detail Drawer */}
-      {selectedApplicant && (
-        <ApplicantDrawer
-          applicant={selectedApplicant}
-          stage={getStage(selectedApplicant.id, selectedApplicant.stage)}
-          onClose={() => setSelectedApplicant(null)}
-          onAction={() => advanceStage(selectedApplicant)}
-          onReject={() => rejectApplicant(selectedApplicant)}
+      {selectedApplicant && (() => {
+        const live = applicants.find(a => a.id === selectedApplicant.id) ?? selectedApplicant;
+        return (
+          <ApplicantDrawer
+            applicant={live}
+            stage={live.stage}
+            onClose={() => setSelectedApplicant(null)}
+            onAction={() => advanceStage(live)}
+            onReject={() => rejectApplicant(live)}
+            onScheduleInterview={() => {
+              setInterviewTarget(live);
+              setSelectedApplicant(null);
+            }}
+          />
+        );
+      })()}
+
+      {/* Interview Schedule Modal */}
+      {interviewTarget && (
+        <InterviewScheduleModal
+          inquiry={{
+            id: interviewTarget.id,
+            studentName: interviewTarget.name,
+            parentName: interviewTarget.parentName,
+            phone: interviewTarget.phone,
+            applyingForClass: interviewTarget.applyingForClass,
+          }}
+          onClose={() => setInterviewTarget(null)}
+          onScheduled={() => {
+            setInterviewTarget(null);
+            load();
+            setActiveTab('interviews');
+          }}
         />
       )}
     </PageWrapper>

@@ -1,17 +1,60 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import PageWrapper from '@/components/layout/PageWrapper';
 import StatCard from '@/components/shared/StatCard';
 import { Heart, Stethoscope, AlertCircle, CheckCircle, Shield } from 'lucide-react';
-import healthData from '@/data/health.json';
+import { Skeleton } from '@/components/ui/skeleton';
+
+const VACCINATIONS = [
+  { key: 'BCG', label: 'BCG' },
+  { key: 'HepB', label: 'HepB' },
+  { key: 'MMR', label: 'MMR' },
+  { key: 'DPT', label: 'DPT' },
+  { key: 'Typh', label: 'Typh' },
+];
+
+const mockVaccTracker = [
+  { name: 'Arjun C.', BCG: true, HepB: true, MMR: true, DPT: true, Typh: false },
+  { name: 'Priya S.', BCG: true, HepB: true, MMR: false, DPT: true, Typh: false },
+  { name: 'Souvik M.', BCG: true, HepB: true, MMR: true, DPT: true, Typh: true },
+  { name: 'Ananya R.', BCG: true, HepB: false, MMR: true, DPT: true, Typh: true },
+  { name: 'Rajan B.', BCG: true, HepB: true, MMR: true, DPT: false, Typh: true },
+];
 
 export default function HealthPage() {
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({ visitsToday: 0, referredToday: 0, vaccinationsDue: 0 });
+  const [logs, setLogs] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch('/api/health')
+      .then(r => r.json())
+      .then(data => {
+        setStats(data.stats ?? { visitsToday: 0, referredToday: 0, vaccinationsDue: 0 });
+        setLogs(data.logs ?? []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <PageWrapper>
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+        </div>
+        <Skeleton className="h-64 rounded-xl" />
+      </PageWrapper>
+    );
+  }
+
   return (
     <PageWrapper>
       <div className="grid grid-cols-3 gap-4 mb-6">
-        <StatCard title="Nurse Visits Today" value={String(healthData.stats.nurseVisitsToday)} icon={Heart} iconBg="bg-pink" />
-        <StatCard title="Referred to Doctor" value={String(healthData.stats.referredToDoctor)} icon={Stethoscope} iconBg="bg-coral" />
-        <StatCard title="Vaccinations Due" value={String(healthData.stats.vaccinationsDueThisMonth)} icon={AlertCircle} iconBg="bg-amber" subtitle="This month" />
+        <StatCard title="Nurse Visits Today" value={String(stats.visitsToday)} icon={Heart} iconBg="bg-pink" />
+        <StatCard title="Referred to Doctor" value={String(stats.referredToday)} icon={Stethoscope} iconBg="bg-coral" />
+        <StatCard title="Vaccinations Due" value={String(stats.vaccinationsDue)} icon={AlertCircle} iconBg="bg-amber" subtitle="Next 30 days" />
       </div>
 
       {/* Epidemic Alert */}
@@ -39,32 +82,39 @@ export default function HealthPage() {
                 </tr>
               </thead>
               <tbody>
-                {healthData.nurseLog.map((entry, i) => (
-                  <tr key={entry.id} className={`border-b border-gray-50 hover:bg-gray-50/80 ${i % 2 === 0 ? '' : 'bg-gray-50/30'}`}>
-                    <td className="px-5 py-3 text-xs text-gray-500 whitespace-nowrap">{entry.date}</td>
-                    <td className="px-5 py-3">
-                      <p className="text-sm font-semibold text-gray-800">{entry.studentName}</p>
-                      <p className="text-xs text-gray-400">{entry.class}</p>
-                    </td>
-                    <td className="px-5 py-3 text-sm text-gray-600 max-w-[160px]">
-                      <span className="line-clamp-2">{entry.complaint}</span>
-                    </td>
-                    <td className="px-5 py-3 text-xs text-gray-500 max-w-[160px]">
-                      <span className="line-clamp-2">{entry.action}</span>
-                    </td>
-                    <td className="px-5 py-3">
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${entry.referredToDoctor ? 'bg-amber/10 text-amber' : 'bg-gray-100 text-gray-500'}`}>
-                        {entry.referredToDoctor ? 'Yes' : 'No'}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3">
-                      {entry.parentNotified
-                        ? <CheckCircle className="w-4 h-4 text-green" />
-                        : <span className="text-xs text-gray-400">—</span>
-                      }
-                    </td>
-                  </tr>
-                ))}
+                {logs.length === 0 ? (
+                  <tr><td colSpan={6} className="text-center py-8 text-sm text-gray-400">No nurse visits recorded</td></tr>
+                ) : logs.map((entry, i) => {
+                  const gradeName = entry.student?.section?.grade?.name ?? '';
+                  const secName = entry.student?.section?.name ?? '';
+                  const className = gradeName ? `${gradeName}-${secName}` : '';
+                  return (
+                    <tr key={entry.id} className={`border-b border-gray-50 hover:bg-gray-50/80 ${i % 2 === 0 ? '' : 'bg-gray-50/30'}`}>
+                      <td className="px-5 py-3 text-xs text-gray-500 whitespace-nowrap">{new Date(entry.date).toLocaleDateString('en-IN')}{entry.time ? ` · ${entry.time}` : ''}</td>
+                      <td className="px-5 py-3">
+                        <p className="text-sm font-semibold text-gray-800">{entry.student?.name ?? '—'}</p>
+                        <p className="text-xs text-gray-400">{className}</p>
+                      </td>
+                      <td className="px-5 py-3 text-sm text-gray-600 max-w-[160px]">
+                        <span className="line-clamp-2">{entry.complaint}</span>
+                      </td>
+                      <td className="px-5 py-3 text-xs text-gray-500 max-w-[160px]">
+                        <span className="line-clamp-2">{entry.actionTaken ?? '—'}</span>
+                      </td>
+                      <td className="px-5 py-3">
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${entry.referredToDoctor ? 'bg-amber/10 text-amber' : 'bg-gray-100 text-gray-500'}`}>
+                          {entry.referredToDoctor ? 'Yes' : 'No'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3">
+                        {entry.parentNotified
+                          ? <CheckCircle className="w-4 h-4 text-green" />
+                          : <span className="text-xs text-gray-400">—</span>
+                        }
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -78,30 +128,25 @@ export default function HealthPage() {
               <thead>
                 <tr className="border-b border-gray-100">
                   <th className="text-left text-gray-400 pb-2">Student</th>
-                  <th className="text-center text-gray-400 pb-2">BCG</th>
-                  <th className="text-center text-gray-400 pb-2">HepB</th>
-                  <th className="text-center text-gray-400 pb-2">MMR</th>
-                  <th className="text-center text-gray-400 pb-2">DPT</th>
-                  <th className="text-center text-gray-400 pb-2">Typh</th>
+                  {VACCINATIONS.map(v => (
+                    <th key={v.key} className="text-center text-gray-400 pb-2">{v.label}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {healthData.vaccinationTracker.map(v => {
-                  const vals = [v.BCG, v.HepatitisB, v.MMR, v.DPT, v.TyphoidBooster];
-                  return (
-                    <tr key={v.studentId} className="border-b border-gray-50">
-                      <td className="py-2 font-semibold text-gray-700 text-[11px]">{v.name.split(' ')[0]}</td>
-                      {vals.map((val, i) => (
-                        <td key={i} className="text-center py-2">
-                          {val
-                            ? <CheckCircle className="w-3.5 h-3.5 text-green mx-auto" />
-                            : <span className="text-coral text-[11px] font-bold">×</span>
-                          }
-                        </td>
-                      ))}
-                    </tr>
-                  );
-                })}
+                {mockVaccTracker.map((v, idx) => (
+                  <tr key={idx} className="border-b border-gray-50">
+                    <td className="py-2 font-semibold text-gray-700 text-[11px]">{v.name}</td>
+                    {VACCINATIONS.map(vacc => (
+                      <td key={vacc.key} className="text-center py-2">
+                        {(v as any)[vacc.key]
+                          ? <CheckCircle className="w-3.5 h-3.5 text-green mx-auto" />
+                          : <span className="text-coral text-[11px] font-bold">×</span>
+                        }
+                      </td>
+                    ))}
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

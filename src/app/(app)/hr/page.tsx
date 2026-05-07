@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import PageWrapper from '@/components/layout/PageWrapper';
 import { toast } from 'sonner';
 import { getInitials } from '@/lib/utils';
@@ -18,8 +18,6 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid
 } from 'recharts';
 import staffData from '@/data/staff.json';
-import { useTenantSafe } from '@/context/TenantContext';
-import MHSHRPage from '@/components/mhs/MHSHRPage';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -462,14 +460,70 @@ function ApplyLeaveModal({ staff, onClose, onApply }: { staff: Staff[]; onClose:
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function HRPage() {
-  const tenant = useTenantSafe();
-  return tenant?.id === 'muraliganj' ? <MHSHRPage /> : <SundarbanaHRContent />;
-}
-
-function SundarbanaHRContent() {
   const [activeTab, setActiveTab] = useState<Tab>('directory');
   const [staffList, setStaffList] = useState<Staff[]>(staffData as Staff[]);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>(seedLeave);
+
+  // Fetch real data from API on mount
+  useEffect(() => {
+    fetch('/api/hr')
+      .then(r => r.json())
+      .then(data => {
+        const teachers: Staff[] = (data.teachers ?? []).map((t: any) => ({
+          id: t.id, name: t.name, photo: null,
+          designation: t.designation ?? 'Teacher',
+          department: t.subjects?.[0]?.subject?.name
+            ? (t.subjects[0].subject.name.match(/maths|math/i) ? 'Science & Maths'
+              : t.subjects[0].subject.name.match(/english|bengali|hindi/i) ? 'Languages'
+              : t.subjects[0].subject.name.match(/history|geography|civics/i) ? 'Humanities'
+              : 'Science & Maths')
+            : 'Academic',
+          subject: t.subjects?.[0]?.subject?.name ?? null,
+          joiningDate: t.joiningDate?.split('T')[0] ?? '',
+          qualification: t.qualification ?? 'B.Ed.',
+          phone: t.phone ?? '', email: t.email ?? '',
+          salary: t.salary ?? 45000,
+          leaveBalance: 12 - (t.leaveRequests?.length ?? 0),
+          status: t.isActive ? 'active' : 'on-leave',
+          employmentType: 'full-time',
+          teachingCapacity: t.subjects?.map((s: any) => s.subject?.name).filter(Boolean) ?? [],
+        }));
+        const nonTeaching: Staff[] = (data.staff ?? []).map((s: any) => ({
+          id: s.id, name: s.name, photo: null,
+          designation: s.designation ?? 'Staff',
+          department: s.department ?? 'Administration',
+          subject: null, joiningDate: s.joiningDate?.split('T')[0] ?? '',
+          qualification: s.qualification ?? 'Graduate',
+          phone: s.phone ?? '', email: s.email ?? '',
+          salary: s.salary ?? 35000,
+          leaveBalance: s.leaveBalance ?? 12,
+          status: s.isActive ? 'active' : 'on-leave',
+          employmentType: 'full-time',
+        }));
+        const merged = [...teachers, ...nonTeaching];
+        if (merged.length > 0) setStaffList(merged as Staff[]);
+      })
+      .catch(() => {});
+
+    fetch('/api/hr/leave')
+      .then(r => r.json())
+      .then(data => {
+        const mapped: LeaveRequest[] = (data ?? []).map((r: any) => ({
+          id: r.id,
+          staffId: r.teacherId ?? r.staffId ?? '',
+          name: r.teacher?.name ?? r.staff?.name ?? 'Unknown',
+          designation: r.teacher?.designation ?? r.staff?.designation ?? 'Staff',
+          type: r.leaveType,
+          from: r.fromDate?.split('T')[0] ?? '',
+          to: r.toDate?.split('T')[0] ?? '',
+          days: r.days,
+          reason: r.reason ?? '',
+          status: r.status === 'APPROVED' ? 'Approved' : r.status === 'REJECTED' ? 'Rejected' : 'Pending',
+        }));
+        if (mapped.length > 0) setLeaveRequests(mapped);
+      })
+      .catch(() => {});
+  }, []);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [showAddStaff, setShowAddStaff] = useState(false);
   const [showApplyLeave, setShowApplyLeave] = useState(false);
