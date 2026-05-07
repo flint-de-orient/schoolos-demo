@@ -60,7 +60,7 @@ export default function PrivacyPage() {
             Meta Platforms, Inc. to send transactional messages to parents on behalf of schools.
           </p>
           <ul className="list-disc pl-5 space-y-1">
-            <li>Schools connect their own WhatsApp Business Account to SchoolOS via Meta's Embedded Signup flow.</li>
+            <li>Schools connect their own WhatsApp Business Account to SchoolOS via Meta&apos;s Embedded Signup flow.</li>
             <li>SchoolOS acts as a Technology Service Provider (Tech Provider) on the WhatsApp Business Platform.</li>
             <li>Messages sent via WhatsApp are transactional in nature: attendance notifications, fee reminders, exam timetables, and similar school communications.</li>
             <li>Parent phone numbers used for WhatsApp notifications are provided by the school and used solely for school communication purposes.</li>
@@ -83,7 +83,7 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-lg font-semibold text-gray-900 mb-3">6. Data Retention</h2>
           <p>
-            Student and staff data is retained for the duration of the school's active subscription and
+            Student and staff data is retained for the duration of the school&apos;s active subscription and
             for 1 year thereafter to allow data export. Schools may request deletion of all their data
             by contacting us. WhatsApp and SMS logs are retained for 90 days.
           </p>
@@ -104,7 +104,7 @@ export default function PrivacyPage() {
             SchoolOS processes data about students including minors as part of school administration
             services contracted by educational institutions. This data is processed solely on behalf of
             and under the instructions of the contracting school. Parents may contact their school
-            administration to request access to or deletion of their child's data.
+            administration to request access to or deletion of their child&apos;s data.
           </p>
         </section>
 
@@ -143,7 +143,7 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-lg font-semibold text-gray-900 mb-3">11. Changes to This Policy</h2>
           <p>
-            We may update this Privacy Policy from time to time. The "Last updated" date at the top
+            We may update this Privacy Policy from time to time. The &quot;Last updated&quot; date at the top
             reflects the most recent revision. Continued use of SchoolOS after changes constitutes
             acceptance of the updated policy.
           </p>
