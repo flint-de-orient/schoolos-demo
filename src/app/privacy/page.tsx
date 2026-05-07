@@ -99,7 +99,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-gray-900 mb-3">8. Children's Privacy</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-3">8. Children&apos;s Privacy</h2>
           <p>
             SchoolOS processes data about students including minors as part of school administration
             services contracted by educational institutions. This data is processed solely on behalf of
