@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import {
   PrismaClient, Board, ModuleId, UserRole, TeacherType,
   DayOfWeek, Gender, BloodGroup, FeeStatus,
