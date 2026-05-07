@@ -6,6 +6,7 @@ import { Building, CalendarDays, ToggleLeft, Users, Bell, CreditCard, Plus, Penc
 import { toast } from 'sonner';
 import { useAcademicYear } from '@/context/AcademicYearContext';
 import type { AcademicYear } from '@/context/AcademicYearContext';
+import WhatsAppConnect from '@/components/settings/WhatsAppConnect';
 
 // ─── Module groups ────────────────────────────────────────────────────────────
 
@@ -72,6 +73,7 @@ type ProviderDef = {
   description: string;
   docsUrl: string;
   comingSoon?: boolean;
+  embeddedSignup?: boolean;
   configFields: { key: string; label: string; placeholder: string; sensitive?: boolean; multiline?: boolean }[];
   secretFields: { key: string; label: string; placeholder: string }[];
 };
@@ -122,15 +124,11 @@ const PROVIDERS: ProviderDef[] = [
     id: 'whatsapp',
     name: 'WhatsApp Business',
     logo: '💬',
-    description: 'Send WhatsApp messages to parents. Requires a Meta Business account with approved templates.',
+    description: 'Send WhatsApp messages to parents via Meta Embedded Signup.',
     docsUrl: 'https://developers.facebook.com/docs/whatsapp/cloud-api',
-    comingSoon: true,
-    configFields: [
-      { key: 'phoneNumberId', label: 'Phone Number ID', placeholder: 'From Meta for Developers dashboard' },
-    ],
-    secretFields: [
-      { key: 'apiKey', label: 'API Token', placeholder: 'Permanent system token from Meta Business' },
-    ],
+    embeddedSignup: true,
+    configFields: [],
+    secretFields: [],
   },
 ];
 
@@ -261,6 +259,23 @@ function IntegrationsTab() {
             {isOpen && !provider.comingSoon && (
               <div className="px-4 pb-4 border-t border-gray-100">
                 <div className="pt-4 space-y-3">
+
+                  {/* WhatsApp — Embedded Signup flow */}
+                  {provider.embeddedSignup ? (
+                    <WhatsAppConnect
+                      connected={!!(row?.enabled && row.config?.phoneNumberId)}
+                      wabaId={row?.config?.wabaId as string | undefined}
+                      phoneNumberId={row?.config?.phoneNumberId as string | undefined}
+                      businessName={row?.config?.businessName as string | undefined}
+                      onConnected={() => {
+                        fetch('/api/settings/integrations')
+                          .then(r => r.json())
+                          .then(d => setRows(Array.isArray(d) ? d : (d.data ?? [])));
+                        setExpanded(null);
+                      }}
+                    />
+                  ) : (
+                  <>
                   {/* Setup guide link */}
                   <a href={provider.docsUrl} target="_blank" rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 text-xs text-teal font-semibold hover:underline">
@@ -348,6 +363,8 @@ function IntegrationsTab() {
                       {isSaving ? 'Saving…' : connected ? 'Update Credentials' : 'Connect'}
                     </button>
                   </div>
+                  </>
+                  )}
                 </div>
               </div>
             )}
