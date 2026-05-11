@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
     admissionNo, name, dateOfBirth, gender, gradeId, sectionId,
     house, admissionDate, rollNo, address, city, state, pincode,
     religion, category, bloodGroup, aadharNo, previousSchool,
+    fatherName, motherName, phone, email, occupation,
   } = body;
 
   if (!admissionNo || !name || !gradeId || !sectionId || !admissionDate) {
@@ -113,6 +114,32 @@ export async function POST(req: NextRequest) {
       section: { select: { name: true } },
     },
   });
+
+  // Create parent record if any parent info was provided
+  if (fatherName || motherName || phone) {
+    try {
+      const parent = await db.parent.create({
+        data: {
+          tenantId: session.user.tenantId,
+          fatherName: fatherName || null,
+          motherName: motherName || null,
+          phone: phone || '0000000000',
+          email: email || null,
+          occupation: occupation || null,
+        },
+      });
+      await db.studentParent.create({
+        data: {
+          studentId: student.id,
+          parentId: parent.id,
+          relation: fatherName ? 'Father' : 'Mother',
+          isPrimary: true,
+        },
+      });
+    } catch (e) {
+      console.error('[createParent] failed for student', student.id, e);
+    }
+  }
 
   // Auto-assign fee plan — non-fatal: student is created regardless
   if (student.grade.academicYearId) {
