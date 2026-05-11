@@ -258,6 +258,16 @@ function StaffDrawer({ staff, onClose }: { staff: Staff; onClose: () => void }) 
 
 // ─── Add Staff Modal ──────────────────────────────────────────────────────────
 
+function FieldWrapper({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="text-xs font-semibold text-gray-700 mb-1.5 block">{label}</label>
+      {children}
+      {error && <p className="text-xs text-coral mt-1">{error}</p>}
+    </div>
+  );
+}
+
 function AddStaffModal({ onClose, onAdd }: { onClose: () => void; onAdd: (s: Staff) => void }) {
   const depts = Object.keys(deptConfig);
   const [form, setForm] = useState({ name: '', designation: '', department: '', subject: '', phone: '', email: '', qualification: '', salary: '', joiningDate: '', isTeacher: false });
@@ -309,14 +319,6 @@ function AddStaffModal({ onClose, onAdd }: { onClose: () => void; onAdd: (s: Sta
     onClose();
   };
 
-  const F = ({ label, error, half, children }: { label: string; error?: string; half?: boolean; children: React.ReactNode }) => (
-    <div className={half ? '' : ''}>
-      <label className="text-xs font-semibold text-gray-700 mb-1.5 block">{label}</label>
-      {children}
-      {error && <p className="text-xs text-coral mt-1">{error}</p>}
-    </div>
-  );
-
   const inp = (field: keyof typeof form, placeholder: string, type = 'text', extra?: string) => (
     <input type={type} placeholder={placeholder} value={form[field] as string}
       onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
@@ -344,28 +346,28 @@ function AddStaffModal({ onClose, onAdd }: { onClose: () => void; onAdd: (s: Sta
               </button>
             ))}
           </div>
-          <F label="Full Name *" error={errors.name}>{inp('name', 'e.g. Mrs. Ananya Bose')}</F>
+          <FieldWrapper label="Full Name *" error={errors.name}>{inp('name', 'e.g. Mrs. Ananya Bose')}</FieldWrapper>
           <div className="grid grid-cols-2 gap-3">
-            <F label="Designation *" error={errors.designation}>{inp('designation', form.isTeacher ? 'e.g. Senior Teacher' : 'e.g. Admin Officer')}</F>
-            <F label="Department *" error={errors.department}>
+            <FieldWrapper label="Designation *" error={errors.designation}>{inp('designation', form.isTeacher ? 'e.g. Senior Teacher' : 'e.g. Admin Officer')}</FieldWrapper>
+            <FieldWrapper label="Department *" error={errors.department}>
               <select value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))}
                 className={`w-full px-3 py-2.5 text-sm border rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-navy/20 ${errors.department ? 'border-coral' : 'border-gray-200'}`}>
                 <option value="">Select...</option>
                 {depts.map(d => <option key={d}>{d}</option>)}
               </select>
-            </F>
+            </FieldWrapper>
           </div>
           {form.isTeacher && (
-            <F label="Subject"><input type="text" placeholder="e.g. Mathematics" value={form.subject} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20" /></F>
+            <FieldWrapper label="Subject"><input type="text" placeholder="e.g. Mathematics" value={form.subject} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20" /></FieldWrapper>
           )}
           <div className="grid grid-cols-2 gap-3">
-            <F label="Phone *" error={errors.phone}>{inp('phone', '10-digit mobile')}</F>
-            <F label="Email *" error={errors.email}>{inp('email', 'work email', 'email')}</F>
+            <FieldWrapper label="Phone *" error={errors.phone}>{inp('phone', '10-digit mobile')}</FieldWrapper>
+            <FieldWrapper label="Email *" error={errors.email}>{inp('email', 'work email', 'email')}</FieldWrapper>
           </div>
-          <F label="Qualification">{inp('qualification', 'e.g. M.Sc Mathematics, B.Ed')}</F>
+          <FieldWrapper label="Qualification">{inp('qualification', 'e.g. M.Sc Mathematics, B.Ed')}</FieldWrapper>
           <div className="grid grid-cols-2 gap-3">
-            {!form.isTeacher && <F label="Basic Salary (₹) *" error={errors.salary}>{inp('salary', 'Monthly basic', 'number')}</F>}
-            <F label="Joining Date *" error={errors.joiningDate}>{inp('joiningDate', '', 'date')}</F>
+            {!form.isTeacher && <FieldWrapper label="Basic Salary (₹) *" error={errors.salary}>{inp('salary', 'Monthly basic', 'number')}</FieldWrapper>}
+            <FieldWrapper label="Joining Date *" error={errors.joiningDate}>{inp('joiningDate', '', 'date')}</FieldWrapper>
           </div>
         </div>
         <div className="flex gap-3 p-5 border-t border-gray-100 sticky bottom-0 bg-white rounded-b-2xl">
