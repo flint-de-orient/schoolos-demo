@@ -170,8 +170,8 @@ export default function TeacherProfileSheet({ teacherId, onClose }: Props) {
       fetch('/api/hr/subjects').then(r => r.json()),
       fetch('/api/hr/grades').then(r => r.json()),
     ]).then(([s, g]) => {
-      setSubjects(s.data?.subjects ?? []);
-      setGrades(g.data?.grades ?? []);
+      setSubjects(s.subjects ?? s.data?.subjects ?? []);
+      setGrades(g.grades ?? g.data?.grades ?? []);
     });
   }, []);
 
