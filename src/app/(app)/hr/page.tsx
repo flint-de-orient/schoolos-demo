@@ -72,17 +72,51 @@ const seedLeave: LeaveRequest[] = [
 
 // ─── Staff Profile Drawer ─────────────────────────────────────────────────────
 
+type DrawerSalarySettings = { hraPercent: number; daPercent: number; taFlat: number; medicalFlat: number; specialAllowancePercent: number; pfPercent: number; professionalTax: number };
+type DrawerSalaryGrade = { id: string; name: string; category: string; basicMin: number; basicMax: number };
+
+function computePayslip(basic: number, ss: DrawerSalarySettings) {
+  const hra     = Math.round(basic * ss.hraPercent / 100);
+  const da      = Math.round(basic * ss.daPercent / 100);
+  const ta      = ss.taFlat;
+  const medical = ss.medicalFlat;
+  const special = Math.round(basic * ss.specialAllowancePercent / 100);
+  const gross   = basic + hra + da + ta + medical + special;
+  const pf      = Math.round(basic * ss.pfPercent / 100);
+  const pt      = ss.professionalTax;
+  const net     = gross - pf - pt;
+  return { hra, da, ta, medical, special, gross, pf, pt, net };
+}
+
 function StaffDrawer({ staff, onClose, onSalaryUpdate }: { staff: Staff; onClose: () => void; onSalaryUpdate?: (id: string, salary: number) => void }) {
   const dept = getDept(staff.department);
   const yearsOfService = new Date().getFullYear() - new Date(staff.joiningDate).getFullYear();
   const [basicSalary, setBasicSalary] = useState(staff.salary);
   const [editingSalary, setEditingSalary] = useState(false);
-  const [salaryInput, setSalaryInput] = useState(String(staff.salary));
+  const [salaryInput, setSalaryInput] = useState(String(staff.salary || ''));
   const [savingSalary, setSavingSalary] = useState(false);
+  const [salaryGrades, setSalaryGrades] = useState<DrawerSalaryGrade[]>([]);
+  const [salarySettings, setSalarySettings] = useState<DrawerSalarySettings>({ hraPercent: 20, daPercent: 0, taFlat: 0, medicalFlat: 0, specialAllowancePercent: 0, pfPercent: 12, professionalTax: 200 });
+  const [selectedGradeId, setSelectedGradeId] = useState('');
 
-  const allowance = Math.round(basicSalary * 0.2);
-  const deduction = Math.round(basicSalary * 0.12);
-  const net = basicSalary + allowance - deduction;
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/hr/salary-grades').then(r => r.json()),
+      fetch('/api/hr/salary-settings').then(r => r.json()),
+    ]).then(([g, s]) => {
+      setSalaryGrades((g.grades ?? []).map((x: DrawerSalaryGrade) => ({ ...x, basicMin: Number(x.basicMin), basicMax: Number(x.basicMax) })));
+      const ss = s.settings ?? {};
+      setSalarySettings({
+        hraPercent: Number(ss.hraPercent ?? 20), daPercent: Number(ss.daPercent ?? 0),
+        taFlat: Number(ss.taFlat ?? 0), medicalFlat: Number(ss.medicalFlat ?? 0),
+        specialAllowancePercent: Number(ss.specialAllowancePercent ?? 0),
+        pfPercent: Number(ss.pfPercent ?? 12), professionalTax: Number(ss.professionalTax ?? 200),
+      });
+    });
+  }, []);
+
+  const payslip = computePayslip(basicSalary, salarySettings);
+  const previewPayslip = computePayslip(Number(salaryInput) || 0, salarySettings);
 
   const handleSaveSalary = async () => {
     const val = Number(salaryInput);
@@ -146,7 +180,7 @@ function StaffDrawer({ staff, onClose, onSalaryUpdate }: { staff: Staff; onClose
           {[
             { label: 'Years', value: yearsOfService },
             { label: 'Leave Left', value: staff.leaveBalance },
-            { label: 'Net Pay', value: `₹${Math.round(net / 1000)}k` },
+            { label: 'Net Pay', value: basicSalary > 0 ? `₹${Math.round(payslip.net / 1000)}k` : '—' },
           ].map(s => (
             <div key={s.label} className="p-3 text-center">
               <div className="text-lg font-sora font-bold text-navy">{s.value}</div>
@@ -257,21 +291,51 @@ function StaffDrawer({ staff, onClose, onSalaryUpdate }: { staff: Staff; onClose
           </div>
 
           {editingSalary ? (
-            <div className="space-y-2">
+            <div className="space-y-2.5">
+              {/* Pay Band picker */}
+              {salaryGrades.length > 0 && (
+                <div>
+                  <label className="text-[10px] text-gray-400 block mb-1">Pay Band <span className="text-gray-300">(optional — auto-fills basic)</span></label>
+                  <select
+                    value={selectedGradeId}
+                    onChange={e => {
+                      setSelectedGradeId(e.target.value);
+                      const g = salaryGrades.find(x => x.id === e.target.value);
+                      if (g) setSalaryInput(String(Math.round((g.basicMin + g.basicMax) / 2)));
+                    }}
+                    className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-navy/20"
+                  >
+                    <option value="">Select pay band…</option>
+                    {salaryGrades.map(g => (
+                      <option key={g.id} value={g.id}>{g.name} — ₹{g.basicMin.toLocaleString('en-IN')} to ₹{g.basicMax.toLocaleString('en-IN')}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {/* Basic input */}
               <div>
                 <label className="text-[10px] text-gray-400 block mb-1">Basic Salary (₹ / month)</label>
                 <input
                   type="number" min={0} value={salaryInput}
-                  onChange={e => setSalaryInput(e.target.value)}
+                  onChange={e => { setSalaryInput(e.target.value); setSelectedGradeId(''); }}
                   className="w-full text-sm border-2 border-navy/30 rounded-xl px-3 py-2 focus:outline-none focus:border-navy font-semibold text-navy"
                   autoFocus
                 />
               </div>
-              {salaryInput && Number(salaryInput) > 0 && (
+              {/* Live payslip preview */}
+              {Number(salaryInput) > 0 && (
                 <div className="bg-iceLight rounded-xl p-3 text-xs space-y-1">
-                  <div className="flex justify-between text-gray-500"><span>Gross (est.)</span><span className="font-semibold">₹{(Number(salaryInput) * 1.2).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span></div>
-                  <div className="flex justify-between text-gray-500"><span>Deductions (est.)</span><span className="font-semibold text-coral">−₹{Math.round(Number(salaryInput) * 0.12).toLocaleString('en-IN')}</span></div>
-                  <div className="flex justify-between font-bold text-navy border-t border-navy/10 pt-1"><span>Net Pay (est.)</span><span>₹{Math.round(Number(salaryInput) * 1.08).toLocaleString('en-IN')}</span></div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Payslip Preview</p>
+                  <div className="flex justify-between text-gray-600"><span>Basic Pay</span><span className="font-semibold">₹{Number(salaryInput).toLocaleString('en-IN')}</span></div>
+                  {previewPayslip.hra > 0 && <div className="flex justify-between text-green"><span>HRA ({salarySettings.hraPercent}%)</span><span className="font-semibold">+₹{previewPayslip.hra.toLocaleString('en-IN')}</span></div>}
+                  {previewPayslip.da > 0 && <div className="flex justify-between text-green"><span>DA ({salarySettings.daPercent}%)</span><span className="font-semibold">+₹{previewPayslip.da.toLocaleString('en-IN')}</span></div>}
+                  {previewPayslip.ta > 0 && <div className="flex justify-between text-green"><span>TA (flat)</span><span className="font-semibold">+₹{previewPayslip.ta.toLocaleString('en-IN')}</span></div>}
+                  {previewPayslip.medical > 0 && <div className="flex justify-between text-green"><span>Medical (flat)</span><span className="font-semibold">+₹{previewPayslip.medical.toLocaleString('en-IN')}</span></div>}
+                  {previewPayslip.special > 0 && <div className="flex justify-between text-green"><span>Special ({salarySettings.specialAllowancePercent}%)</span><span className="font-semibold">+₹{previewPayslip.special.toLocaleString('en-IN')}</span></div>}
+                  <div className="flex justify-between font-semibold text-gray-700 border-t border-navy/10 pt-1"><span>Gross</span><span>₹{previewPayslip.gross.toLocaleString('en-IN')}</span></div>
+                  {previewPayslip.pf > 0 && <div className="flex justify-between text-coral"><span>PF ({salarySettings.pfPercent}%)</span><span className="font-semibold">−₹{previewPayslip.pf.toLocaleString('en-IN')}</span></div>}
+                  {previewPayslip.pt > 0 && <div className="flex justify-between text-coral"><span>Prof. Tax</span><span className="font-semibold">−₹{previewPayslip.pt.toLocaleString('en-IN')}</span></div>}
+                  <div className="flex justify-between font-bold text-navy border-t border-navy/10 pt-1"><span>Net Pay</span><span>₹{previewPayslip.net.toLocaleString('en-IN')}</span></div>
                 </div>
               )}
               <div className="flex gap-2">
@@ -282,7 +346,7 @@ function StaffDrawer({ staff, onClose, onSalaryUpdate }: { staff: Staff; onClose
               </div>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {basicSalary === 0 ? (
                 <div className="text-center py-3 border-2 border-dashed border-gray-200 rounded-xl">
                   <p className="text-xs text-gray-400">No salary assigned</p>
@@ -290,19 +354,18 @@ function StaffDrawer({ staff, onClose, onSalaryUpdate }: { staff: Staff; onClose
                 </div>
               ) : (
                 <>
-                  {[
-                    { label: 'Basic Pay', value: basicSalary, color: 'text-gray-700', prefix: '' },
-                    { label: 'HRA + TA (20%)', value: allowance, color: 'text-green', prefix: '+' },
-                    { label: 'PF Deduction (12%)', value: deduction, color: 'text-coral', prefix: '−' },
-                  ].map(row => (
-                    <div key={row.label} className="flex justify-between text-xs">
-                      <span className="text-gray-500">{row.label}</span>
-                      <span className={`font-semibold ${row.color}`}>{row.prefix}₹{row.value.toLocaleString('en-IN')}</span>
-                    </div>
-                  ))}
-                  <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
+                  <div className="flex justify-between text-xs"><span className="text-gray-500">Basic Pay</span><span className="font-semibold text-gray-700">₹{basicSalary.toLocaleString('en-IN')}</span></div>
+                  {payslip.hra > 0 && <div className="flex justify-between text-xs"><span className="text-gray-500">HRA ({salarySettings.hraPercent}%)</span><span className="font-semibold text-green">+₹{payslip.hra.toLocaleString('en-IN')}</span></div>}
+                  {payslip.da > 0 && <div className="flex justify-between text-xs"><span className="text-gray-500">DA ({salarySettings.daPercent}%)</span><span className="font-semibold text-green">+₹{payslip.da.toLocaleString('en-IN')}</span></div>}
+                  {payslip.ta > 0 && <div className="flex justify-between text-xs"><span className="text-gray-500">TA (flat)</span><span className="font-semibold text-green">+₹{payslip.ta.toLocaleString('en-IN')}</span></div>}
+                  {payslip.medical > 0 && <div className="flex justify-between text-xs"><span className="text-gray-500">Medical</span><span className="font-semibold text-green">+₹{payslip.medical.toLocaleString('en-IN')}</span></div>}
+                  {payslip.special > 0 && <div className="flex justify-between text-xs"><span className="text-gray-500">Special Allowance</span><span className="font-semibold text-green">+₹{payslip.special.toLocaleString('en-IN')}</span></div>}
+                  <div className="flex justify-between text-xs font-semibold text-gray-600 border-t border-gray-100 pt-1.5"><span>Gross</span><span>₹{payslip.gross.toLocaleString('en-IN')}</span></div>
+                  {payslip.pf > 0 && <div className="flex justify-between text-xs"><span className="text-gray-500">PF ({salarySettings.pfPercent}%)</span><span className="font-semibold text-coral">−₹{payslip.pf.toLocaleString('en-IN')}</span></div>}
+                  {payslip.pt > 0 && <div className="flex justify-between text-xs"><span className="text-gray-500">Prof. Tax</span><span className="font-semibold text-coral">−₹{payslip.pt.toLocaleString('en-IN')}</span></div>}
+                  <div className="flex justify-between text-sm pt-1.5 border-t border-gray-100">
                     <span className="font-bold text-gray-700">Net Pay</span>
-                    <span className="font-bold text-navy">₹{net.toLocaleString('en-IN')}</span>
+                    <span className="font-bold text-navy">₹{payslip.net.toLocaleString('en-IN')}</span>
                   </div>
                 </>
               )}

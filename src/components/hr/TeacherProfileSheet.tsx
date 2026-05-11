@@ -63,6 +63,20 @@ interface Props {
   onClose: () => void;
 }
 
+// ─── Payslip helper ───────────────────────────────────────────────────────────
+
+function calcPayslip(basic: number, ss: { hraPercent: number; daPercent: number; taFlat: number; medicalFlat: number; specialAllowancePercent: number; pfPercent: number; professionalTax: number }) {
+  const hra     = Math.round(basic * ss.hraPercent / 100);
+  const da      = Math.round(basic * ss.daPercent / 100);
+  const ta      = ss.taFlat;
+  const medical = ss.medicalFlat;
+  const special = Math.round(basic * ss.specialAllowancePercent / 100);
+  const gross   = basic + hra + da + ta + medical + special;
+  const pf      = Math.round(basic * ss.pfPercent / 100);
+  const pt      = ss.professionalTax;
+  return { hra, da, ta, medical, special, gross, pf, pt, net: gross - pf - pt };
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const DAYS: { key: DayKey; short: string }[] = [
@@ -134,6 +148,9 @@ export default function TeacherProfileSheet({ teacherId, onClose }: Props) {
   // Salary state
   const [salaryInput, setSalaryInput] = useState('');
   const [editingSalary, setEditingSalary] = useState(false);
+  const [salaryGrades, setSalaryGrades] = useState<{ id: string; name: string; category: string; basicMin: number; basicMax: number }[]>([]);
+  const [salarySettings, setSalarySettings] = useState({ hraPercent: 20, daPercent: 0, taFlat: 0, medicalFlat: 0, specialAllowancePercent: 0, pfPercent: 12, professionalTax: 200 });
+  const [selectedGradeId, setSelectedGradeId] = useState('');
 
   // ── Load teacher data ──
   const loadTeacher = useCallback(async () => {
@@ -170,14 +187,24 @@ export default function TeacherProfileSheet({ teacherId, onClose }: Props) {
     }
   }, [teacherId]);
 
-  // ── Load subjects & grades (once) ──
+  // ── Load subjects, grades, salary config (once) ──
   useEffect(() => {
     Promise.all([
       fetch('/api/hr/subjects').then(r => r.json()),
       fetch('/api/hr/grades').then(r => r.json()),
-    ]).then(([s, g]) => {
+      fetch('/api/hr/salary-grades').then(r => r.json()),
+      fetch('/api/hr/salary-settings').then(r => r.json()),
+    ]).then(([s, g, sg, ss]) => {
       setSubjects(s.subjects ?? s.data?.subjects ?? []);
       setGrades(g.grades ?? g.data?.grades ?? []);
+      setSalaryGrades((sg.grades ?? []).map((x: { id: string; name: string; category: string; basicMin: number; basicMax: number }) => ({ ...x, basicMin: Number(x.basicMin), basicMax: Number(x.basicMax) })));
+      const cfg = ss.settings ?? {};
+      setSalarySettings({
+        hraPercent: Number(cfg.hraPercent ?? 20), daPercent: Number(cfg.daPercent ?? 0),
+        taFlat: Number(cfg.taFlat ?? 0), medicalFlat: Number(cfg.medicalFlat ?? 0),
+        specialAllowancePercent: Number(cfg.specialAllowancePercent ?? 0),
+        pfPercent: Number(cfg.pfPercent ?? 12), professionalTax: Number(cfg.professionalTax ?? 200),
+      });
     });
   }, []);
 
@@ -714,48 +741,95 @@ export default function TeacherProfileSheet({ teacherId, onClose }: Props) {
                   </div>
 
                   {/* Salary */}
-                  <div className="border border-gray-100 rounded-2xl p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="w-4 h-4 text-green" />
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Basic Salary (₹ / month)</p>
-                      </div>
-                      {!editingSalary && (
-                        <button
-                          onClick={() => setEditingSalary(true)}
-                          className="flex items-center gap-1 text-xs text-navy font-semibold hover:underline"
-                        >
-                          <Pencil className="w-3 h-3" /> Edit
-                        </button>
-                      )}
-                    </div>
-                    {editingSalary ? (
-                      <div className="space-y-2">
-                        <input
-                          type="number" min={0} value={salaryInput}
-                          onChange={e => setSalaryInput(e.target.value)}
-                          placeholder="e.g. 45000"
-                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
-                        />
-                        {salaryInput && Number(salaryInput) > 0 && (
-                          <div className="bg-gray-50 rounded-lg p-3 text-xs space-y-1">
-                            <div className="flex justify-between text-gray-500"><span>Gross (est.)</span><span className="font-semibold">₹{(Number(salaryInput) * 1.2).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span></div>
-                            <div className="flex justify-between text-gray-500"><span>Deductions (est.)</span><span className="font-semibold text-coral">−₹{Math.round(Number(salaryInput) * 0.12).toLocaleString('en-IN')}</span></div>
-                            <div className="flex justify-between font-bold text-navy border-t border-navy/10 pt-1"><span>Net Pay (est.)</span><span>₹{Math.round(Number(salaryInput) * 1.08).toLocaleString('en-IN')}</span></div>
+                  {(() => {
+                    const basicNum = Number(teacher.salary) || 0;
+                    const previewNum = Number(salaryInput) || 0;
+                    const ps = calcPayslip(basicNum, salarySettings);
+                    const prev = calcPayslip(previewNum, salarySettings);
+                    return (
+                      <div className="border border-gray-100 rounded-2xl p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <DollarSign className="w-4 h-4 text-green" />
+                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Salary</p>
+                          </div>
+                          {!editingSalary && (
+                            <button onClick={() => setEditingSalary(true)} className="flex items-center gap-1 text-xs text-navy font-semibold hover:underline">
+                              <Pencil className="w-3 h-3" /> Edit
+                            </button>
+                          )}
+                        </div>
+                        {editingSalary ? (
+                          <div className="space-y-2.5">
+                            {/* Pay Band */}
+                            {salaryGrades.length > 0 && (
+                              <div>
+                                <label className="text-[10px] text-gray-400 block mb-1">Pay Band <span className="text-gray-300">(auto-fills basic)</span></label>
+                                <select
+                                  value={selectedGradeId}
+                                  onChange={e => {
+                                    setSelectedGradeId(e.target.value);
+                                    const g = salaryGrades.find(x => x.id === e.target.value);
+                                    if (g) setSalaryInput(String(Math.round((g.basicMin + g.basicMax) / 2)));
+                                  }}
+                                  className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-navy/20"
+                                >
+                                  <option value="">Select pay band…</option>
+                                  {salaryGrades.map(g => (
+                                    <option key={g.id} value={g.id}>{g.name} — ₹{g.basicMin.toLocaleString('en-IN')} to ₹{g.basicMax.toLocaleString('en-IN')}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
+                            <div>
+                              <label className="text-[10px] text-gray-400 block mb-1">Basic Salary (₹ / month)</label>
+                              <input
+                                type="number" min={0} value={salaryInput}
+                                onChange={e => { setSalaryInput(e.target.value); setSelectedGradeId(''); }}
+                                placeholder="e.g. 45000"
+                                className="w-full border-2 border-navy/30 rounded-xl px-3 py-2 text-sm font-semibold text-navy focus:outline-none focus:border-navy"
+                              />
+                            </div>
+                            {previewNum > 0 && (
+                              <div className="bg-iceLight rounded-xl p-3 text-xs space-y-1">
+                                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Payslip Preview</p>
+                                <div className="flex justify-between text-gray-600"><span>Basic Pay</span><span className="font-semibold">₹{previewNum.toLocaleString('en-IN')}</span></div>
+                                {prev.hra > 0 && <div className="flex justify-between text-green"><span>HRA ({salarySettings.hraPercent}%)</span><span className="font-semibold">+₹{prev.hra.toLocaleString('en-IN')}</span></div>}
+                                {prev.da > 0 && <div className="flex justify-between text-green"><span>DA ({salarySettings.daPercent}%)</span><span className="font-semibold">+₹{prev.da.toLocaleString('en-IN')}</span></div>}
+                                {prev.ta > 0 && <div className="flex justify-between text-green"><span>TA (flat)</span><span className="font-semibold">+₹{prev.ta.toLocaleString('en-IN')}</span></div>}
+                                {prev.medical > 0 && <div className="flex justify-between text-green"><span>Medical</span><span className="font-semibold">+₹{prev.medical.toLocaleString('en-IN')}</span></div>}
+                                {prev.special > 0 && <div className="flex justify-between text-green"><span>Special ({salarySettings.specialAllowancePercent}%)</span><span className="font-semibold">+₹{prev.special.toLocaleString('en-IN')}</span></div>}
+                                <div className="flex justify-between font-semibold text-gray-700 border-t border-navy/10 pt-1"><span>Gross</span><span>₹{prev.gross.toLocaleString('en-IN')}</span></div>
+                                {prev.pf > 0 && <div className="flex justify-between text-coral"><span>PF ({salarySettings.pfPercent}%)</span><span className="font-semibold">−₹{prev.pf.toLocaleString('en-IN')}</span></div>}
+                                {prev.pt > 0 && <div className="flex justify-between text-coral"><span>Prof. Tax</span><span className="font-semibold">−₹{prev.pt.toLocaleString('en-IN')}</span></div>}
+                                <div className="flex justify-between font-bold text-navy border-t border-navy/10 pt-1"><span>Net Pay</span><span>₹{prev.net.toLocaleString('en-IN')}</span></div>
+                              </div>
+                            )}
+                            <button onClick={() => setEditingSalary(false)} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+                            <p className="text-[10px] text-gray-400">Saved with &quot;Save Load Limits&quot; below</p>
+                          </div>
+                        ) : basicNum > 0 ? (
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between text-xs"><span className="text-gray-500">Basic Pay</span><span className="font-semibold text-gray-700">₹{basicNum.toLocaleString('en-IN')}</span></div>
+                            {ps.hra > 0 && <div className="flex justify-between text-xs"><span className="text-gray-500">HRA ({salarySettings.hraPercent}%)</span><span className="font-semibold text-green">+₹{ps.hra.toLocaleString('en-IN')}</span></div>}
+                            {ps.da > 0 && <div className="flex justify-between text-xs"><span className="text-gray-500">DA ({salarySettings.daPercent}%)</span><span className="font-semibold text-green">+₹{ps.da.toLocaleString('en-IN')}</span></div>}
+                            {ps.ta > 0 && <div className="flex justify-between text-xs"><span className="text-gray-500">TA</span><span className="font-semibold text-green">+₹{ps.ta.toLocaleString('en-IN')}</span></div>}
+                            {ps.medical > 0 && <div className="flex justify-between text-xs"><span className="text-gray-500">Medical</span><span className="font-semibold text-green">+₹{ps.medical.toLocaleString('en-IN')}</span></div>}
+                            {ps.special > 0 && <div className="flex justify-between text-xs"><span className="text-gray-500">Special</span><span className="font-semibold text-green">+₹{ps.special.toLocaleString('en-IN')}</span></div>}
+                            <div className="flex justify-between text-xs font-semibold text-gray-600 border-t border-gray-100 pt-1.5"><span>Gross</span><span>₹{ps.gross.toLocaleString('en-IN')}</span></div>
+                            {ps.pf > 0 && <div className="flex justify-between text-xs"><span className="text-gray-500">PF ({salarySettings.pfPercent}%)</span><span className="font-semibold text-coral">−₹{ps.pf.toLocaleString('en-IN')}</span></div>}
+                            {ps.pt > 0 && <div className="flex justify-between text-xs"><span className="text-gray-500">Prof. Tax</span><span className="font-semibold text-coral">−₹{ps.pt.toLocaleString('en-IN')}</span></div>}
+                            <div className="flex justify-between text-sm pt-1.5 border-t border-gray-100"><span className="font-bold text-gray-700">Net Pay</span><span className="font-bold text-navy">₹{ps.net.toLocaleString('en-IN')}</span></div>
+                          </div>
+                        ) : (
+                          <div>
+                            <p className="text-xs text-gray-400">No salary assigned</p>
+                            <button onClick={() => setEditingSalary(true)} className="text-xs text-navy font-semibold mt-1 hover:underline">Set salary →</button>
                           </div>
                         )}
-                        <button onClick={() => setEditingSalary(false)} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
-                        <p className="text-[10px] text-gray-400">Changes saved with &quot;Save Load Limits&quot; below</p>
                       </div>
-                    ) : teacher.salary ? (
-                      <p className="text-2xl font-bold font-sora text-green">₹{Number(teacher.salary).toLocaleString('en-IN')}<span className="text-xs font-normal text-gray-400 ml-1">/month</span></p>
-                    ) : (
-                      <div>
-                        <p className="text-xs text-gray-400">No salary assigned</p>
-                        <button onClick={() => setEditingSalary(true)} className="text-xs text-navy font-semibold mt-1 hover:underline">Set salary →</button>
-                      </div>
-                    )}
-                  </div>
+                    );
+                  })()}
 
                   {/* Teacher type */}
                   <div className="border border-gray-100 rounded-2xl p-4">
