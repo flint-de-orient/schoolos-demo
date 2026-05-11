@@ -28,7 +28,8 @@ export async function sendWhatsAppTemplate(
   toPhone: string,
   templateName: string,
   bodyVars: string[],
-  buttonUrlVar?: string // dynamic suffix for URL buttons
+  buttonUrlVar?: string,
+  recipientName?: string
 ): Promise<SendResult> {
   try {
     const config = await db.tenantIntegrationConfig.findUnique({
@@ -84,8 +85,35 @@ export async function sendWhatsAppTemplate(
       return { success: false, error: data.error?.message ?? 'WhatsApp API error' };
     }
 
-    return { success: true, messageId: data.messages?.[0]?.id };
+    const messageId = data.messages?.[0]?.id;
+    await db.outboundLog.create({
+      data: {
+        tenantId,
+        channel: 'WHATSAPP',
+        templateName,
+        recipientPhone: formatPhone(toPhone),
+        recipientName,
+        status: 'SENT',
+        messageId,
+        metadata: { bodyVars, buttonUrlVar },
+      },
+    }).catch(() => {});
+
+    return { success: true, messageId };
   } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
+    const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+    await db.outboundLog.create({
+      data: {
+        tenantId,
+        channel: 'WHATSAPP',
+        templateName,
+        recipientPhone: formatPhone(toPhone),
+        recipientName,
+        status: 'FAILED',
+        errorMessage,
+        metadata: { bodyVars, buttonUrlVar },
+      },
+    }).catch(() => {});
+    return { success: false, error: errorMessage };
   }
 }

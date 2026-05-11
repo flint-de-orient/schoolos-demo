@@ -7,7 +7,7 @@ import {
   FileText, CreditCard, Library, Bus, Heart, Users,
   Smartphone, ShoppingBag, Brain, BarChart3, Settings,
   Sparkles, GraduationCap, ChevronRight, BookUser, IdCard, Globe,
-  LogOut,
+  LogOut, Bell,
 } from 'lucide-react';
 import { useTenantSafe } from '@/context/TenantContext';
 import { signOut } from 'next-auth/react';
@@ -70,7 +70,8 @@ const allNavGroups = [
   {
     label: 'System',
     items: [
-      { moduleId: 'settings',     href: '/settings',     label: 'Settings',            icon: Settings },
+      { moduleId: 'notifications', href: '/notifications', label: 'Notification Log',   icon: Bell },
+      { moduleId: 'settings',      href: '/settings',      label: 'Settings',           icon: Settings },
     ],
   },
 ];

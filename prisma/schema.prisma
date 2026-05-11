@@ -193,6 +193,13 @@ enum NotificationType {
   SUCCESS
 }
 
+enum MessageStatus {
+  SENT
+  FAILED
+  DELIVERED
+  READ
+}
+
 enum NotificationChannel {
   IN_APP
   WHATSAPP
@@ -314,6 +321,7 @@ model Tenant {
   idCards         IDCard[]
   aiJobs          AIJob[]
   notifications   Notification[]
+  outboundLogs    OutboundLog[]
   auditLogs       AuditLog[]
   chatSessions    ChatSession[]
   schoolEvents    SchoolEvent[]
@@ -2669,6 +2677,26 @@ model Notification {
 
   @@index([tenantId, userId, isRead])
   @@index([userId])
+}
+
+model OutboundLog {
+  id             String              @id @default(cuid())
+  tenantId       String
+  channel        NotificationChannel
+  templateName   String
+  recipientPhone String
+  recipientName  String?
+  status         MessageStatus       @default(SENT)
+  messageId      String?
+  errorMessage   String?
+  metadata       Json                @default("{}")
+  createdAt      DateTime            @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, channel])
+  @@index([tenantId, status])
 }
 
 // ─────────────────────────────────────────────

@@ -20,14 +20,12 @@ export async function notifyAbsent(
   const tenant = await getTenantInfo(tenantId);
   if (!tenant) return;
 
-  await sendWhatsAppTemplate(tenantId, parentPhone, 'student_absent_alert', [
-    parentName,
-    studentName,
-    className,
-    date,
-    tenant.name,
-    tenant.phone ?? 'the school office',
-  ]);
+  await sendWhatsAppTemplate(
+    tenantId, parentPhone, 'student_absent_alert',
+    [parentName, studentName, className, date, tenant.name, tenant.phone ?? 'the school office'],
+    undefined,
+    parentName
+  );
 }
 
 // Template 2: fee_payment_reminder
@@ -45,19 +43,10 @@ export async function notifyFeeOverdue(
   if (!tenant) return;
 
   await sendWhatsAppTemplate(
-    tenantId,
-    parentPhone,
-    'fee_payment_reminder',
-    [
-      tenant.name,
-      parentName,
-      amount.toLocaleString('en-IN'),
-      studentName,
-      term,
-      dueDate,
-      tenant.phone ?? 'the school office',
-    ],
-    receiptRef // dynamic URL suffix → /pay/{receiptRef}
+    tenantId, parentPhone, 'fee_payment_reminder',
+    [tenant.name, parentName, amount.toLocaleString('en-IN'), studentName, term, dueDate, tenant.phone ?? 'the school office'],
+    receiptRef,
+    parentName
   );
 }
 
@@ -73,15 +62,12 @@ export async function notifyAdmissionStage(
   const tenant = await getTenantInfo(tenantId);
   if (!tenant) return;
 
-  await sendWhatsAppTemplate(tenantId, parentPhone, 'admission_stage_update', [
-    tenant.name,
-    parentName,
-    studentName,
-    className,
-    stage,
-    tenant.name,
-    tenant.phone ?? 'the school office',
-  ]);
+  await sendWhatsAppTemplate(
+    tenantId, parentPhone, 'admission_stage_update',
+    [tenant.name, parentName, studentName, className, stage, tenant.name, tenant.phone ?? 'the school office'],
+    undefined,
+    parentName
+  );
 }
 
 // Template 4: exam_timetable_notification
@@ -98,16 +84,12 @@ export async function notifyExamTimetable(
   const tenant = await getTenantInfo(tenantId);
   if (!tenant) return;
 
-  await sendWhatsAppTemplate(tenantId, parentPhone, 'exam_timetable_notification', [
-    tenant.name,
-    parentName,
-    studentName,
-    className,
-    firstSubject,
-    firstDate,
-    firstTime,
-    tenant.phone ?? 'the school office',
-  ]);
+  await sendWhatsAppTemplate(
+    tenantId, parentPhone, 'exam_timetable_notification',
+    [tenant.name, parentName, studentName, className, firstSubject, firstDate, firstTime, tenant.phone ?? 'the school office'],
+    undefined,
+    parentName
+  );
 }
 
 // Template 5: fee_payment_confirmation
@@ -124,18 +106,9 @@ export async function notifyFeeConfirmed(
   if (!tenant) return;
 
   await sendWhatsAppTemplate(
-    tenantId,
-    parentPhone,
-    'fee_payment_confirmation',
-    [
-      tenant.name,
-      parentName,
-      amount.toLocaleString('en-IN'),
-      studentName,
-      paidDate,
-      receiptNo,
-      tenant.name,
-    ],
-    receiptNo // dynamic URL suffix → /receipts/{receiptNo}
+    tenantId, parentPhone, 'fee_payment_confirmation',
+    [tenant.name, parentName, amount.toLocaleString('en-IN'), studentName, paidDate, receiptNo, tenant.name],
+    receiptNo,
+    parentName
   );
 }
