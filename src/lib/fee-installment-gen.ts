@@ -34,7 +34,7 @@ type Plan = {
 
 type InstallmentRow = {
   feeAccountId: string;
-  planItemId: string;
+  planItemId: string | null;
   termLabel: string;
   amount: Decimal;
   dueDate: Date;
@@ -89,7 +89,7 @@ export function generateInstallments(
       const amount = totalAmount.mul(inst.percentage).div(100).toDecimalPlaces(2);
       rows.push({
         feeAccountId,
-        planItemId: items[0]?.id ?? '',  // synthetic — links to first item
+        planItemId: items[0]?.id ?? null,
         termLabel: inst.name,
         amount,
         dueDate: new Date(sessionYear, inst.dueMonth - 1, inst.dueDay),

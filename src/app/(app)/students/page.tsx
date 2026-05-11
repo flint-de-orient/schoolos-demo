@@ -179,15 +179,19 @@ function StudentDrawer({ mode, student, grades, onClose, onSaved }: StudentDrawe
         body: JSON.stringify(form),
       });
       if (!res.ok) {
-        const body = await res.json();
-        toast.error(body.error ?? 'Failed to save');
+        let msg = `Server error (${res.status})`;
+        try {
+          const body = await res.json();
+          msg = body.error ?? msg;
+        } catch { /* response wasn't JSON */ }
+        toast.error(msg);
         return;
       }
       toast.success(mode === 'add' ? `${form.name} enrolled successfully` : 'Student updated');
       onSaved();
       onClose();
-    } catch {
-      toast.error('Network error');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Network error — please try again');
     } finally {
       setSaving(false);
     }

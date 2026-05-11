@@ -114,16 +114,20 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  // Auto-assign fee plan if an active plan covers this grade
+  // Auto-assign fee plan — non-fatal: student is created regardless
   if (student.grade.academicYearId) {
-    await autoAssignFeePlan(
-      session.user.tenantId,
-      student.id,
-      gradeId,
-      student.grade.academicYearId,
-      session.user.id,
-      true, // new admission — skip components excluded for new students
-    );
+    try {
+      await autoAssignFeePlan(
+        session.user.tenantId,
+        student.id,
+        gradeId,
+        student.grade.academicYearId,
+        session.user.id,
+        true,
+      );
+    } catch (e) {
+      console.error('[autoAssignFeePlan] failed for student', student.id, e);
+    }
   }
 
   return ok(student, 201);
