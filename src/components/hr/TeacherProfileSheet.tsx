@@ -108,7 +108,8 @@ export default function TeacherProfileSheet({ teacherId, onClose }: Props) {
   const [teacher, setTeacher] = useState<TeacherDetail | null>(null);
   const [subjects, setSubjects] = useState<SubjectOption[]>([]);
   const [grades, setGrades] = useState<GradeOption[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'subjects' | 'availability' | 'limits'>('subjects');
 
   // Subject form state
@@ -133,23 +134,31 @@ export default function TeacherProfileSheet({ teacherId, onClose }: Props) {
   const loadTeacher = useCallback(async () => {
     if (!teacherId) return;
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await fetch(`/api/hr/teachers/${teacherId}`);
-      if (!res.ok) { toast.error('Failed to load teacher'); return; }
-      const { data } = await res.json();
-      setTeacher(data.teacher);
-      setLimits({ maxPeriodsDay: data.teacher.maxPeriodsDay, maxPeriodsWeek: data.teacher.maxPeriodsWeek });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json) {
+        setLoadError(json?.error ?? `HTTP ${res.status}`);
+        return;
+      }
+      const t = json.data?.teacher ?? json.teacher ?? null;
+      if (!t) { setLoadError('Teacher data missing in response'); return; }
+      setTeacher(t);
+      setLimits({ maxPeriodsDay: t.maxPeriodsDay, maxPeriodsWeek: t.maxPeriodsWeek });
 
       // Populate availability edit state from DB
       const map: Record<DayKey, { startTime: string; endTime: string }[]> = {
         MONDAY: [], TUESDAY: [], WEDNESDAY: [], THURSDAY: [], FRIDAY: [], SATURDAY: [],
       };
-      for (const slot of data.teacher.availabilities) {
+      for (const slot of (t.availabilities ?? [])) {
         if (map[slot.day as DayKey]) {
           map[slot.day as DayKey].push({ startTime: slot.startTime, endTime: slot.endTime });
         }
       }
       setAvailEdit(map);
+    } catch (e: any) {
+      setLoadError(e?.message ?? 'Unexpected error');
     } finally {
       setLoading(false);
     }
@@ -167,10 +176,12 @@ export default function TeacherProfileSheet({ teacherId, onClose }: Props) {
   }, []);
 
   useEffect(() => {
-    loadTeacher();
+    setTeacher(null);
+    setLoadError(null);
     setActiveTab('subjects');
     setShowSubjectForm(false);
     setAvailDirty(new Set());
+    loadTeacher();
   }, [loadTeacher]);
 
   // ── Subject handlers ──
@@ -274,9 +285,24 @@ export default function TeacherProfileSheet({ teacherId, onClose }: Props) {
         onClick={e => e.stopPropagation()}
       >
         {/* ── Header ── */}
-        {loading || !teacher ? (
-          <div className="flex-1 flex items-center justify-center">
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center flex-col gap-3">
             <Loader2 className="w-6 h-6 animate-spin text-navy" />
+            <p className="text-xs text-gray-400">Loading teacher profile…</p>
+          </div>
+        ) : loadError ? (
+          <div className="flex-1 flex items-center justify-center flex-col gap-3 p-8">
+            <AlertCircle className="w-8 h-8 text-coral" />
+            <p className="text-sm font-semibold text-gray-700">Failed to load profile</p>
+            <p className="text-xs text-gray-400 text-center">{loadError}</p>
+            <button onClick={loadTeacher} className="text-xs font-semibold text-navy border border-navy/30 px-4 py-2 rounded-xl hover:bg-navy/5">
+              Retry
+            </button>
+          </div>
+        ) : !teacher ? (
+          <div className="flex-1 flex items-center justify-center flex-col gap-3 p-8">
+            <AlertCircle className="w-8 h-8 text-gray-300" />
+            <p className="text-sm text-gray-400">Teacher not found</p>
           </div>
         ) : (
           <>
