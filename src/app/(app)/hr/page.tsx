@@ -17,6 +17,7 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid
 } from 'recharts';
+import TeacherProfileSheet from '@/components/hr/TeacherProfileSheet';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Staff = {
@@ -26,6 +27,7 @@ type Staff = {
   employmentType: string; teachingCapacity: string[];
   weeklyAvailability?: null; weeklyLoad?: { current: number; target: number };
   monthlyLoad?: number; annualLoad?: number;
+  _sourceType: 'teacher' | 'staff';
 };
 
 type LeaveRequest = {
@@ -314,6 +316,7 @@ function AddStaffModal({ onClose, onAdd }: { onClose: () => void; onAdd: (s: Sta
       salary: Number(form.salary) || 45000, leaveBalance: 15,
       status: 'active', employmentType: 'full-time',
       teachingCapacity: form.subject ? [form.subject] : [],
+      _sourceType: form.isTeacher ? 'teacher' : 'staff',
     });
     toast.success(`${form.name} added to staff directory`);
     onClose();
@@ -508,8 +511,9 @@ function mapTeacher(t: any): Staff {
     salary: Number(t.salary ?? 45000),
     leaveBalance: 12 - (t.leaveRequests?.length ?? 0),
     status: t.isActive ? 'active' : 'on-leave',
-    employmentType: 'full-time',
+    employmentType: t.type === 'PART_TIME' ? 'part-time' : 'full-time',
     teachingCapacity: t.subjects?.map((s: any) => s.subject?.name).filter(Boolean) ?? [],
+    _sourceType: 'teacher',
   };
 }
 
@@ -527,6 +531,7 @@ function mapStaff(s: any): Staff {
     status: s.isActive ? 'active' : 'on-leave',
     employmentType: 'full-time',
     teachingCapacity: [],
+    _sourceType: 'staff',
   };
 }
 
@@ -571,6 +576,7 @@ export default function HRPage() {
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [showAddStaff, setShowAddStaff] = useState(false);
   const [showApplyLeave, setShowApplyLeave] = useState(false);
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(null);
 
   // Directory state
   const [search, setSearch] = useState('');
@@ -904,7 +910,7 @@ export default function HRPage() {
               {viewMode === 'grid' ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                   {filteredStaff.map(s => (
-                      <button key={s.id} onClick={() => setSelectedStaff(s)}
+                      <button key={s.id} onClick={() => s._sourceType === 'teacher' ? setSelectedTeacherId(s.id) : setSelectedStaff(s)}
                         className="text-left bg-gray-50 hover:bg-white border border-gray-100 hover:border-gray-200 hover:shadow-md rounded-2xl p-4 transition-all group text-center">
                         <div className={`w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center text-white font-bold text-sm font-sora shadow-sm ${s.status === 'active' ? 'gradient-navy' : 'bg-gray-300'}`}>
                           {getInitials(s.name)}
@@ -925,8 +931,11 @@ export default function HRPage() {
                             {(s.teachingCapacity as string[]).slice(0, 2).join(' · ')}{(s.teachingCapacity as string[]).length > 2 ? ` +${(s.teachingCapacity as string[]).length - 2}` : ''}
                           </p>
                         )}
-                        <div className="mt-2 text-[10px] text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-0.5">
-                          View profile <ChevronRight className="w-3 h-3" />
+                        <div className="mt-2 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-0.5">
+                          {s._sourceType === 'teacher'
+                            ? <span className="text-teal font-semibold flex items-center gap-0.5"><BookOpen className="w-2.5 h-2.5" /> Subjects & Availability</span>
+                            : <span className="text-gray-400 flex items-center gap-0.5">View profile <ChevronRight className="w-3 h-3" /></span>
+                          }
                         </div>
                       </button>
                   ))}
@@ -946,7 +955,7 @@ export default function HRPage() {
                       {filteredStaff.map((s, i) => {
                         const dept = getDept(s.department);
                         return (
-                          <tr key={s.id} onClick={() => setSelectedStaff(s)}
+                          <tr key={s.id} onClick={() => s._sourceType === 'teacher' ? setSelectedTeacherId(s.id) : setSelectedStaff(s)}
                             className={`border-b border-gray-50 hover:bg-gray-50/80 transition-colors cursor-pointer ${i % 2 !== 0 ? 'bg-gray-50/30' : ''}`}>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2.5">
@@ -1649,6 +1658,7 @@ export default function HRPage() {
 
       {/* Drawers & Modals */}
       {selectedStaff && <StaffDrawer staff={selectedStaff} onClose={() => setSelectedStaff(null)} />}
+      <TeacherProfileSheet teacherId={selectedTeacherId} onClose={() => setSelectedTeacherId(null)} />
       {showAddStaff && <AddStaffModal onClose={() => setShowAddStaff(false)} onAdd={s => setStaffList(prev => [s, ...prev])} />}
       {showApplyLeave && <ApplyLeaveModal staff={staffList} onClose={() => setShowApplyLeave(false)} onApply={l => setLeaveRequests(prev => [l, ...prev])} />}
 
