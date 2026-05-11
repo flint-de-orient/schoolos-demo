@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import PageWrapper from '@/components/layout/PageWrapper';
-import { Building, CalendarDays, ToggleLeft, Users, Bell, CreditCard, Plus, Pencil, Trash2, Check, Star, X, AlertTriangle, Plug, ChevronDown, ChevronUp, Eye, EyeOff, Loader2, CheckCircle2, AlertCircle, BookOpen, Palette } from 'lucide-react';
+import { Building, CalendarDays, ToggleLeft, Users, Bell, CreditCard, Plus, Pencil, Trash2, Check, Star, X, AlertTriangle, Plug, ChevronDown, ChevronUp, Eye, EyeOff, Loader2, CheckCircle2, AlertCircle, BookOpen, Palette, DollarSign, CalendarCheck, Info, LayoutList } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAcademicYear } from '@/context/AcademicYearContext';
 import type { AcademicYear } from '@/context/AcademicYearContext';
@@ -54,7 +54,7 @@ const moduleGroups = [
   },
 ];
 
-type Tab = 'profile' | 'sessions' | 'subjects' | 'modules' | 'roles' | 'notifications' | 'billing' | 'integrations';
+type Tab = 'profile' | 'sessions' | 'subjects' | 'salary' | 'leave' | 'modules' | 'roles' | 'notifications' | 'billing' | 'integrations';
 
 // ─── Integrations Tab ─────────────────────────────────────────────────────────
 
@@ -719,6 +719,560 @@ function SubjectsTab() {
   );
 }
 
+// ─── Salary Settings tab ──────────────────────────────────────────────────
+
+const LEAVE_COLORS = [
+  '#1E2761','#028090','#534AB7','#D85A30','#3B6D11',
+  '#993556','#BA7517','#0369a1','#7c3aed','#be185d',
+];
+
+type SalaryGradeRow = { id: string; name: string; category: string; basicMin: number; basicMax: number; description: string | null };
+type LeavePolicyRow = {
+  id: string; leaveType: string; label: string | null; color: string | null;
+  daysAllowed: number; isCarryOver: boolean; maxCarryOver: number | null;
+  isPaid: boolean; isEncashable: boolean; requiresApproval: boolean;
+  maxConsecutiveDays: number | null; minServiceDays: number | null;
+  description: string | null; roleTypes: string[];
+};
+
+type SalaryForm = {
+  hraPercent: number; daPercent: number; taFlat: number; medicalFlat: number;
+  specialAllowancePercent: number; pfPercent: number; professionalTax: number;
+  tdsThresholdAnnual: number; tdsPercent: number; payDay: number;
+};
+
+function SalarySettingsTab() {
+  const [form, setForm] = useState<SalaryForm>({
+    hraPercent: 20, daPercent: 0, taFlat: 0, medicalFlat: 0,
+    specialAllowancePercent: 0, pfPercent: 12,
+    professionalTax: 200, tdsThresholdAnnual: 500000, tdsPercent: 10, payDay: 28,
+  });
+  const [grades, setGrades] = useState<SalaryGradeRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [showGradeForm, setShowGradeForm] = useState(false);
+  const [editGradeId, setEditGradeId] = useState<string | null>(null);
+  const [gradeForm, setGradeForm] = useState({ name: '', category: 'TEACHING', basicMin: '', basicMax: '', description: '' });
+  const [savingGrade, setSavingGrade] = useState(false);
+
+  const PREVIEW_BASIC = 40000;
+  const hra = Math.round(PREVIEW_BASIC * Number(form.hraPercent) / 100);
+  const da = Math.round(PREVIEW_BASIC * Number(form.daPercent) / 100);
+  const ta = Number(form.taFlat);
+  const med = Number(form.medicalFlat);
+  const special = Math.round(PREVIEW_BASIC * Number(form.specialAllowancePercent) / 100);
+  const grossPrev = PREVIEW_BASIC + hra + da + ta + med + special;
+  const pfPrev = Math.round(PREVIEW_BASIC * Number(form.pfPercent) / 100);
+  const ptPrev = Number(form.professionalTax);
+  const netPrev = grossPrev - pfPrev - ptPrev;
+
+  const load = async () => {
+    setLoading(true);
+    const [s, g] = await Promise.all([
+      fetch('/api/hr/salary-settings').then(r => r.json()),
+      fetch('/api/hr/salary-grades').then(r => r.json()),
+    ]);
+    if (s.settings) {
+      setForm({
+        hraPercent: Number(s.settings.hraPercent),
+        daPercent: Number(s.settings.daPercent),
+        taFlat: Number(s.settings.taFlat),
+        medicalFlat: Number(s.settings.medicalFlat),
+        specialAllowancePercent: Number(s.settings.specialAllowancePercent),
+        pfPercent: Number(s.settings.pfPercent),
+        professionalTax: Number(s.settings.professionalTax),
+        tdsThresholdAnnual: Number(s.settings.tdsThresholdAnnual),
+        tdsPercent: Number(s.settings.tdsPercent),
+        payDay: Number(s.settings.payDay),
+      });
+    }
+    setGrades(g.grades?.map((gr: any) => ({ ...gr, basicMin: Number(gr.basicMin), basicMax: Number(gr.basicMax) })) ?? []);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const n = (field: keyof SalaryForm) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm(f => ({ ...f, [field]: Number(e.target.value) }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    const res = await fetch('/api/hr/salary-settings', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form),
+    });
+    setSaving(false);
+    if (res.ok) toast.success('Salary settings saved'); else toast.error('Failed to save');
+  };
+
+  const openNewGrade = () => {
+    setEditGradeId(null);
+    setGradeForm({ name: '', category: 'TEACHING', basicMin: '', basicMax: '', description: '' });
+    setShowGradeForm(true);
+  };
+
+  const openEditGrade = (g: SalaryGradeRow) => {
+    setEditGradeId(g.id);
+    setGradeForm({ name: g.name, category: g.category, basicMin: String(g.basicMin), basicMax: String(g.basicMax), description: g.description ?? '' });
+    setShowGradeForm(true);
+  };
+
+  const handleSaveGrade = async () => {
+    if (!gradeForm.name || !gradeForm.basicMin || !gradeForm.basicMax) { toast.error('Fill all required fields'); return; }
+    setSavingGrade(true);
+    const url = editGradeId ? `/api/hr/salary-grades/${editGradeId}` : '/api/hr/salary-grades';
+    const res = await fetch(url, {
+      method: editGradeId ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...gradeForm, basicMin: Number(gradeForm.basicMin), basicMax: Number(gradeForm.basicMax) }),
+    });
+    setSavingGrade(false);
+    if (res.ok) { await load(); setShowGradeForm(false); toast.success(editGradeId ? 'Grade updated' : 'Grade created'); }
+    else { const d = await res.json(); toast.error(d.error || 'Failed'); }
+  };
+
+  const handleDeleteGrade = async (id: string) => {
+    const res = await fetch(`/api/hr/salary-grades/${id}`, { method: 'DELETE' });
+    if (res.ok) { await load(); toast.success('Grade deleted'); } else toast.error('Failed');
+  };
+
+  const catColor = (c: string) => c === 'TEACHING' ? 'bg-teal/10 text-teal border-teal/20' : c === 'NON_TEACHING' ? 'bg-purple/10 text-purple border-purple/20' : 'bg-gray-100 text-gray-600 border-gray-200';
+
+  if (loading) return <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-navy" /></div>;
+
+  return (
+    <div className="space-y-5">
+      {/* ── Allowance Components ── */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <h3 className="font-sora font-semibold text-navy mb-1">Allowance Components</h3>
+        <p className="text-xs text-gray-400 mb-5">Applied to all staff during payroll generation. Percentages are of Basic Salary.</p>
+
+        <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+          {/* Allowances */}
+          <div className="space-y-3">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Allowances</p>
+            {([
+              { key: 'hraPercent', label: 'HRA (House Rent Allowance)', unit: '% of Basic', max: 60 },
+              { key: 'daPercent', label: 'DA (Dearness Allowance)', unit: '% of Basic', max: 50 },
+              { key: 'specialAllowancePercent', label: 'Special Allowance', unit: '% of Basic', max: 30 },
+              { key: 'taFlat', label: 'Travel Allowance (TA)', unit: '₹ flat/month', max: 10000 },
+              { key: 'medicalFlat', label: 'Medical Allowance', unit: '₹ flat/month', max: 5000 },
+            ] as { key: keyof SalaryForm; label: string; unit: string; max: number }[]).map(f => (
+              <div key={f.key} className="flex items-center gap-3">
+                <div className="flex-1">
+                  <label className="text-xs text-gray-600 font-medium">{f.label}</label>
+                  <p className="text-[10px] text-gray-400">{f.unit}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number" min={0} max={f.max} step={0.5}
+                    value={form[f.key]}
+                    onChange={n(f.key)}
+                    className="w-20 text-sm border border-gray-200 rounded-lg px-2 py-1.5 text-center focus:outline-none focus:ring-2 focus:ring-navy/20"
+                  />
+                  <span className="text-xs text-gray-400 w-14">{f.unit.startsWith('%') ? '%' : '₹'}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Deductions */}
+          <div className="space-y-3">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Deductions</p>
+            {([
+              { key: 'pfPercent', label: 'Provident Fund (PF)', unit: '% of Basic', note: 'Employee share' },
+              { key: 'professionalTax', label: 'Professional Tax', unit: '₹ flat/month', note: 'State-specific' },
+              { key: 'tdsPercent', label: 'TDS Rate', unit: '% of Basic (above threshold)', note: '' },
+              { key: 'tdsThresholdAnnual', label: 'TDS Threshold', unit: '₹ annual basic', note: 'Above this → TDS applies' },
+              { key: 'payDay', label: 'Salary Pay Day', unit: 'Day of month (1–31)', note: '' },
+            ] as { key: keyof SalaryForm; label: string; unit: string; note: string }[]).map(f => (
+              <div key={f.key} className="flex items-center gap-3">
+                <div className="flex-1">
+                  <label className="text-xs text-gray-600 font-medium">{f.label}</label>
+                  <p className="text-[10px] text-gray-400">{f.note || f.unit}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number" min={0}
+                    value={form[f.key]}
+                    onChange={n(f.key)}
+                    className="w-24 text-sm border border-gray-200 rounded-lg px-2 py-1.5 text-center focus:outline-none focus:ring-2 focus:ring-navy/20"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Live preview */}
+        <div className="mt-5 border border-navy/10 rounded-2xl p-4 bg-iceLight">
+          <p className="text-xs font-bold text-navy uppercase tracking-wide mb-3 flex items-center gap-1.5"><Info className="w-3.5 h-3.5" /> Live Preview — Basic ₹{PREVIEW_BASIC.toLocaleString('en-IN')}</p>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
+            <div className="text-gray-500">Basic</div><div className="font-semibold text-right">₹{PREVIEW_BASIC.toLocaleString('en-IN')}</div>
+            {hra > 0 && <><div className="text-gray-500">+ HRA ({form.hraPercent}%)</div><div className="font-semibold text-right text-teal">₹{hra.toLocaleString('en-IN')}</div></>}
+            {da > 0 && <><div className="text-gray-500">+ DA ({form.daPercent}%)</div><div className="font-semibold text-right text-teal">₹{da.toLocaleString('en-IN')}</div></>}
+            {ta > 0 && <><div className="text-gray-500">+ TA</div><div className="font-semibold text-right text-teal">₹{ta.toLocaleString('en-IN')}</div></>}
+            {med > 0 && <><div className="text-gray-500">+ Medical</div><div className="font-semibold text-right text-teal">₹{med.toLocaleString('en-IN')}</div></>}
+            {special > 0 && <><div className="text-gray-500">+ Special ({form.specialAllowancePercent}%)</div><div className="font-semibold text-right text-teal">₹{special.toLocaleString('en-IN')}</div></>}
+            <div className="border-t border-navy/10 pt-1 font-bold text-navy">Gross</div><div className="border-t border-navy/10 pt-1 font-bold text-navy text-right">₹{grossPrev.toLocaleString('en-IN')}</div>
+            {pfPrev > 0 && <><div className="text-gray-500">− PF ({form.pfPercent}%)</div><div className="font-semibold text-right text-coral">₹{pfPrev.toLocaleString('en-IN')}</div></>}
+            {ptPrev > 0 && <><div className="text-gray-500">− Prof. Tax</div><div className="font-semibold text-right text-coral">₹{ptPrev.toLocaleString('en-IN')}</div></>}
+            <div className="border-t border-navy/10 pt-1 font-bold text-green">Net Pay</div><div className="border-t border-navy/10 pt-1 font-bold text-green text-right">₹{netPrev.toLocaleString('en-IN')}</div>
+          </div>
+        </div>
+
+        <button onClick={handleSave} disabled={saving} className="mt-4 flex items-center gap-1.5 px-5 py-2 bg-navy text-white text-sm font-semibold rounded-xl hover:bg-navyMid transition-colors disabled:opacity-50">
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+          Save Salary Settings
+        </button>
+      </div>
+
+      {/* ── Salary Grades ── */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <div className="flex items-center justify-between mb-1">
+          <div>
+            <h3 className="font-sora font-semibold text-navy">Salary Grades</h3>
+            <p className="text-xs text-gray-400 mt-0.5">Named pay bands — assign grades to staff for quick salary classification</p>
+          </div>
+          <button onClick={openNewGrade} className="flex items-center gap-1.5 px-3 py-2 bg-navy text-white text-xs font-semibold rounded-xl hover:bg-navyMid transition-colors">
+            <Plus className="w-3.5 h-3.5" /> Add Grade
+          </button>
+        </div>
+
+        {showGradeForm && (
+          <div className="mt-4 mb-3 bg-iceLight border border-ice rounded-2xl p-4 space-y-3">
+            <p className="text-xs font-semibold text-navy">{editGradeId ? 'Edit Grade' : 'New Salary Grade'}</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide block mb-1">Grade Name *</label>
+                <input value={gradeForm.name} onChange={e => setGradeForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Teaching Senior Scale" className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-navy/20" />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide block mb-1">Applicable To</label>
+                <select value={gradeForm.category} onChange={e => setGradeForm(f => ({ ...f, category: e.target.value }))} className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-navy/20">
+                  <option value="TEACHING">Teaching Staff</option>
+                  <option value="NON_TEACHING">Non-Teaching Staff</option>
+                  <option value="ALL">All Staff</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide block mb-1">Basic Min (₹/month) *</label>
+                <input type="number" value={gradeForm.basicMin} onChange={e => setGradeForm(f => ({ ...f, basicMin: e.target.value }))} placeholder="e.g. 30000" className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-navy/20" />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide block mb-1">Basic Max (₹/month) *</label>
+                <input type="number" value={gradeForm.basicMax} onChange={e => setGradeForm(f => ({ ...f, basicMax: e.target.value }))} placeholder="e.g. 50000" className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-navy/20" />
+              </div>
+              <div className="col-span-2">
+                <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide block mb-1">Description</label>
+                <input value={gradeForm.description} onChange={e => setGradeForm(f => ({ ...f, description: e.target.value }))} placeholder="Optional notes" className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-navy/20" />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setShowGradeForm(false)} className="flex-1 py-2 text-xs font-semibold text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">Cancel</button>
+              <button onClick={handleSaveGrade} disabled={savingGrade} className="flex-1 py-2 text-xs font-semibold bg-navy text-white rounded-xl hover:bg-navyMid disabled:opacity-50 flex items-center justify-center gap-1.5">
+                {savingGrade ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                {editGradeId ? 'Update' : 'Create Grade'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {grades.length === 0 ? (
+          <div className="text-center py-8 text-gray-400 text-sm mt-4"><LayoutList className="w-6 h-6 mx-auto mb-2 opacity-30" />No salary grades yet</div>
+        ) : (
+          <div className="mt-4 space-y-2">
+            {['TEACHING', 'NON_TEACHING', 'ALL'].map(cat => {
+              const group = grades.filter(g => g.category === cat);
+              if (group.length === 0) return null;
+              const catLabel = cat === 'TEACHING' ? 'Teaching Staff' : cat === 'NON_TEACHING' ? 'Non-Teaching Staff' : 'All Staff';
+              return (
+                <div key={cat}>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">{catLabel}</p>
+                  {group.map(g => (
+                    <div key={g.id} className="flex items-center gap-3 border border-gray-100 rounded-xl px-4 py-2.5 hover:border-gray-200 transition-colors group mb-1.5">
+                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${catColor(g.category)}`}>{catLabel}</span>
+                      <div className="flex-1">
+                        <span className="font-semibold text-sm text-gray-800">{g.name}</span>
+                        {g.description && <span className="text-xs text-gray-400 ml-2">{g.description}</span>}
+                      </div>
+                      <span className="text-xs font-mono text-navy">₹{g.basicMin.toLocaleString('en-IN')} – ₹{g.basicMax.toLocaleString('en-IN')}</span>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => openEditGrade(g)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500"><Pencil className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => handleDeleteGrade(g.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Leave Policy tab ──────────────────────────────────────────────────────
+
+const DEFAULT_LEAVE_TYPES = [
+  { leaveType: 'CL', label: 'Casual Leave', color: '#028090', daysAllowed: 12, roleTypes: ['ALL'] },
+  { leaveType: 'EL', label: 'Earned Leave', color: '#3B6D11', daysAllowed: 15, roleTypes: ['ALL'], isCarryOver: true, maxCarryOver: 30, isEncashable: true },
+  { leaveType: 'SL', label: 'Sick Leave', color: '#D85A30', daysAllowed: 10, roleTypes: ['ALL'] },
+  { leaveType: 'ML', label: 'Medical Leave', color: '#BA7517', daysAllowed: 30, roleTypes: ['ALL'], description: 'Requires medical certificate' },
+  { leaveType: 'MatL', label: 'Maternity Leave', color: '#993556', daysAllowed: 180, roleTypes: ['TEACHING', 'NON_TEACHING'], isPaid: true, description: 'For female staff (govt. norms)' },
+  { leaveType: 'PatL', label: 'Paternity Leave', color: '#534AB7', daysAllowed: 15, roleTypes: ['TEACHING', 'NON_TEACHING'] },
+];
+
+function LeavePolicyTab() {
+  const [policies, setPolicies] = useState<LeavePolicyRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    leaveType: '', label: '', color: LEAVE_COLORS[0],
+    daysAllowed: 12, isCarryOver: false, maxCarryOver: '',
+    isPaid: true, isEncashable: false, requiresApproval: true,
+    maxConsecutiveDays: '', minServiceDays: '', description: '',
+    roleTypes: ['ALL'] as string[],
+  });
+
+  const load = async () => {
+    setLoading(true);
+    const res = await fetch('/api/hr/leave-policies');
+    const json = await res.json();
+    setPolicies(json.policies ?? []);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const openNew = () => {
+    setEditId(null);
+    setForm({ leaveType: '', label: '', color: LEAVE_COLORS[0], daysAllowed: 12, isCarryOver: false, maxCarryOver: '', isPaid: true, isEncashable: false, requiresApproval: true, maxConsecutiveDays: '', minServiceDays: '', description: '', roleTypes: ['ALL'] });
+    setShowForm(true);
+  };
+
+  const openEdit = (p: LeavePolicyRow) => {
+    setEditId(p.id);
+    setForm({
+      leaveType: p.leaveType, label: p.label ?? p.leaveType, color: p.color ?? LEAVE_COLORS[0],
+      daysAllowed: p.daysAllowed, isCarryOver: p.isCarryOver, maxCarryOver: p.maxCarryOver ? String(p.maxCarryOver) : '',
+      isPaid: p.isPaid, isEncashable: p.isEncashable, requiresApproval: p.requiresApproval,
+      maxConsecutiveDays: p.maxConsecutiveDays ? String(p.maxConsecutiveDays) : '',
+      minServiceDays: p.minServiceDays ? String(p.minServiceDays) : '',
+      description: p.description ?? '', roleTypes: p.roleTypes ?? ['ALL'],
+    });
+    setShowForm(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.leaveType.trim() || !form.label.trim()) { toast.error('Leave type code and label are required'); return; }
+    setSaving(true);
+    const url = editId ? `/api/hr/leave-policies/${editId}` : '/api/hr/leave-policies';
+    const res = await fetch(url, {
+      method: editId ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...form,
+        maxCarryOver: form.maxCarryOver ? Number(form.maxCarryOver) : null,
+        maxConsecutiveDays: form.maxConsecutiveDays ? Number(form.maxConsecutiveDays) : null,
+        minServiceDays: form.minServiceDays ? Number(form.minServiceDays) : null,
+      }),
+    });
+    setSaving(false);
+    if (res.ok) { await load(); setShowForm(false); toast.success(editId ? 'Policy updated' : 'Policy created'); }
+    else { const d = await res.json(); toast.error(d.error || 'Failed'); }
+  };
+
+  const handleDelete = async (p: LeavePolicyRow) => {
+    const res = await fetch(`/api/hr/leave-policies/${p.id}`, { method: 'DELETE' });
+    if (res.ok) { await load(); toast.success(`${p.label ?? p.leaveType} policy deleted`); } else toast.error('Failed');
+  };
+
+  const seedDefaults = async () => {
+    for (const d of DEFAULT_LEAVE_TYPES) {
+      const existing = policies.find(p => p.leaveType === d.leaveType);
+      if (!existing) {
+        await fetch('/api/hr/leave-policies', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...d, isPaid: d.isPaid ?? true, isEncashable: d.isEncashable ?? false, requiresApproval: true }),
+        });
+      }
+    }
+    await load();
+    toast.success('Default leave types added');
+  };
+
+  const toggleRole = (role: string) => {
+    if (role === 'ALL') { setForm(f => ({ ...f, roleTypes: ['ALL'] })); return; }
+    setForm(f => {
+      const current = f.roleTypes.filter(r => r !== 'ALL');
+      const next = current.includes(role) ? current.filter(r => r !== role) : [...current, role];
+      return { ...f, roleTypes: next.length === 0 ? ['ALL'] : next };
+    });
+  };
+
+  if (loading) return <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-navy" /></div>;
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+      <div className="flex items-center justify-between mb-1">
+        <div>
+          <h3 className="font-sora font-semibold text-navy">Leave Policy</h3>
+          <p className="text-xs text-gray-400 mt-0.5">Define leave types, entitlements, carry-forward and encashment rules per staff category</p>
+        </div>
+        <div className="flex gap-2">
+          {policies.length === 0 && (
+            <button onClick={seedDefaults} className="flex items-center gap-1.5 px-3 py-2 bg-gold text-navy text-xs font-semibold rounded-xl hover:bg-gold/90 transition-colors">
+              <Star className="w-3.5 h-3.5" /> Load Defaults
+            </button>
+          )}
+          <button onClick={openNew} className="flex items-center gap-1.5 px-3 py-2 bg-navy text-white text-xs font-semibold rounded-xl hover:bg-navyMid transition-colors">
+            <Plus className="w-3.5 h-3.5" /> Add Leave Type
+          </button>
+        </div>
+      </div>
+
+      {/* Form */}
+      {showForm && (
+        <div className="mt-4 mb-4 bg-iceLight border border-ice rounded-2xl p-4 space-y-3">
+          <p className="text-xs font-semibold text-navy">{editId ? 'Edit Leave Type' : 'New Leave Type'}</p>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide block mb-1">Code * <span className="normal-case font-normal">(e.g. CL)</span></label>
+              <input value={form.leaveType} onChange={e => setForm(f => ({ ...f, leaveType: e.target.value.toUpperCase() }))} disabled={!!editId} placeholder="CL" className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-navy/20 disabled:bg-gray-50" />
+            </div>
+            <div className="col-span-2">
+              <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide block mb-1">Full Name *</label>
+              <input value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} placeholder="Casual Leave" className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-navy/20" />
+            </div>
+            <div>
+              <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide block mb-1">Days / Year *</label>
+              <input type="number" min={0} value={form.daysAllowed} onChange={e => setForm(f => ({ ...f, daysAllowed: Number(e.target.value) }))} className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-navy/20" />
+            </div>
+            <div>
+              <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide block mb-1">Max Consecutive Days</label>
+              <input type="number" min={0} value={form.maxConsecutiveDays} onChange={e => setForm(f => ({ ...f, maxConsecutiveDays: e.target.value }))} placeholder="No limit" className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-navy/20" />
+            </div>
+            <div>
+              <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide block mb-1">Min. Service Days</label>
+              <input type="number" min={0} value={form.minServiceDays} onChange={e => setForm(f => ({ ...f, minServiceDays: e.target.value }))} placeholder="No minimum" className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-navy/20" />
+            </div>
+          </div>
+
+          {/* Color */}
+          <div>
+            <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide block mb-2">Badge Colour</label>
+            <div className="flex gap-2 flex-wrap">
+              {LEAVE_COLORS.map(c => (
+                <button key={c} onClick={() => setForm(f => ({ ...f, color: c }))} className={`w-6 h-6 rounded-full transition-transform ${form.color === c ? 'ring-2 ring-offset-1 ring-navy scale-110' : 'hover:scale-105'}`} style={{ backgroundColor: c }} />
+              ))}
+            </div>
+          </div>
+
+          {/* Role types */}
+          <div>
+            <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide block mb-2">Applicable To</label>
+            <div className="flex gap-2">
+              {['ALL', 'TEACHING', 'NON_TEACHING'].map(role => (
+                <button key={role} onClick={() => toggleRole(role)} className={`px-3 py-1.5 rounded-xl text-xs font-semibold border-2 transition-colors ${form.roleTypes.includes(role) ? 'bg-navy text-white border-navy' : 'border-gray-200 text-gray-600 hover:border-navy/40'}`}>
+                  {role === 'ALL' ? 'All Staff' : role === 'TEACHING' ? 'Teaching' : 'Non-Teaching'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Flags row */}
+          <div className="flex flex-wrap gap-4">
+            {([
+              { key: 'isPaid', label: 'Paid Leave' },
+              { key: 'isCarryOver', label: 'Carry Forward' },
+              { key: 'isEncashable', label: 'Encashable' },
+              { key: 'requiresApproval', label: 'Requires Approval' },
+            ] as const).map(({ key, label }) => (
+              <label key={key} className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-600">
+                <input type="checkbox" checked={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.checked }))} className="w-3.5 h-3.5 accent-navy" />
+                {label}
+              </label>
+            ))}
+          </div>
+
+          {form.isCarryOver && (
+            <div>
+              <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide block mb-1">Max Carry-Forward Days</label>
+              <input type="number" min={0} value={form.maxCarryOver} onChange={e => setForm(f => ({ ...f, maxCarryOver: e.target.value }))} placeholder="e.g. 30" className="w-32 text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-navy/20" />
+            </div>
+          )}
+
+          <div>
+            <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide block mb-1">Notes / Description</label>
+            <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="e.g. Requires medical certificate" className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-navy/20" />
+          </div>
+
+          <div className="flex gap-2">
+            <button onClick={() => setShowForm(false)} className="flex-1 py-2 text-xs font-semibold text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">Cancel</button>
+            <button onClick={handleSave} disabled={saving} className="flex-1 py-2 text-xs font-semibold bg-navy text-white rounded-xl hover:bg-navyMid disabled:opacity-50 flex items-center justify-center gap-1.5">
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              {editId ? 'Update Policy' : 'Create Policy'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Policy list */}
+      {policies.length === 0 ? (
+        <div className="text-center py-10 text-gray-400 mt-4">
+          <CalendarCheck className="w-8 h-8 mx-auto mb-2 opacity-30" />
+          <p className="text-sm">No leave policies defined yet</p>
+          <p className="text-xs mt-1">Click &ldquo;Load Defaults&rdquo; to add standard Indian school leave types, or add manually</p>
+        </div>
+      ) : (
+        <div className="mt-4 space-y-2">
+          {policies.map(p => (
+            <div key={p.id} className="flex items-start gap-3 border border-gray-100 rounded-xl px-4 py-3 hover:border-gray-200 transition-colors group">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white text-[10px] font-bold font-sora" style={{ backgroundColor: p.color ?? '#1E2761' }}>
+                {p.leaveType}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-sm text-gray-800">{p.label ?? p.leaveType}</span>
+                  <span className="text-xs font-bold text-navy">{p.daysAllowed} days/year</span>
+                  {p.isPaid ? <span className="text-[9px] bg-green/10 text-green border border-green/20 px-1.5 py-0.5 rounded-full font-semibold">Paid</span> : <span className="text-[9px] bg-coral/10 text-coral border border-coral/20 px-1.5 py-0.5 rounded-full font-semibold">Unpaid</span>}
+                  {p.isCarryOver && <span className="text-[9px] bg-teal/10 text-teal border border-teal/20 px-1.5 py-0.5 rounded-full font-semibold">Carry-fwd {p.maxCarryOver ? `(max ${p.maxCarryOver}d)` : ''}</span>}
+                  {p.isEncashable && <span className="text-[9px] bg-gold/10 text-amber border border-amber/20 px-1.5 py-0.5 rounded-full font-semibold">Encashable</span>}
+                  {(p.roleTypes ?? []).filter(r => r !== 'ALL').map(r => (
+                    <span key={r} className={`text-[9px] border px-1.5 py-0.5 rounded-full font-semibold ${r === 'TEACHING' ? 'bg-teal/10 text-teal border-teal/20' : 'bg-purple/10 text-purple border-purple/20'}`}>{r === 'TEACHING' ? 'Teaching' : 'Non-Teaching'}</span>
+                  ))}
+                </div>
+                <div className="text-[10px] text-gray-400 mt-1 flex items-center gap-3 flex-wrap">
+                  {p.maxConsecutiveDays && <span>Max {p.maxConsecutiveDays} consecutive days</span>}
+                  {p.requiresApproval && <span>Requires approval</span>}
+                  {p.description && <span className="italic">{p.description}</span>}
+                </div>
+              </div>
+              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5">
+                <button onClick={() => openEdit(p)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500"><Pencil className="w-3.5 h-3.5" /></button>
+                <button onClick={() => handleDelete(p)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Summary */}
+      {policies.length > 0 && (
+        <div className="mt-4 pt-3 border-t border-gray-100 flex gap-5 text-xs text-gray-500">
+          <span>{policies.length} leave types</span>
+          <span>{policies.filter(p => p.isPaid).length} paid</span>
+          <span>{policies.filter(p => p.isCarryOver).length} with carry-forward</span>
+          <span>{policies.filter(p => p.isEncashable).length} encashable</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Academic Sessions tab ─────────────────────────────────────────────────
 
 function AcademicSessionsTab() {
@@ -1026,6 +1580,8 @@ export default function SettingsPage() {
     { id: 'profile',       label: 'School Profile',  icon: Building },
     { id: 'sessions',      label: 'Sessions',        icon: CalendarDays },
     { id: 'subjects',      label: 'Subjects',        icon: BookOpen },
+    { id: 'salary',        label: 'Salary',          icon: DollarSign },
+    { id: 'leave',         label: 'Leave Policy',    icon: CalendarCheck },
     { id: 'modules',       label: 'Modules',         icon: ToggleLeft },
     { id: 'roles',         label: 'User Roles',      icon: Users },
     { id: 'notifications', label: 'Notifications',   icon: Bell },
@@ -1103,6 +1659,12 @@ export default function SettingsPage() {
 
           {/* Subjects */}
           {activeTab === 'subjects' && <SubjectsTab />}
+
+          {/* Salary Settings */}
+          {activeTab === 'salary' && <SalarySettingsTab />}
+
+          {/* Leave Policy */}
+          {activeTab === 'leave' && <LeavePolicyTab />}
 
           {/* Module Activation */}
           {activeTab === 'modules' && (
