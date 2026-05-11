@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { requireSession, ok, err } from '@/lib/api-auth';
+import { refreshOverdueStatuses } from '@/lib/fee-overdue';
 
 export async function GET(req: NextRequest) {
   try {
@@ -8,6 +9,7 @@ export async function GET(req: NextRequest) {
     if (error) return error;
 
     const tenantId = session.user.tenantId;
+    await refreshOverdueStatuses(tenantId);
     const academicYearId = req.nextUrl.searchParams.get('academicYearId') ?? undefined;
 
     // Monthly collection: sum of transactions grouped by month

@@ -3,10 +3,14 @@ import { db } from '@/lib/db';
 import { requireSession, ok, err } from '@/lib/api-auth';
 import { FeeStatus, TransactionMode } from '@prisma/client';
 import { notifyFeeConfirmed } from '@/lib/notifications';
+import { refreshOverdueStatuses } from '@/lib/fee-overdue';
 
 export async function GET(req: NextRequest) {
   const { session, error } = await requireSession();
   if (error) return error;
+
+  // Keep overdue statuses accurate without a background job
+  await refreshOverdueStatuses(session.user.tenantId);
 
   const { searchParams } = req.nextUrl;
   const search = searchParams.get('q') ?? '';
