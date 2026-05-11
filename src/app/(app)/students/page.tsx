@@ -504,19 +504,19 @@ interface ActionsMenuProps {
 function ActionsMenu({ student, onEdit, onPromote, onToggleActive, onDelete }: ActionsMenuProps) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="relative">
-      <button onClick={() => setOpen(o => !o)}
-        className="w-8 h-8 flex items-center justify-center text-gray-700 bg-gray-100 hover:bg-gray-200 hover:text-navy rounded-lg transition-colors">
+    <div className="relative flex items-center gap-1">
+      <button onClick={(e) => { e.stopPropagation(); onEdit(); }}
+        className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-navy bg-iceLight border border-ice hover:bg-navy hover:text-white rounded-lg transition-colors">
+        <Edit2 className="w-3 h-3" /> Edit
+      </button>
+      <button onClick={(e) => { e.stopPropagation(); setOpen(o => !o); }}
+        className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-navy hover:bg-gray-100 rounded-lg transition-colors">
         <MoreVertical className="w-4 h-4" />
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-50">
-            <button onClick={() => { setOpen(false); onEdit(); }}
-              className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left">
-              <Edit2 className="w-3.5 h-3.5" /> Edit
-            </button>
             <button onClick={() => { setOpen(false); onPromote(); }}
               className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left">
               <ArrowUpRight className="w-3.5 h-3.5" /> Promote
