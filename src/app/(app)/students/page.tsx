@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import PageWrapper from '@/components/layout/PageWrapper';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -503,20 +503,33 @@ interface ActionsMenuProps {
 
 function ActionsMenu({ student, onEdit, onPromote, onToggleActive, onDelete }: ActionsMenuProps) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 0, right: 0 });
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  const handleOpen = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + window.scrollY + 4, right: window.innerWidth - r.right });
+    }
+    setOpen(o => !o);
+  };
+
   return (
-    <div className="relative flex items-center gap-1">
+    <div className="flex items-center gap-1">
       <button onClick={(e) => { e.stopPropagation(); onEdit(); }}
         className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-navy bg-iceLight border border-ice hover:bg-navy hover:text-white rounded-lg transition-colors">
         <Edit2 className="w-3 h-3" /> Edit
       </button>
-      <button onClick={(e) => { e.stopPropagation(); setOpen(o => !o); }}
+      <button ref={btnRef} onClick={handleOpen}
         className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-navy hover:bg-gray-100 rounded-lg transition-colors">
         <MoreVertical className="w-4 h-4" />
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-50">
+          <div className="fixed w-44 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-50"
+            style={{ top: pos.top, right: pos.right }}>
             <button onClick={() => { setOpen(false); onPromote(); }}
               className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left">
               <ArrowUpRight className="w-3.5 h-3.5" /> Promote
