@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   Plus, ChevronDown, Users, BookOpen, ToggleLeft, ToggleRight,
-  Pencil, Check, X, Layers, AlertCircle, RefreshCw,
+  Check, X, Layers, AlertCircle, RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -119,7 +119,7 @@ export default function ClassesPage() {
           </div>
           <div>
             <h1 className="font-sora font-bold text-2xl text-gray-900">Classes &amp; Sections</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Manage your school's class structure and sections</p>
+            <p className="text-sm text-gray-500 mt-0.5">Manage your school&apos;s class structure and sections</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -181,7 +181,7 @@ export default function ClassesPage() {
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <Layers className="w-12 h-12 text-gray-300 mb-3" />
           <p className="text-gray-500 font-medium">No classes yet</p>
-          <p className="text-sm text-gray-400 mt-1">Click "Add Class" to create the first class for this academic year.</p>
+          <p className="text-sm text-gray-400 mt-1">Click &quot;Add Class&quot; to create the first class for this academic year.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4">
@@ -314,7 +314,7 @@ function GradeCard({
       {/* Sections */}
       <div className="px-5 py-3">
         {visibleSections.length === 0 && !addingSection ? (
-          <p className="text-xs text-gray-400 italic py-1">No sections yet — click "Add Section" to create one.</p>
+          <p className="text-xs text-gray-400 italic py-1">No sections yet — click &quot;Add Section&quot; to create one.</p>
         ) : (
           <div className="flex flex-wrap gap-2">
             {visibleSections.map((section) => (
