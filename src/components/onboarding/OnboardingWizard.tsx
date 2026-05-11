@@ -131,8 +131,8 @@ export default function OnboardingWizard({
       body: JSON.stringify(year),
     });
     setLoading(false);
-    if (!res.ok) { toast.error('Failed to create academic year'); return; }
     const data = await res.json();
+    if (!res.ok) { toast.error(data.error ?? 'Failed to create academic year'); return; }
     setAcademicYearId(data.data.id);
     setStep(2);
   };
