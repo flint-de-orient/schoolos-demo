@@ -76,11 +76,16 @@ export async function POST(req: NextRequest) {
   if (error) return error;
 
   const body = await req.json();
-  const { feeAccountId, installmentId, amount, mode, notes } = body;
+  const { feeAccountId, installmentId, installmentIds, amount, mode, notes } = body;
 
   if (!feeAccountId || !amount || !mode) {
     return err('feeAccountId, amount and mode are required');
   }
+
+  // Support both single installmentId and array installmentIds
+  const instIds: string[] = installmentIds?.length
+    ? installmentIds
+    : installmentId ? [installmentId] : [];
 
   const account = await db.feeAccount.findFirst({
     where: { id: feeAccountId, tenantId: session.user.tenantId },
@@ -94,7 +99,7 @@ export async function POST(req: NextRequest) {
       data: {
         tenantId: session.user.tenantId,
         feeAccountId,
-        installmentId,
+        installmentId: instIds[0] ?? null,
         amount,
         mode: mode as TransactionMode,
         receiptNo,
@@ -112,11 +117,17 @@ export async function POST(req: NextRequest) {
       data: { totalPaid: newPaid, balance: newBalance > 0 ? newBalance : 0, status: newStatus },
     });
 
-    if (installmentId) {
-      await tx.feeInstallment.update({
-        where: { id: installmentId },
-        data: { paidAmount: { increment: Number(amount) }, status: newStatus },
-      });
+    // Mark each selected installment as PAID
+    if (instIds.length > 0) {
+      for (const iId of instIds) {
+        const inst = await tx.feeInstallment.findUnique({ where: { id: iId }, select: { amount: true } });
+        if (inst) {
+          await tx.feeInstallment.update({
+            where: { id: iId },
+            data: { paidAmount: inst.amount, status: 'PAID' },
+          });
+        }
+      }
     }
 
     return t;

@@ -105,17 +105,21 @@ const MODE_TO_DB: Record<string, string> = {
 
 interface PaymentModalProps {
   accountId: string;
-  installment?: Installment;
+  installments?: Installment[];  // multiple months
+  installment?: Installment;     // single month (legacy)
   defaultAmount: number;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-function PaymentModal({ accountId, installment, defaultAmount, onClose, onSuccess }: PaymentModalProps) {
+function PaymentModal({ accountId, installments, installment, defaultAmount, onClose, onSuccess }: PaymentModalProps) {
   const [amount,  setAmount]  = useState(String(defaultAmount));
   const [mode,    setMode]    = useState('Cash');
   const [notes,   setNotes]   = useState('');
   const [saving,  setSaving]  = useState(false);
+
+  const months = installments?.length ? installments : installment ? [installment] : [];
+  const instIds = months.map(i => i.id);
 
   async function submit() {
     const amt = Number(amount);
@@ -127,7 +131,7 @@ function PaymentModal({ accountId, installment, defaultAmount, onClose, onSucces
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           feeAccountId: accountId,
-          installmentId: installment?.id,
+          installmentIds: instIds.length > 0 ? instIds : undefined,
           amount: amt,
           mode: MODE_TO_DB[mode] ?? 'CASH',
           notes: notes || undefined,
@@ -139,7 +143,7 @@ function PaymentModal({ accountId, installment, defaultAmount, onClose, onSucces
         return;
       }
       const d = await res.json();
-      toast.success('Payment recorded', {
+      toast.success(months.length > 1 ? `${months.length} months paid` : 'Payment recorded', {
         description: `Receipt: ${d.data?.receiptNo ?? '—'}`,
       });
       onSuccess();
@@ -157,11 +161,15 @@ function PaymentModal({ accountId, installment, defaultAmount, onClose, onSucces
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div>
             <h3 className="font-sora font-bold text-navy text-base">Collect Payment</h3>
-            {installment && (
+            {months.length > 1 ? (
               <p className="text-xs text-gray-400 mt-0.5">
-                {installment.termLabel} · Due {new Date(installment.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                {months.length} months: {months.map(m => m.termLabel).join(', ')}
               </p>
-            )}
+            ) : months[0] ? (
+              <p className="text-xs text-gray-400 mt-0.5">
+                {months[0].termLabel} · Due {new Date(months[0].dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </p>
+            ) : null}
           </div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500">
             <X size={16} />
@@ -312,9 +320,10 @@ function AssignForm({ studentId, onAssigned }: { studentId: string; onAssigned: 
 // ─── Main Panel ────────────────────────────────────────────────────────────────
 
 export default function StudentFeePanel({ studentId }: { studentId: string }) {
-  const [data,    setData]    = useState<{ assignment: Assignment | null } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [paying,  setPaying]  = useState<{ installment?: Installment; defaultAmount: number } | null>(null);
+  const [data,     setData]     = useState<{ assignment: Assignment | null } | null>(null);
+  const [loading,  setLoading]  = useState(true);
+  const [paying,   setPaying]   = useState<{ installments?: Installment[]; installment?: Installment; defaultAmount: number } | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   async function load() {
     setLoading(true);
@@ -431,55 +440,100 @@ export default function StudentFeePanel({ studentId }: { studentId: string }) {
       )}
 
       {/* Installments table */}
-      {installments.length > 0 ? (
-        <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Installments</p>
-          <div className="border border-gray-100 rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-100">
-                <tr>
-                  {['Term', 'Amount', 'Due Date', 'Paid', 'Status', ''].map(h => (
-                    <th key={h} className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-3 py-2.5">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {installments.map(inst => {
-                  const canPay = (inst.status === 'OVERDUE' || inst.status === 'PENDING') && !account?.isLocked;
-                  const outstanding = Number(inst.amount) - Number(inst.paidAmount);
-                  return (
-                    <tr key={inst.id} className={`transition-colors ${inst.status === 'OVERDUE' ? 'bg-coral/3 hover:bg-coral/6' : 'hover:bg-gray-50/60'}`}>
-                      <td className="px-3 py-2.5 font-medium text-gray-800">{inst.termLabel}</td>
-                      <td className="px-3 py-2.5 font-semibold text-navy">{fmt(inst.amount)}</td>
-                      <td className="px-3 py-2.5 text-gray-500 text-xs whitespace-nowrap">
-                        {new Date(inst.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </td>
-                      <td className="px-3 py-2.5 text-green font-semibold">
-                        {Number(inst.paidAmount) > 0 ? fmt(inst.paidAmount) : '—'}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <StatusBadge status={inst.status} />
-                        {Number(inst.lateFee) > 0 && (
-                          <span className="ml-1 text-[10px] text-coral">+{fmt(inst.lateFee)} late</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        {canPay && outstanding > 0 && (
-                          <button
-                            onClick={() => setPaying({ installment: inst, defaultAmount: outstanding })}
-                            className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-gold text-navy rounded-lg hover:bg-gold/90 transition-colors whitespace-nowrap">
-                            <IndianRupee size={10} /> Pay
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      {installments.length > 0 ? (() => {
+        const payable = installments.filter(i =>
+          (i.status === 'OVERDUE' || i.status === 'PENDING') && !account?.isLocked && (Number(i.amount) - Number(i.paidAmount)) > 0
+        );
+        const selList = payable.filter(i => selected.has(i.id));
+        const selTotal = selList.reduce((s, i) => s + Number(i.amount) - Number(i.paidAmount), 0);
+
+        const toggle = (id: string) => setSelected(prev => {
+          const next = new Set(prev);
+          next.has(id) ? next.delete(id) : next.add(id);
+          return next;
+        });
+        const selectAll = () => setSelected(new Set(payable.map(i => i.id)));
+        const clearAll  = () => setSelected(new Set());
+
+        return (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Installments</p>
+              {payable.length > 1 && (
+                <div className="flex items-center gap-2">
+                  {selected.size > 0 && (
+                    <>
+                      <button onClick={clearAll} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">Clear</button>
+                      <button
+                        onClick={() => setPaying({ installments: selList, defaultAmount: selTotal })}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-gold text-navy rounded-lg hover:bg-gold/90 transition-colors shadow-sm">
+                        <IndianRupee size={11} /> Pay {selected.size} month{selected.size > 1 ? 's' : ''} · {fmt(selTotal)}
+                      </button>
+                    </>
+                  )}
+                  {selected.size === 0 && (
+                    <button onClick={selectAll} className="text-xs text-navy hover:underline transition-colors font-semibold">
+                      Select all due
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="border border-gray-100 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-100">
+                  <tr>
+                    <th className="w-8 px-3 py-2.5" />
+                    {['Term', 'Amount', 'Due Date', 'Paid', 'Status', ''].map(h => (
+                      <th key={h} className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-3 py-2.5">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {installments.map(inst => {
+                    const canPay = (inst.status === 'OVERDUE' || inst.status === 'PENDING') && !account?.isLocked;
+                    const outstanding = Number(inst.amount) - Number(inst.paidAmount);
+                    const isSelected = selected.has(inst.id);
+                    return (
+                      <tr key={inst.id} className={`transition-colors ${isSelected ? 'bg-gold/8' : inst.status === 'OVERDUE' ? 'bg-coral/3 hover:bg-coral/6' : 'hover:bg-gray-50/60'}`}>
+                        <td className="px-3 py-2.5">
+                          {canPay && outstanding > 0 ? (
+                            <input type="checkbox" checked={isSelected} onChange={() => toggle(inst.id)}
+                              className="w-3.5 h-3.5 accent-navy cursor-pointer" />
+                          ) : null}
+                        </td>
+                        <td className="px-3 py-2.5 font-medium text-gray-800">{inst.termLabel}</td>
+                        <td className="px-3 py-2.5 font-semibold text-navy">{fmt(inst.amount)}</td>
+                        <td className="px-3 py-2.5 text-gray-500 text-xs whitespace-nowrap">
+                          {new Date(inst.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </td>
+                        <td className="px-3 py-2.5 text-green font-semibold">
+                          {Number(inst.paidAmount) > 0 ? fmt(inst.paidAmount) : '—'}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <StatusBadge status={inst.status} />
+                          {Number(inst.lateFee) > 0 && (
+                            <span className="ml-1 text-[10px] text-coral">+{fmt(inst.lateFee)} late</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          {canPay && outstanding > 0 && !isSelected && (
+                            <button
+                              onClick={() => setPaying({ installment: inst, defaultAmount: outstanding })}
+                              className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-gold text-navy rounded-lg hover:bg-gold/90 transition-colors whitespace-nowrap">
+                              <IndianRupee size={10} /> Pay
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      ) : account ? (
+        );
+      })() : account ? (
         <div className="text-center py-8 text-gray-400 text-sm bg-gray-50 rounded-xl">
           No installments generated yet.
         </div>

@@ -339,6 +339,7 @@ export default function FeePage() {
         <div className={`grid gap-5 transition-all ${drawerRecord ? 'grid-cols-[1fr_380px]' : 'grid-cols-1'}`}>
           <RecordsTable
             records={filtered}
+            allRecords={records}
             loading={loading}
             search={search} setSearch={setSearch}
             filterStatus={filterStatus} setFilterStatus={setFilterStatus}
@@ -566,8 +567,8 @@ function OverviewTab({ summary, collectionRate, records, monthly, loading, onOpe
 
 // ─── Records Table ────────────────────────────────────────────────────────────
 
-function RecordsTable({ records, loading, search, setSearch, filterStatus, setFilterStatus, filterGrade, setFilterGrade, grades, selected, onSelect, onRemind, onRecordPayment, onViewReceipt }: {
-  records: FeeRecord[]; loading: boolean;
+function RecordsTable({ records, allRecords, loading, search, setSearch, filterStatus, setFilterStatus, filterGrade, setFilterGrade, grades, selected, onSelect, onRemind, onRecordPayment, onViewReceipt }: {
+  records: FeeRecord[]; allRecords: FeeRecord[]; loading: boolean;
   search: string; setSearch: (v: string) => void;
   filterStatus: string; setFilterStatus: (v: string) => void;
   filterGrade: string; setFilterGrade: (v: string) => void;
@@ -575,6 +576,22 @@ function RecordsTable({ records, loading, search, setSearch, filterStatus, setFi
   onSelect: (r: FeeRecord) => void; onRemind: (r: FeeRecord) => void;
   onRecordPayment: (r: FeeRecord) => void; onViewReceipt: (r: FeeRecord) => void;
 }) {
+  const counts: Record<string, number> = {
+    all:     allRecords.length,
+    paid:    allRecords.filter(r => r.status === 'paid').length,
+    pending: allRecords.filter(r => r.status === 'pending').length,
+    overdue: allRecords.filter(r => r.status === 'overdue').length,
+    partial: allRecords.filter(r => r.status === 'partial').length,
+  };
+
+  const tabColors: Record<string, string> = {
+    all:     'bg-navy text-white',
+    paid:    'bg-green text-white',
+    pending: 'bg-amber text-white',
+    overdue: 'bg-coral text-white',
+    partial: 'bg-blue-600 text-white',
+  };
+
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
       {/* Filters */}
@@ -590,16 +607,21 @@ function RecordsTable({ records, loading, search, setSearch, filterStatus, setFi
             {grades.map(g => <option key={g} value={g}>{g === 'all' ? 'All Classes' : g}</option>)}
           </select>
         </div>
-        <div className="flex items-center gap-2">
-          {['all','paid','pending','overdue','partial'].map(s => (
+        <div className="flex items-center gap-2 flex-wrap">
+          {(['all','paid','pending','overdue','partial'] as const).map(s => (
             <button key={s} onClick={() => setFilterStatus(s)}
-              className={`px-3 py-1 text-xs font-semibold rounded-full capitalize transition-colors ${
-                filterStatus === s ? 'bg-navy text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full capitalize transition-colors ${
+                filterStatus === s ? tabColors[s] : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}>
-              {s === 'all' ? 'All Status' : s}
+              {s === 'all' ? 'All' : s}
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                filterStatus === s ? 'bg-white/20' : counts[s] > 0 ? (s === 'overdue' ? 'bg-coral/15 text-coral' : s === 'pending' ? 'bg-amber/15 text-amber' : 'bg-gray-200 text-gray-600') : 'bg-gray-100 text-gray-400'
+              }`}>
+                {counts[s]}
+              </span>
             </button>
           ))}
-          <span className="ml-auto text-xs text-gray-400">{records.length} accounts</span>
+          <span className="ml-auto text-xs text-gray-400">{records.length} shown</span>
         </div>
       </div>
 
