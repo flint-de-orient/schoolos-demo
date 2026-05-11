@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { requireSession, ok, err } from '@/lib/api-auth';
+import { Decimal } from '@prisma/client/runtime/library';
 
 export async function GET(
   _req: NextRequest,
@@ -32,13 +33,15 @@ export async function PATCH(
   if (error) return error;
 
   const body = await req.json();
-  const { maxPeriodsDay, maxPeriodsWeek, type, designation, department, phone, email, qualification } = body;
+  const { maxPeriodsDay, maxPeriodsWeek, type, designation, department, phone, email, qualification, salary } = body;
 
   const existing = await db.teacher.findFirst({
     where: { id: params.id, tenantId: session.user.tenantId, deletedAt: null },
     select: { id: true },
   });
   if (!existing) return err('Teacher not found', 404);
+
+  if (salary !== undefined && Number(salary) < 0) return err('Salary cannot be negative');
 
   const updated = await db.teacher.update({
     where: { id: params.id },
@@ -51,8 +54,9 @@ export async function PATCH(
       ...(phone !== undefined && { phone }),
       ...(email !== undefined && { email }),
       ...(qualification !== undefined && { qualification }),
+      ...(salary !== undefined && { salary: salary ? new Decimal(salary) : null }),
     },
-    select: { id: true, maxPeriodsDay: true, maxPeriodsWeek: true, type: true },
+    select: { id: true, maxPeriodsDay: true, maxPeriodsWeek: true, type: true, salary: true },
   });
 
   return ok(updated);

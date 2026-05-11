@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   X, BookOpen, Clock, BarChart3, Plus, Trash2, Save,
-  CheckCircle2, AlertCircle, Loader2, Star,
+  CheckCircle2, AlertCircle, Loader2, Star, Pencil, Check, DollarSign,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -39,6 +39,7 @@ interface TeacherDetail {
   qualification: string | null;
   maxPeriodsDay: number;
   maxPeriodsWeek: number;
+  salary: number | null;
   subjects: SubjectRecord[];
   availabilities: AvailSlot[];
 }
@@ -130,6 +131,10 @@ export default function TeacherProfileSheet({ teacherId, onClose }: Props) {
   const [limits, setLimits] = useState({ maxPeriodsDay: 6, maxPeriodsWeek: 30 });
   const [savingLimits, setSavingLimits] = useState(false);
 
+  // Salary state
+  const [salaryInput, setSalaryInput] = useState('');
+  const [editingSalary, setEditingSalary] = useState(false);
+
   // ── Load teacher data ──
   const loadTeacher = useCallback(async () => {
     if (!teacherId) return;
@@ -146,6 +151,7 @@ export default function TeacherProfileSheet({ teacherId, onClose }: Props) {
       if (!t) { setLoadError('Teacher data missing in response'); return; }
       setTeacher(t);
       setLimits({ maxPeriodsDay: t.maxPeriodsDay, maxPeriodsWeek: t.maxPeriodsWeek });
+      setSalaryInput(t.salary ? String(t.salary) : '');
 
       // Populate availability edit state from DB
       const map: Record<DayKey, { startTime: string; endTime: string }[]> = {
@@ -262,14 +268,21 @@ export default function TeacherProfileSheet({ teacherId, onClose }: Props) {
 
   // ── Load limits handler ──
   async function handleSaveLimits() {
+    const salaryVal = salaryInput ? Number(salaryInput) : null;
+    if (salaryInput && (isNaN(Number(salaryInput)) || Number(salaryInput) < 0)) {
+      toast.error('Enter a valid salary');
+      return;
+    }
     setSavingLimits(true);
     try {
       const res = await fetch(`/api/hr/teachers/${teacherId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(limits),
+        body: JSON.stringify({ ...limits, salary: salaryVal }),
       });
       if (!res.ok) { toast.error('Failed to save'); return; }
+      setTeacher(prev => prev ? { ...prev, salary: salaryVal } : prev);
+      setEditingSalary(false);
       toast.success('Load limits updated');
     } finally {
       setSavingLimits(false);
@@ -698,6 +711,50 @@ export default function TeacherProfileSheet({ teacherId, onClose }: Props) {
                       <p><strong className="text-gray-700">Part-time</strong> — set based on contract hours</p>
                       <p><strong className="text-gray-700">Substitute</strong> — usually 4/day to keep load light</p>
                     </div>
+                  </div>
+
+                  {/* Salary */}
+                  <div className="border border-gray-100 rounded-2xl p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="w-4 h-4 text-green" />
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Basic Salary (₹ / month)</p>
+                      </div>
+                      {!editingSalary && (
+                        <button
+                          onClick={() => setEditingSalary(true)}
+                          className="flex items-center gap-1 text-xs text-navy font-semibold hover:underline"
+                        >
+                          <Pencil className="w-3 h-3" /> Edit
+                        </button>
+                      )}
+                    </div>
+                    {editingSalary ? (
+                      <div className="space-y-2">
+                        <input
+                          type="number" min={0} value={salaryInput}
+                          onChange={e => setSalaryInput(e.target.value)}
+                          placeholder="e.g. 45000"
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
+                        />
+                        {salaryInput && Number(salaryInput) > 0 && (
+                          <div className="bg-gray-50 rounded-lg p-3 text-xs space-y-1">
+                            <div className="flex justify-between text-gray-500"><span>Gross (est.)</span><span className="font-semibold">₹{(Number(salaryInput) * 1.2).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span></div>
+                            <div className="flex justify-between text-gray-500"><span>Deductions (est.)</span><span className="font-semibold text-coral">−₹{Math.round(Number(salaryInput) * 0.12).toLocaleString('en-IN')}</span></div>
+                            <div className="flex justify-between font-bold text-navy border-t border-navy/10 pt-1"><span>Net Pay (est.)</span><span>₹{Math.round(Number(salaryInput) * 1.08).toLocaleString('en-IN')}</span></div>
+                          </div>
+                        )}
+                        <button onClick={() => setEditingSalary(false)} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+                        <p className="text-[10px] text-gray-400">Changes saved with &quot;Save Load Limits&quot; below</p>
+                      </div>
+                    ) : teacher.salary ? (
+                      <p className="text-2xl font-bold font-sora text-green">₹{Number(teacher.salary).toLocaleString('en-IN')}<span className="text-xs font-normal text-gray-400 ml-1">/month</span></p>
+                    ) : (
+                      <div>
+                        <p className="text-xs text-gray-400">No salary assigned</p>
+                        <button onClick={() => setEditingSalary(true)} className="text-xs text-navy font-semibold mt-1 hover:underline">Set salary →</button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Teacher type */}

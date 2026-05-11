@@ -11,7 +11,8 @@ import {
   Building2, BarChart3, Banknote, FileText, AlertCircle,
   CheckCircle2, XCircle, Plus, Briefcase, Star,
   Brain, CalendarClock, BookMarked, Zap, RefreshCw,
-  UserCheck, UserX, AlertOctagon, AlertTriangle, Layers
+  UserCheck, UserX, AlertOctagon, AlertTriangle, Layers,
+  Pencil, Loader2
 } from 'lucide-react';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
@@ -71,12 +72,38 @@ const seedLeave: LeaveRequest[] = [
 
 // ─── Staff Profile Drawer ─────────────────────────────────────────────────────
 
-function StaffDrawer({ staff, onClose }: { staff: Staff; onClose: () => void }) {
+function StaffDrawer({ staff, onClose, onSalaryUpdate }: { staff: Staff; onClose: () => void; onSalaryUpdate?: (id: string, salary: number) => void }) {
   const dept = getDept(staff.department);
   const yearsOfService = new Date().getFullYear() - new Date(staff.joiningDate).getFullYear();
-  const allowance = Math.round(staff.salary * 0.2);
-  const deduction = Math.round(staff.salary * 0.12);
-  const net = staff.salary + allowance - deduction;
+  const [basicSalary, setBasicSalary] = useState(staff.salary);
+  const [editingSalary, setEditingSalary] = useState(false);
+  const [salaryInput, setSalaryInput] = useState(String(staff.salary));
+  const [savingSalary, setSavingSalary] = useState(false);
+
+  const allowance = Math.round(basicSalary * 0.2);
+  const deduction = Math.round(basicSalary * 0.12);
+  const net = basicSalary + allowance - deduction;
+
+  const handleSaveSalary = async () => {
+    const val = Number(salaryInput);
+    if (!val || val < 0) { toast.error('Enter a valid salary'); return; }
+    setSavingSalary(true);
+    const res = await fetch(`/api/hr/staff/${staff.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ salary: val }),
+    });
+    setSavingSalary(false);
+    if (res.ok) {
+      setBasicSalary(val);
+      setEditingSalary(false);
+      onSalaryUpdate?.(staff.id, val);
+      toast.success(`Salary updated for ${staff.name}`);
+    } else {
+      const d = await res.json();
+      toast.error(d.error || 'Failed to update salary');
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex justify-end" onClick={onClose}>
@@ -217,25 +244,70 @@ function StaffDrawer({ staff, onClose }: { staff: Staff; onClose: () => void }) 
           </div>
         )}
 
-        {/* Salary breakdown */}
+        {/* Salary */}
         <div className="p-4 border-b border-gray-100">
-          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Salary Breakdown</p>
-          <div className="space-y-2">
-            {[
-              { label: 'Basic Pay', value: staff.salary, color: 'text-gray-700', prefix: '' },
-              { label: 'HRA + TA (20%)', value: allowance, color: 'text-green', prefix: '+' },
-              { label: 'PF + TDS (12%)', value: Math.round(staff.salary * 0.12), color: 'text-coral', prefix: '−' },
-            ].map(row => (
-              <div key={row.label} className="flex justify-between text-xs">
-                <span className="text-gray-500">{row.label}</span>
-                <span className={`font-semibold ${row.color}`}>{row.prefix}₹{row.value.toLocaleString('en-IN')}</span>
-              </div>
-            ))}
-            <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
-              <span className="font-bold text-gray-700">Net Pay</span>
-              <span className="font-bold text-navy">₹{net.toLocaleString('en-IN')}</span>
-            </div>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Salary</p>
+            {!editingSalary && (
+              <button onClick={() => { setSalaryInput(String(basicSalary)); setEditingSalary(true); }}
+                className="text-[10px] font-semibold text-navy border border-navy/30 px-2 py-0.5 rounded-lg hover:bg-navy/5 flex items-center gap-1">
+                <Pencil className="w-2.5 h-2.5" /> Edit
+              </button>
+            )}
           </div>
+
+          {editingSalary ? (
+            <div className="space-y-2">
+              <div>
+                <label className="text-[10px] text-gray-400 block mb-1">Basic Salary (₹ / month)</label>
+                <input
+                  type="number" min={0} value={salaryInput}
+                  onChange={e => setSalaryInput(e.target.value)}
+                  className="w-full text-sm border-2 border-navy/30 rounded-xl px-3 py-2 focus:outline-none focus:border-navy font-semibold text-navy"
+                  autoFocus
+                />
+              </div>
+              {salaryInput && Number(salaryInput) > 0 && (
+                <div className="bg-iceLight rounded-xl p-3 text-xs space-y-1">
+                  <div className="flex justify-between text-gray-500"><span>Gross (est.)</span><span className="font-semibold">₹{(Number(salaryInput) * 1.2).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span></div>
+                  <div className="flex justify-between text-gray-500"><span>Deductions (est.)</span><span className="font-semibold text-coral">−₹{Math.round(Number(salaryInput) * 0.12).toLocaleString('en-IN')}</span></div>
+                  <div className="flex justify-between font-bold text-navy border-t border-navy/10 pt-1"><span>Net Pay (est.)</span><span>₹{Math.round(Number(salaryInput) * 1.08).toLocaleString('en-IN')}</span></div>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <button onClick={() => setEditingSalary(false)} className="flex-1 py-1.5 text-xs font-semibold text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">Cancel</button>
+                <button onClick={handleSaveSalary} disabled={savingSalary} className="flex-1 py-1.5 text-xs font-semibold bg-navy text-white rounded-xl hover:bg-navyMid disabled:opacity-50 flex items-center justify-center gap-1">
+                  {savingSalary ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} Save
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {basicSalary === 0 ? (
+                <div className="text-center py-3 border-2 border-dashed border-gray-200 rounded-xl">
+                  <p className="text-xs text-gray-400">No salary assigned</p>
+                  <button onClick={() => { setSalaryInput(''); setEditingSalary(true); }} className="text-xs text-navy font-semibold mt-1 hover:underline">Set salary →</button>
+                </div>
+              ) : (
+                <>
+                  {[
+                    { label: 'Basic Pay', value: basicSalary, color: 'text-gray-700', prefix: '' },
+                    { label: 'HRA + TA (20%)', value: allowance, color: 'text-green', prefix: '+' },
+                    { label: 'PF Deduction (12%)', value: deduction, color: 'text-coral', prefix: '−' },
+                  ].map(row => (
+                    <div key={row.label} className="flex justify-between text-xs">
+                      <span className="text-gray-500">{row.label}</span>
+                      <span className={`font-semibold ${row.color}`}>{row.prefix}₹{row.value.toLocaleString('en-IN')}</span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
+                    <span className="font-bold text-gray-700">Net Pay</span>
+                    <span className="font-bold text-navy">₹{net.toLocaleString('en-IN')}</span>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Actions */}
@@ -1657,7 +1729,7 @@ export default function HRPage() {
       </div>
 
       {/* Drawers & Modals */}
-      {selectedStaff && <StaffDrawer staff={selectedStaff} onClose={() => setSelectedStaff(null)} />}
+      {selectedStaff && <StaffDrawer staff={selectedStaff} onClose={() => setSelectedStaff(null)} onSalaryUpdate={(id, sal) => setStaffList(prev => prev.map(s => s.id === id ? { ...s, salary: sal } : s))} />}
       <TeacherProfileSheet teacherId={selectedTeacherId} onClose={() => setSelectedTeacherId(null)} />
       {showAddStaff && <AddStaffModal onClose={() => setShowAddStaff(false)} onAdd={s => setStaffList(prev => [s, ...prev])} />}
       {showApplyLeave && <ApplyLeaveModal staff={staffList} onClose={() => setShowApplyLeave(false)} onApply={l => setLeaveRequests(prev => [l, ...prev])} />}

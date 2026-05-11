@@ -641,6 +641,7 @@ model Teacher {
   isActive        Boolean     @default(true)
   maxPeriodsDay   Int         @default(6)
   maxPeriodsWeek  Int         @default(30)
+  salary          Decimal?    @db.Decimal(12,2)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   deletedAt       DateTime?
