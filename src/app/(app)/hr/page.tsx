@@ -17,11 +17,16 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid
 } from 'recharts';
-import staffData from '@/data/staff.json';
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Staff = typeof staffData[number];
+type Staff = {
+  id: string; name: string; photo: null; designation: string; department: string;
+  subject: string | null; joiningDate: string; qualification: string; phone: string;
+  email: string; salary: number; leaveBalance: number; status: 'active' | 'on-leave';
+  employmentType: string; teachingCapacity: string[];
+  weeklyAvailability?: null; weeklyLoad?: { current: number; target: number };
+  monthlyLoad?: number; annualLoad?: number;
+};
 
 type LeaveRequest = {
   id: string; staffId: string; name: string; designation: string;
@@ -255,8 +260,9 @@ function StaffDrawer({ staff, onClose }: { staff: Staff; onClose: () => void }) 
 
 function AddStaffModal({ onClose, onAdd }: { onClose: () => void; onAdd: (s: Staff) => void }) {
   const depts = Object.keys(deptConfig);
-  const [form, setForm] = useState({ name: '', designation: '', department: '', subject: '', phone: '', email: '', qualification: '', salary: '', joiningDate: '' });
+  const [form, setForm] = useState({ name: '', designation: '', department: '', subject: '', phone: '', email: '', qualification: '', salary: '', joiningDate: '', isTeacher: false });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -265,35 +271,40 @@ function AddStaffModal({ onClose, onAdd }: { onClose: () => void; onAdd: (s: Sta
     if (!form.department) e.department = 'Required';
     if (!form.phone || !/^\d{10}$/.test(form.phone)) e.phone = 'Valid 10-digit number';
     if (!form.email.trim() || !form.email.includes('@')) e.email = 'Valid email required';
-    if (!form.salary || Number(form.salary) < 1) e.salary = 'Required';
+    if (!form.isTeacher && (!form.salary || Number(form.salary) < 1)) e.salary = 'Required';
     if (!form.joiningDate) e.joiningDate = 'Required';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!validate()) return;
+    setSaving(true);
+    const res = await fetch('/api/hr', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: form.name.trim(), designation: form.designation.trim(),
+        department: form.department, phone: form.phone, email: form.email.trim(),
+        qualification: form.qualification || null,
+        salary: form.isTeacher ? null : Number(form.salary),
+        joiningDate: form.joiningDate, isTeacher: form.isTeacher,
+      }),
+    });
+    setSaving(false);
+    if (!res.ok) { const d = await res.json().catch(() => ({})); toast.error(d.error ?? 'Failed to add staff'); return; }
+    const d = await res.json();
     onAdd({
-      id: `STF${Date.now()}`,
-      name: form.name.trim(),
-      designation: form.designation.trim(),
-      department: form.department,
-      subject: form.subject || null,
-      phone: form.phone,
-      email: form.email.trim(),
+      id: d.id ?? `STF${Date.now()}`,
+      name: form.name.trim(), photo: null,
+      designation: form.designation.trim(), department: form.department,
+      subject: form.subject || null, joiningDate: form.joiningDate,
       qualification: form.qualification || 'Not specified',
-      salary: Number(form.salary),
-      leaveBalance: 15,
-      joiningDate: form.joiningDate,
-      status: 'active',
-      photo: null,
-      employmentType: 'full-time',
+      phone: form.phone, email: form.email.trim(),
+      salary: Number(form.salary) || 45000, leaveBalance: 15,
+      status: 'active', employmentType: 'full-time',
       teachingCapacity: form.subject ? [form.subject] : [],
-      weeklyAvailability: null,
-      weeklyLoad: { current: 0, target: 28 },
-      monthlyLoad: 0,
-      annualLoad: 0,
-    } as unknown as Staff);
+    });
     toast.success(`${form.name} added to staff directory`);
     onClose();
   };
@@ -307,7 +318,7 @@ function AddStaffModal({ onClose, onAdd }: { onClose: () => void; onAdd: (s: Sta
   );
 
   const inp = (field: keyof typeof form, placeholder: string, type = 'text', extra?: string) => (
-    <input type={type} placeholder={placeholder} value={form[field]}
+    <input type={type} placeholder={placeholder} value={form[field] as string}
       onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
       className={`w-full px-3 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 ${errors[field] ? 'border-coral' : 'border-gray-200'} ${extra ?? ''}`} />
   );
@@ -323,9 +334,19 @@ function AddStaffModal({ onClose, onAdd }: { onClose: () => void; onAdd: (s: Sta
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500"><X className="w-4 h-4" /></button>
         </div>
         <div className="p-5 space-y-4">
+          {/* Type toggle */}
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+            <span className="text-xs font-semibold text-gray-600">Type:</span>
+            {[{ v: false, l: 'Non-Teaching Staff' }, { v: true, l: 'Teaching Staff' }].map(opt => (
+              <button key={String(opt.v)} onClick={() => setForm(f => ({ ...f, isTeacher: opt.v }))}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${form.isTeacher === opt.v ? 'bg-navy text-white' : 'text-gray-500 hover:text-gray-700'}`}>
+                {opt.l}
+              </button>
+            ))}
+          </div>
           <F label="Full Name *" error={errors.name}>{inp('name', 'e.g. Mrs. Ananya Bose')}</F>
           <div className="grid grid-cols-2 gap-3">
-            <F label="Designation *" error={errors.designation}>{inp('designation', 'e.g. Senior Teacher')}</F>
+            <F label="Designation *" error={errors.designation}>{inp('designation', form.isTeacher ? 'e.g. Senior Teacher' : 'e.g. Admin Officer')}</F>
             <F label="Department *" error={errors.department}>
               <select value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))}
                 className={`w-full px-3 py-2.5 text-sm border rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-navy/20 ${errors.department ? 'border-coral' : 'border-gray-200'}`}>
@@ -334,20 +355,24 @@ function AddStaffModal({ onClose, onAdd }: { onClose: () => void; onAdd: (s: Sta
               </select>
             </F>
           </div>
+          {form.isTeacher && (
+            <F label="Subject"><input type="text" placeholder="e.g. Mathematics" value={form.subject} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20" /></F>
+          )}
           <div className="grid grid-cols-2 gap-3">
-            <F label="Subject (if teacher)"><input type="text" placeholder="e.g. Mathematics" value={form.subject} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20" /></F>
             <F label="Phone *" error={errors.phone}>{inp('phone', '10-digit mobile')}</F>
+            <F label="Email *" error={errors.email}>{inp('email', 'work email', 'email')}</F>
           </div>
-          <F label="Email *" error={errors.email}>{inp('email', 'work email address', 'email')}</F>
           <F label="Qualification">{inp('qualification', 'e.g. M.Sc Mathematics, B.Ed')}</F>
           <div className="grid grid-cols-2 gap-3">
-            <F label="Basic Salary (₹) *" error={errors.salary}>{inp('salary', 'Monthly basic', 'number')}</F>
+            {!form.isTeacher && <F label="Basic Salary (₹) *" error={errors.salary}>{inp('salary', 'Monthly basic', 'number')}</F>}
             <F label="Joining Date *" error={errors.joiningDate}>{inp('joiningDate', '', 'date')}</F>
           </div>
         </div>
         <div className="flex gap-3 p-5 border-t border-gray-100 sticky bottom-0 bg-white rounded-b-2xl">
           <button onClick={onClose} className="flex-1 py-2.5 text-sm font-semibold text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">Cancel</button>
-          <button onClick={handleAdd} className="flex-1 py-2.5 text-sm font-semibold bg-gold text-navy rounded-xl hover:bg-gold/90 transition-colors">Add Staff Member</button>
+          <button onClick={handleAdd} disabled={saving} className="flex-1 py-2.5 text-sm font-semibold bg-gold text-navy rounded-xl hover:bg-gold/90 transition-colors disabled:opacity-50">
+            {saving ? 'Saving…' : 'Add Staff Member'}
+          </button>
         </div>
       </div>
     </div>
@@ -459,56 +484,72 @@ function ApplyLeaveModal({ staff, onClose, onApply }: { staff: Staff[]; onClose:
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+function mapTeacher(t: any): Staff {
+  const subjectName = t.subjects?.[0]?.subject?.name ?? null;
+  const dept = subjectName
+    ? (subjectName.match(/maths|math|physics|chemistry|biology/i) ? 'Science & Maths'
+      : subjectName.match(/english|bengali|hindi|sanskrit/i) ? 'Languages'
+      : subjectName.match(/history|geography|civics|economics/i) ? 'Humanities'
+      : subjectName.match(/computer|it|technology/i) ? 'Technology'
+      : subjectName.match(/physical|sports/i) ? 'Sports'
+      : subjectName.match(/music|art|drawing/i) ? 'Arts'
+      : 'Science & Maths')
+    : (t.department ?? 'Academic');
+  return {
+    id: t.id, name: t.name, photo: null,
+    designation: t.designation ?? 'Teacher',
+    department: dept,
+    subject: subjectName,
+    joiningDate: t.joiningDate?.split('T')[0] ?? '',
+    qualification: t.qualification ?? 'B.Ed.',
+    phone: t.phone ?? '', email: t.email ?? '',
+    salary: Number(t.salary ?? 45000),
+    leaveBalance: 12 - (t.leaveRequests?.length ?? 0),
+    status: t.isActive ? 'active' : 'on-leave',
+    employmentType: 'full-time',
+    teachingCapacity: t.subjects?.map((s: any) => s.subject?.name).filter(Boolean) ?? [],
+  };
+}
+
+function mapStaff(s: any): Staff {
+  return {
+    id: s.id, name: s.name, photo: null,
+    designation: s.designation ?? 'Staff',
+    department: s.department ?? 'Administration',
+    subject: null,
+    joiningDate: s.joiningDate?.split('T')[0] ?? '',
+    qualification: s.qualification ?? 'Graduate',
+    phone: s.phone ?? '', email: s.email ?? '',
+    salary: Number(s.salary ?? 35000),
+    leaveBalance: 12,
+    status: s.isActive ? 'active' : 'on-leave',
+    employmentType: 'full-time',
+    teachingCapacity: [],
+  };
+}
+
 export default function HRPage() {
   const [activeTab, setActiveTab] = useState<Tab>('directory');
-  const [staffList, setStaffList] = useState<Staff[]>(staffData as Staff[]);
-  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>(seedLeave);
+  const [staffList, setStaffList] = useState<Staff[]>([]);
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Fetch real data from API on mount
-  useEffect(() => {
+  const loadStaff = () =>
     fetch('/api/hr')
       .then(r => r.json())
       .then(data => {
-        const teachers: Staff[] = (data.teachers ?? []).map((t: any) => ({
-          id: t.id, name: t.name, photo: null,
-          designation: t.designation ?? 'Teacher',
-          department: t.subjects?.[0]?.subject?.name
-            ? (t.subjects[0].subject.name.match(/maths|math/i) ? 'Science & Maths'
-              : t.subjects[0].subject.name.match(/english|bengali|hindi/i) ? 'Languages'
-              : t.subjects[0].subject.name.match(/history|geography|civics/i) ? 'Humanities'
-              : 'Science & Maths')
-            : 'Academic',
-          subject: t.subjects?.[0]?.subject?.name ?? null,
-          joiningDate: t.joiningDate?.split('T')[0] ?? '',
-          qualification: t.qualification ?? 'B.Ed.',
-          phone: t.phone ?? '', email: t.email ?? '',
-          salary: t.salary ?? 45000,
-          leaveBalance: 12 - (t.leaveRequests?.length ?? 0),
-          status: t.isActive ? 'active' : 'on-leave',
-          employmentType: 'full-time',
-          teachingCapacity: t.subjects?.map((s: any) => s.subject?.name).filter(Boolean) ?? [],
-        }));
-        const nonTeaching: Staff[] = (data.staff ?? []).map((s: any) => ({
-          id: s.id, name: s.name, photo: null,
-          designation: s.designation ?? 'Staff',
-          department: s.department ?? 'Administration',
-          subject: null, joiningDate: s.joiningDate?.split('T')[0] ?? '',
-          qualification: s.qualification ?? 'Graduate',
-          phone: s.phone ?? '', email: s.email ?? '',
-          salary: s.salary ?? 35000,
-          leaveBalance: s.leaveBalance ?? 12,
-          status: s.isActive ? 'active' : 'on-leave',
-          employmentType: 'full-time',
-        }));
-        const merged = [...teachers, ...nonTeaching];
-        if (merged.length > 0) setStaffList(merged as Staff[]);
-      })
-      .catch(() => {});
+        const merged = [
+          ...(data.teachers ?? []).map(mapTeacher),
+          ...(data.staff ?? []).map(mapStaff),
+        ];
+        setStaffList(merged);
+      });
 
+  const loadLeave = () =>
     fetch('/api/hr/leave')
       .then(r => r.json())
       .then(data => {
-        const mapped: LeaveRequest[] = (data ?? []).map((r: any) => ({
+        setLeaveRequests((data ?? []).map((r: any) => ({
           id: r.id,
           staffId: r.teacherId ?? r.staffId ?? '',
           name: r.teacher?.name ?? r.staff?.name ?? 'Unknown',
@@ -519,10 +560,11 @@ export default function HRPage() {
           days: r.days,
           reason: r.reason ?? '',
           status: r.status === 'APPROVED' ? 'Approved' : r.status === 'REJECTED' ? 'Rejected' : 'Pending',
-        }));
-        if (mapped.length > 0) setLeaveRequests(mapped);
-      })
-      .catch(() => {});
+        })));
+      });
+
+  useEffect(() => {
+    Promise.all([loadStaff(), loadLeave()]).finally(() => setLoading(false));
   }, []);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [showAddStaff, setShowAddStaff] = useState(false);
@@ -541,8 +583,12 @@ export default function HRPage() {
 
   // Payroll state
   const [payrollMonth, setPayrollMonth] = useState('April 2026');
-  const [processedIds, setProcessedIds] = useState<Set<string>>(new Set(['STF001','STF002','STF003']));
+  const [processedIds, setProcessedIds] = useState<Set<string>>(new Set());
   const [payrollSearch, setPayrollSearch] = useState('');
+  type DBPayroll = { id: string; staffId: string; month: number; year: number; basic: number; allowances: number; pfDeduction: number; tdsDeduction: number; netPay: number; status: string; staff: { id: string; name: string; designation: string; department: string | null } };
+  const [dbPayrolls, setDbPayrolls] = useState<DBPayroll[]>([]);
+  const [payrollLoading, setPayrollLoading] = useState(false);
+  const [payrollGenerated, setPayrollGenerated] = useState(false);
 
   // Availability state
   type AvailEntry = { id: string; staffId: string; name: string; type: 'absence' | 'extra'; date: string; timeTo?: string; period: 'full-day' | 'partial' | 'multi-day'; endDate?: string; reason: string; affectedPeriods?: string[]; substitute?: string };
@@ -585,8 +631,14 @@ export default function HRPage() {
   ), [staffList, payrollSearch]);
 
   // ── Actions ──
-  const handleLeaveAction = (id: string, action: 'Approved' | 'Rejected') => {
+  const handleLeaveAction = async (id: string, action: 'Approved' | 'Rejected') => {
     const req = leaveRequests.find(l => l.id === id)!;
+    const dbStatus = action === 'Approved' ? 'APPROVED' : 'REJECTED';
+    await fetch('/api/hr/leave', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, status: dbStatus }),
+    });
     setLeaveRequests(prev => prev.map(l => l.id === id ? { ...l, status: action } : l));
     if (action === 'Approved') {
       setStaffList(prev => prev.map(s => s.id === req.staffId ? { ...s, leaveBalance: Math.max(0, s.leaveBalance - req.days) } : s));
@@ -596,14 +648,70 @@ export default function HRPage() {
     });
   };
 
-  const processPayroll = (staffId: string, name: string) => {
-    setProcessedIds(prev => new Set([...prev, staffId]));
+  const processPayroll = async (payrollId: string, name: string) => {
+    await fetch('/api/hr/payroll', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: payrollId, status: 'PAID' }),
+    });
+    setProcessedIds(prev => new Set([...prev, payrollId]));
     toast.success(`Payroll processed for ${name}`, { description: `${payrollMonth}` });
   };
 
-  const processAllPayroll = () => {
-    setProcessedIds(new Set(staffList.map(s => s.id)));
-    toast.success(`Payroll processed for all ${staffList.length} staff`, { description: payrollMonth });
+  const processAllPayroll = async () => {
+    const pendingIds = dbPayrolls.filter(p => p.status !== 'PAID').map(p => p.id);
+    if (pendingIds.length === 0) { toast.info('All payrolls already processed'); return; }
+    await fetch('/api/hr/payroll', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: pendingIds, status: 'PAID' }),
+    });
+    setProcessedIds(new Set(dbPayrolls.map(p => p.id)));
+    toast.success(`Payroll processed for all ${pendingIds.length} staff`, { description: payrollMonth });
+  };
+
+  // ── Payroll loading ──
+  const loadPayroll = (monthLabel: string) => {
+    const MONTH_MAP: Record<string, number> = { January:1,February:2,March:3,April:4,May:5,June:6,July:7,August:8,September:9,October:10,November:11,December:12 };
+    const parts = monthLabel.split(' ');
+    const m = MONTH_MAP[parts[0]] ?? new Date().getMonth() + 1;
+    const y = parseInt(parts[1]) || new Date().getFullYear();
+    setPayrollLoading(true);
+    fetch(`/api/hr/payroll?month=${m}&year=${y}`)
+      .then(r => r.json())
+      .then(d => {
+        const records: DBPayroll[] = (d.payrolls ?? []).map((p: any) => ({
+          id: p.id, staffId: p.staffId, month: p.month, year: p.year,
+          basic: Number(p.basic), allowances: Number(p.allowances),
+          pfDeduction: Number(p.pfDeduction), tdsDeduction: Number(p.tdsDeduction),
+          netPay: Number(p.netPay), status: p.status,
+          staff: p.staff,
+        }));
+        setDbPayrolls(records);
+        setProcessedIds(new Set(records.filter(p => p.status === 'PAID').map(p => p.id)));
+        setPayrollGenerated(records.length > 0);
+      })
+      .finally(() => setPayrollLoading(false));
+  };
+
+  useEffect(() => { if (activeTab === 'payroll') loadPayroll(payrollMonth); }, [activeTab, payrollMonth]);
+
+  const generatePayroll = async () => {
+    const MONTH_MAP: Record<string, number> = { January:1,February:2,March:3,April:4,May:5,June:6,July:7,August:8,September:9,October:10,November:11,December:12 };
+    const parts = payrollMonth.split(' ');
+    const m = MONTH_MAP[parts[0]] ?? new Date().getMonth() + 1;
+    const y = parseInt(parts[1]) || new Date().getFullYear();
+    const res = await fetch('/api/hr/payroll', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ month: m, year: y }),
+    });
+    const d = await res.json();
+    if (res.ok) {
+      toast.success(`Payroll generated for ${d.generated} staff members`, { description: payrollMonth });
+      loadPayroll(payrollMonth);
+    } else {
+      toast.error(d.error ?? 'Failed to generate payroll');
+    }
   };
 
   // ── Analytics data ──
@@ -1006,112 +1114,137 @@ export default function HRPage() {
           )}
 
           {/* ── Payroll ── */}
-          {activeTab === 'payroll' && (
-            <div>
-              {/* Header controls */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-                <div className="flex items-center gap-3">
-                  <select value={payrollMonth} onChange={e => setPayrollMonth(e.target.value)}
-                    className="text-sm font-semibold border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-navy/20 text-navy">
-                    {MONTHS.map(m => <option key={m}>{m}</option>)}
-                  </select>
-                  <div className="text-sm text-gray-500">
-                    Total: <span className="font-bold text-navy">₹{totalPayroll.toLocaleString('en-IN')}</span>
+          {activeTab === 'payroll' && (() => {
+            const filteredDB = dbPayrolls.filter(p =>
+              !payrollSearch || p.staff.name.toLowerCase().includes(payrollSearch.toLowerCase())
+            );
+            const gross = dbPayrolls.reduce((s, p) => s + p.basic + p.allowances, 0);
+            const deductions = dbPayrolls.reduce((s, p) => s + p.pfDeduction + p.tdsDeduction, 0);
+            const net = dbPayrolls.reduce((s, p) => s + p.netPay, 0);
+            return (
+              <div>
+                {/* Header controls */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+                  <div className="flex items-center gap-3">
+                    <select value={payrollMonth} onChange={e => setPayrollMonth(e.target.value)}
+                      className="text-sm font-semibold border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-navy/20 text-navy">
+                      {MONTHS.map(m => <option key={m}>{m}</option>)}
+                    </select>
+                    {dbPayrolls.length > 0 && (
+                      <div className="text-sm text-gray-500">
+                        Net: <span className="font-bold text-navy">₹{net.toLocaleString('en-IN')}</span>
+                      </div>
+                    )}
                   </div>
-                </div>
-                <div className="flex gap-2">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input type="text" placeholder="Search staff..." value={payrollSearch} onChange={e => setPayrollSearch(e.target.value)}
-                      className="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 w-48" />
-                  </div>
-                  <button onClick={processAllPayroll}
-                    className="flex items-center gap-1.5 bg-green text-white text-xs font-semibold px-3 py-2 rounded-xl hover:bg-green/80 transition-colors">
-                    <Banknote className="w-3.5 h-3.5" /> Process All
-                  </button>
-                  <button onClick={() => toast.success('Payroll report downloaded')}
-                    className="flex items-center gap-1.5 bg-white text-navyMid border border-gray-200 text-xs font-semibold px-3 py-2 rounded-xl hover:border-navy transition-colors">
-                    <Download className="w-3.5 h-3.5" /> Export
-                  </button>
-                </div>
-              </div>
-
-              {/* Summary cards */}
-              <div className="grid grid-cols-3 gap-3 mb-5">
-                {[
-                  { label: 'Gross Payroll', value: `₹${staffList.reduce((s, x) => s + x.salary + Math.round(x.salary * 0.2), 0).toLocaleString('en-IN')}`, color: 'text-navy', icon: Briefcase },
-                  { label: 'Total Deductions', value: `₹${staffList.reduce((s, x) => s + Math.round(x.salary * 0.12), 0).toLocaleString('en-IN')}`, color: 'text-coral', icon: TrendingUp },
-                  { label: 'Net Disbursement', value: `₹${totalPayroll.toLocaleString('en-IN')}`, color: 'text-green', icon: DollarSign },
-                ].map(s => {
-                  const Icon = s.icon;
-                  return (
-                    <div key={s.label} className="bg-gradient-to-br from-navy to-navyMid rounded-xl p-4 text-white">
-                      <Icon className="w-4 h-4 text-gold mb-2" />
-                      <div className={`text-xl font-sora font-bold ${s.color === 'text-coral' ? 'text-coral' : s.color === 'text-green' ? 'text-green' : 'text-white'}`}>{s.value}</div>
-                      <div className="text-xs text-ice/70 mt-0.5">{s.label}</div>
+                  <div className="flex gap-2">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input type="text" placeholder="Search staff..." value={payrollSearch} onChange={e => setPayrollSearch(e.target.value)}
+                        className="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 w-48" />
                     </div>
-                  );
-                })}
-              </div>
+                    {!payrollGenerated ? (
+                      <button onClick={generatePayroll}
+                        className="flex items-center gap-1.5 bg-gold text-navy text-xs font-semibold px-3 py-2 rounded-xl hover:bg-gold/90 transition-colors">
+                        <Banknote className="w-3.5 h-3.5" /> Generate Payroll
+                      </button>
+                    ) : (
+                      <button onClick={processAllPayroll}
+                        className="flex items-center gap-1.5 bg-green text-white text-xs font-semibold px-3 py-2 rounded-xl hover:bg-green/80 transition-colors">
+                        <Banknote className="w-3.5 h-3.5" /> Process All
+                      </button>
+                    )}
+                    <button onClick={() => toast.success('Payroll report downloaded')}
+                      className="flex items-center gap-1.5 bg-white text-navyMid border border-gray-200 text-xs font-semibold px-3 py-2 rounded-xl hover:border-navy transition-colors">
+                      <Download className="w-3.5 h-3.5" /> Export
+                    </button>
+                  </div>
+                </div>
 
-              {/* Payroll table */}
-              <div className="overflow-x-auto rounded-xl border border-gray-100">
-                <table className="w-full min-w-[800px]">
-                  <thead className="bg-gray-50 border-b border-gray-100">
-                    <tr>
-                      {['Staff','Designation','Basic Pay','HRA + TA','PF + TDS','Net Pay','Status','Action'].map(h => (
-                        <th key={h} className="text-left text-xs uppercase tracking-wide text-gray-400 px-4 py-3 font-medium">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredPayroll.map((s, i) => {
-                      const allowance = Math.round(s.salary * 0.2);
-                      const deduction = Math.round(s.salary * 0.12);
-                      const net = s.salary + allowance - deduction;
-                      const processed = processedIds.has(s.id);
+                {/* Summary cards */}
+                {dbPayrolls.length > 0 && (
+                  <div className="grid grid-cols-3 gap-3 mb-5">
+                    {[
+                      { label: 'Gross Payroll', value: `₹${gross.toLocaleString('en-IN')}`, color: 'text-white', icon: Briefcase },
+                      { label: 'Total Deductions', value: `₹${deductions.toLocaleString('en-IN')}`, color: 'text-coral', icon: TrendingUp },
+                      { label: 'Net Disbursement', value: `₹${net.toLocaleString('en-IN')}`, color: 'text-green', icon: DollarSign },
+                    ].map(s => {
+                      const Icon = s.icon;
                       return (
-                        <tr key={s.id} className={`border-b border-gray-50 hover:bg-gray-50/80 ${i % 2 !== 0 ? 'bg-gray-50/30' : ''}`}>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-7 h-7 rounded-lg bg-navy flex items-center justify-center flex-shrink-0">
-                                <span className="text-white text-[10px] font-bold font-sora">{getInitials(s.name)}</span>
-                              </div>
-                              <span className="font-semibold text-sm text-gray-800">{s.name}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-xs text-gray-500">{s.designation}</td>
-                          <td className="px-4 py-3 text-sm text-gray-700 font-medium">₹{s.salary.toLocaleString('en-IN')}</td>
-                          <td className="px-4 py-3 text-sm font-semibold text-green">+₹{allowance.toLocaleString('en-IN')}</td>
-                          <td className="px-4 py-3 text-sm font-semibold text-coral">−₹{deduction.toLocaleString('en-IN')}</td>
-                          <td className="px-4 py-3 text-sm font-bold text-navy">₹{net.toLocaleString('en-IN')}</td>
-                          <td className="px-4 py-3">
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${processed ? 'bg-green/10 text-green border-green/20' : 'bg-amber/10 text-amber border-amber/20'}`}>
-                              {processed ? 'Processed' : 'Pending'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex gap-1.5">
-                              {!processed && (
-                                <button onClick={() => processPayroll(s.id, s.name)}
-                                  className="text-xs text-green hover:text-green/70 font-semibold border border-green/20 px-2.5 py-1.5 rounded-lg hover:bg-green/5 transition-colors">
-                                  Process
-                                </button>
-                              )}
-                              <button onClick={() => toast.success(`Payslip generated for ${s.name}`)}
-                                className="text-xs text-navyMid hover:text-navy font-semibold border border-gray-200 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1">
-                                <FileText className="w-3 h-3" /> Slip
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
+                        <div key={s.label} className="bg-gradient-to-br from-navy to-navyMid rounded-xl p-4 text-white">
+                          <Icon className="w-4 h-4 text-gold mb-2" />
+                          <div className={`text-xl font-sora font-bold ${s.color}`}>{s.value}</div>
+                          <div className="text-xs text-ice/70 mt-0.5">{s.label}</div>
+                        </div>
                       );
                     })}
-                  </tbody>
-                </table>
+                  </div>
+                )}
+
+                {/* Payroll table */}
+                {payrollLoading ? (
+                  <div className="space-y-2">{Array.from({length:5}).map((_,i) => <div key={i} className="h-12 bg-gray-100 rounded-xl animate-pulse" />)}</div>
+                ) : filteredDB.length === 0 ? (
+                  <div className="text-center py-14 text-sm text-gray-400">
+                    <Banknote className="w-8 h-8 mx-auto mb-3 text-gray-200" />
+                    {payrollGenerated ? 'No payroll records match your search.' : 'Click "Generate Payroll" to create entries for all active staff.'}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border border-gray-100">
+                    <table className="w-full min-w-[800px]">
+                      <thead className="bg-gray-50 border-b border-gray-100">
+                        <tr>
+                          {['Staff','Designation','Basic Pay','HRA + TA','PF + TDS','Net Pay','Status','Action'].map(h => (
+                            <th key={h} className="text-left text-xs uppercase tracking-wide text-gray-400 px-4 py-3 font-medium">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredDB.map((p, i) => {
+                          const processed = processedIds.has(p.id);
+                          return (
+                            <tr key={p.id} className={`border-b border-gray-50 hover:bg-gray-50/80 ${i % 2 !== 0 ? 'bg-gray-50/30' : ''}`}>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-7 h-7 rounded-lg bg-navy flex items-center justify-center flex-shrink-0">
+                                    <span className="text-white text-[10px] font-bold font-sora">{getInitials(p.staff.name)}</span>
+                                  </div>
+                                  <span className="font-semibold text-sm text-gray-800">{p.staff.name}</span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-xs text-gray-500">{p.staff.designation}</td>
+                              <td className="px-4 py-3 text-sm text-gray-700 font-medium">₹{p.basic.toLocaleString('en-IN')}</td>
+                              <td className="px-4 py-3 text-sm font-semibold text-green">+₹{p.allowances.toLocaleString('en-IN')}</td>
+                              <td className="px-4 py-3 text-sm font-semibold text-coral">−₹{(p.pfDeduction + p.tdsDeduction).toLocaleString('en-IN')}</td>
+                              <td className="px-4 py-3 text-sm font-bold text-navy">₹{p.netPay.toLocaleString('en-IN')}</td>
+                              <td className="px-4 py-3">
+                                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${processed ? 'bg-green/10 text-green border-green/20' : 'bg-amber/10 text-amber border-amber/20'}`}>
+                                  {processed ? 'Processed' : 'Pending'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex gap-1.5">
+                                  {!processed && (
+                                    <button onClick={() => processPayroll(p.id, p.staff.name)}
+                                      className="text-xs text-green hover:text-green/70 font-semibold border border-green/20 px-2.5 py-1.5 rounded-lg hover:bg-green/5 transition-colors">
+                                      Process
+                                    </button>
+                                  )}
+                                  <button onClick={() => toast.success(`Payslip generated for ${p.staff.name}`)}
+                                    className="text-xs text-navyMid hover:text-navy font-semibold border border-gray-200 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1">
+                                    <FileText className="w-3 h-3" /> Slip
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* ── Analytics ── */}
           {activeTab === 'analytics' && (
@@ -1326,7 +1459,7 @@ export default function HRPage() {
                 <h4 className="font-sora font-semibold text-navy text-sm mb-3">Part-Time Teacher Weekly Availability</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {staffList.filter(s => 'employmentType' in s && s.employmentType === 'part-time' && s.weeklyAvailability).map(s => {
-                    const avail = s.weeklyAvailability as { day: string; slots: string[] }[];
+                    const avail = (s.weeklyAvailability as unknown) as { day: string; slots: string[] }[];
                     const dept = getDept(s.department);
                     return (
                       <div key={s.id} className="border border-gray-100 rounded-2xl overflow-hidden">
