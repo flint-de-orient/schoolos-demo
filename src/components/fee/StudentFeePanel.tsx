@@ -1,7 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { CreditCard, CheckCircle2, Clock, AlertCircle, Plus, RefreshCw, Lock, Unlock } from 'lucide-react';
+import {
+  CreditCard, CheckCircle2, Clock, AlertCircle, Plus,
+  RefreshCw, Lock, IndianRupee, X, Banknote,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -59,7 +62,7 @@ type AcademicYear  = { id: string; label: string };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
-const fmt = (n: string | number) => Number(n).toLocaleString('en-IN');
+const fmt = (n: string | number) => '₹' + Number(n).toLocaleString('en-IN');
 
 const STATUS_STYLES: Record<string, string> = {
   PAID:    'bg-green/10 text-green border-green/20',
@@ -70,11 +73,7 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 const STATUS_ICON: Record<string, React.ElementType> = {
-  PAID:    CheckCircle2,
-  PENDING: Clock,
-  OVERDUE: AlertCircle,
-  PARTIAL: Clock,
-  WAIVED:  CheckCircle2,
+  PAID: CheckCircle2, PENDING: Clock, OVERDUE: AlertCircle, PARTIAL: Clock, WAIVED: CheckCircle2,
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -91,8 +90,147 @@ function SummaryCard({ label, value, sub, color }: { label: string; value: strin
   return (
     <div className="bg-white border border-gray-100 rounded-xl p-4 flex-1">
       <p className="text-xs text-gray-400 mb-1">{label}</p>
-      <p className={`text-xl font-sora font-bold ${color}`}>₹{value}</p>
+      <p className={`text-xl font-sora font-bold ${color}`}>{value}</p>
       {sub && <p className="text-[11px] text-gray-400 mt-0.5">{sub}</p>}
+    </div>
+  );
+}
+
+// ─── Payment Modal ─────────────────────────────────────────────────────────────
+
+const PAYMENT_MODES = ['UPI', 'Cash', 'NEFT', 'Cheque', 'DD', 'Card'];
+const MODE_TO_DB: Record<string, string> = {
+  UPI: 'UPI', Cash: 'CASH', NEFT: 'NEFT', Cheque: 'CHEQUE', DD: 'DD', Card: 'CARD',
+};
+
+interface PaymentModalProps {
+  accountId: string;
+  installment?: Installment;
+  defaultAmount: number;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+function PaymentModal({ accountId, installment, defaultAmount, onClose, onSuccess }: PaymentModalProps) {
+  const [amount,  setAmount]  = useState(String(defaultAmount));
+  const [mode,    setMode]    = useState('Cash');
+  const [notes,   setNotes]   = useState('');
+  const [saving,  setSaving]  = useState(false);
+
+  async function submit() {
+    const amt = Number(amount);
+    if (!amt || amt <= 0) { toast.error('Enter a valid amount'); return; }
+    setSaving(true);
+    try {
+      const res = await fetch('/api/fee', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          feeAccountId: accountId,
+          installmentId: installment?.id,
+          amount: amt,
+          mode: MODE_TO_DB[mode] ?? 'CASH',
+          notes: notes || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error ?? 'Failed to record payment');
+        return;
+      }
+      const d = await res.json();
+      toast.success('Payment recorded', {
+        description: `Receipt: ${d.data?.receiptNo ?? '—'}`,
+      });
+      onSuccess();
+      onClose();
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm animate-fadeIn">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div>
+            <h3 className="font-sora font-bold text-navy text-base">Collect Payment</h3>
+            {installment && (
+              <p className="text-xs text-gray-400 mt-0.5">
+                {installment.termLabel} · Due {new Date(installment.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </p>
+            )}
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Amount */}
+          <div>
+            <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Amount (₹)</label>
+            <div className="relative">
+              <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="number"
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 font-semibold"
+              />
+            </div>
+          </div>
+
+          {/* Mode */}
+          <div>
+            <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Payment Mode</label>
+            <div className="flex flex-wrap gap-2">
+              {PAYMENT_MODES.map(m => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setMode(m)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
+                    mode === m
+                      ? 'bg-navy text-white border-navy'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-navy/40'
+                  }`}
+                >
+                  {m === 'Cash' && <Banknote size={11} />}
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Notes <span className="font-normal text-gray-400">(optional)</span></label>
+            <input
+              type="text"
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="e.g. Cheque no. 12345"
+              className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3 px-5 pb-5">
+          <button onClick={onClose} className="flex-1 py-2.5 text-sm font-semibold border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={saving}
+            className="flex-1 py-2.5 text-sm font-bold bg-gold text-navy rounded-xl hover:bg-gold/90 transition-colors disabled:opacity-60"
+          >
+            {saving ? 'Saving…' : `Collect ${fmt(amount || 0)}`}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -147,33 +285,24 @@ function AssignForm({ studentId, onAssigned }: { studentId: string; onAssigned: 
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs text-gray-500 mb-1 block">Academic Year</label>
-          <select
-            value={yearId}
-            onChange={e => setYearId(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-navy/20"
-          >
+          <select value={yearId} onChange={e => setYearId(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-navy/20">
             <option value="">Select year…</option>
             {years.map(y => <option key={y.id} value={y.id}>{y.label}</option>)}
           </select>
         </div>
         <div>
           <label className="text-xs text-gray-500 mb-1 block">Fee Plan</label>
-          <select
-            value={planId}
-            onChange={e => setPlanId(e.target.value)}
+          <select value={planId} onChange={e => setPlanId(e.target.value)}
             disabled={!yearId || plans.length === 0}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-navy/20 disabled:opacity-50"
-          >
-            <option value="">{plans.length === 0 ? (yearId ? 'No plans for this year' : 'Select year first…') : 'Select plan…'}</option>
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-navy/20 disabled:opacity-50">
+            <option value="">{plans.length === 0 ? (yearId ? 'No plans' : 'Select year first…') : 'Select plan…'}</option>
             {plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
       </div>
-      <button
-        onClick={assign}
-        disabled={saving || !planId}
-        className="flex items-center gap-2 bg-navy text-white text-sm px-4 py-2 rounded-lg font-medium disabled:opacity-50 hover:bg-navyMid transition-colors"
-      >
+      <button onClick={assign} disabled={saving || !planId}
+        className="flex items-center gap-2 bg-navy text-white text-sm px-4 py-2 rounded-lg font-medium disabled:opacity-50 hover:bg-navyMid transition-colors">
         <Plus size={14} /> {saving ? 'Assigning…' : 'Assign Plan'}
       </button>
     </div>
@@ -183,8 +312,9 @@ function AssignForm({ studentId, onAssigned }: { studentId: string; onAssigned: 
 // ─── Main Panel ────────────────────────────────────────────────────────────────
 
 export default function StudentFeePanel({ studentId }: { studentId: string }) {
-  const [data, setData]       = useState<{ assignment: Assignment | null } | null>(null);
+  const [data,    setData]    = useState<{ assignment: Assignment | null } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [paying,  setPaying]  = useState<{ installment?: Installment; defaultAmount: number } | null>(null);
 
   async function load() {
     setLoading(true);
@@ -210,7 +340,6 @@ export default function StudentFeePanel({ studentId }: { studentId: string }) {
   const assignment = data?.assignment ?? null;
   const account    = assignment?.feeAccount ?? null;
 
-  // ── No assignment ─────────────────────────────────────────────────────────────
   if (!assignment) {
     return (
       <div className="space-y-5">
@@ -224,17 +353,17 @@ export default function StudentFeePanel({ studentId }: { studentId: string }) {
     );
   }
 
-  const installments  = account?.installments ?? [];
+  const installments = account?.installments ?? [];
   const transactions  = account?.transactions ?? [];
   const overdue       = installments.filter(i => i.status === 'OVERDUE').length;
   const upcoming      = installments.find(i => i.status === 'PENDING');
+  const balance       = Number(account?.balance ?? 0);
 
-  // ── Assigned ──────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-5">
 
       {/* Plan header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs text-gray-400 mb-0.5">Fee Plan · {assignment.academicYear.label}</p>
           <p className="text-base font-sora font-bold text-navy">{assignment.feePlan.name}</p>
@@ -256,19 +385,23 @@ export default function StudentFeePanel({ studentId }: { studentId: string }) {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           {account && <StatusBadge status={account.status} />}
-          <button
-            onClick={load}
-            title="Refresh"
-            className="p-1.5 text-gray-400 hover:text-navy rounded-lg hover:bg-gray-100 transition-colors"
-          >
+          {account && balance > 0 && !account.isLocked && (
+            <button
+              onClick={() => setPaying({ defaultAmount: balance })}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-gold text-navy rounded-lg hover:bg-gold/90 transition-colors shadow-sm">
+              <IndianRupee size={12} /> Collect Fee
+            </button>
+          )}
+          <button onClick={load} title="Refresh"
+            className="p-1.5 text-gray-400 hover:text-navy rounded-lg hover:bg-gray-100 transition-colors">
             <RefreshCw size={14} />
           </button>
         </div>
       </div>
 
-      {/* Fee components (plan items) */}
+      {/* Plan components */}
       {assignment.feePlan.items.length > 0 && (
         <div className="bg-iceLight border border-ice rounded-xl px-4 py-3">
           <p className="text-xs font-semibold text-navyMid mb-2">Plan Components</p>
@@ -286,18 +419,18 @@ export default function StudentFeePanel({ studentId }: { studentId: string }) {
       {/* Summary cards */}
       {account && (
         <div className="flex gap-3">
-          <SummaryCard label="Total Due"  value={fmt(account.totalDue)}  color="text-navy"  />
+          <SummaryCard label="Total Due"  value={fmt(account.totalDue)}  color="text-navy" />
           <SummaryCard label="Total Paid" value={fmt(account.totalPaid)} color="text-green" />
           <SummaryCard
             label="Balance"
             value={fmt(account.balance)}
-            color={Number(account.balance) > 0 ? 'text-coral' : 'text-green'}
+            color={balance > 0 ? 'text-coral' : 'text-green'}
             sub={overdue > 0 ? `${overdue} overdue installment${overdue > 1 ? 's' : ''}` : upcoming ? `Next due: ${new Date(upcoming.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : undefined}
           />
         </div>
       )}
 
-      {/* Installments */}
+      {/* Installments table */}
       {installments.length > 0 ? (
         <div>
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Installments</p>
@@ -305,30 +438,43 @@ export default function StudentFeePanel({ studentId }: { studentId: string }) {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
-                  {['Term', 'Amount', 'Due Date', 'Paid', 'Status'].map(h => (
-                    <th key={h} className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-4 py-2.5">{h}</th>
+                  {['Term', 'Amount', 'Due Date', 'Paid', 'Status', ''].map(h => (
+                    <th key={h} className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-3 py-2.5">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {installments.map(inst => (
-                  <tr key={inst.id} className="hover:bg-gray-50/60 transition-colors">
-                    <td className="px-4 py-2.5 font-medium text-gray-800">{inst.termLabel}</td>
-                    <td className="px-4 py-2.5 font-semibold text-navy">₹{fmt(inst.amount)}</td>
-                    <td className="px-4 py-2.5 text-gray-500 text-xs">
-                      {new Date(inst.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </td>
-                    <td className="px-4 py-2.5 text-green font-semibold">
-                      {Number(inst.paidAmount) > 0 ? `₹${fmt(inst.paidAmount)}` : '—'}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <StatusBadge status={inst.status} />
-                      {Number(inst.lateFee) > 0 && (
-                        <span className="ml-1 text-[10px] text-coral">+₹{fmt(inst.lateFee)} late fee</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {installments.map(inst => {
+                  const canPay = (inst.status === 'OVERDUE' || inst.status === 'PENDING') && !account?.isLocked;
+                  const outstanding = Number(inst.amount) - Number(inst.paidAmount);
+                  return (
+                    <tr key={inst.id} className={`transition-colors ${inst.status === 'OVERDUE' ? 'bg-coral/3 hover:bg-coral/6' : 'hover:bg-gray-50/60'}`}>
+                      <td className="px-3 py-2.5 font-medium text-gray-800">{inst.termLabel}</td>
+                      <td className="px-3 py-2.5 font-semibold text-navy">{fmt(inst.amount)}</td>
+                      <td className="px-3 py-2.5 text-gray-500 text-xs whitespace-nowrap">
+                        {new Date(inst.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </td>
+                      <td className="px-3 py-2.5 text-green font-semibold">
+                        {Number(inst.paidAmount) > 0 ? fmt(inst.paidAmount) : '—'}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <StatusBadge status={inst.status} />
+                        {Number(inst.lateFee) > 0 && (
+                          <span className="ml-1 text-[10px] text-coral">+{fmt(inst.lateFee)} late</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        {canPay && outstanding > 0 && (
+                          <button
+                            onClick={() => setPaying({ installment: inst, defaultAmount: outstanding })}
+                            className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-gold text-navy rounded-lg hover:bg-gold/90 transition-colors whitespace-nowrap">
+                            <IndianRupee size={10} /> Pay
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -347,7 +493,7 @@ export default function StudentFeePanel({ studentId }: { studentId: string }) {
             {transactions.map(tx => (
               <div key={tx.id} className="flex items-center justify-between bg-white border border-gray-100 rounded-xl px-4 py-2.5">
                 <div>
-                  <p className="text-sm font-semibold text-green">₹{fmt(tx.amount)}</p>
+                  <p className="text-sm font-semibold text-green">{fmt(tx.amount)}</p>
                   <p className="text-[11px] text-gray-400">
                     {tx.paymentMode} · {new Date(tx.transactedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                     {tx.receiptNo && ` · ${tx.receiptNo}`}
@@ -360,6 +506,16 @@ export default function StudentFeePanel({ studentId }: { studentId: string }) {
         </div>
       )}
 
+      {/* Payment modal */}
+      {paying && account && (
+        <PaymentModal
+          accountId={account.id}
+          installment={paying.installment}
+          defaultAmount={paying.defaultAmount}
+          onClose={() => setPaying(null)}
+          onSuccess={load}
+        />
+      )}
     </div>
   );
 }

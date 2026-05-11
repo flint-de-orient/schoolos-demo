@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { requireSession, ok, err } from '@/lib/api-auth';
+import { refreshOverdueStatuses } from '@/lib/fee-overdue';
 
 export async function GET(
   _req: NextRequest,
@@ -8,6 +9,8 @@ export async function GET(
 ) {
   const { session, error } = await requireSession();
   if (error) return error;
+
+  await refreshOverdueStatuses(session.user.tenantId);
 
   const student = await db.student.findFirst({
     where: { id: params.id, tenantId: session.user.tenantId, deletedAt: null },
