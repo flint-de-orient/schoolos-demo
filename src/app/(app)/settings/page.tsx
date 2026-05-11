@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import PageWrapper from '@/components/layout/PageWrapper';
-import { Building, CalendarDays, ToggleLeft, Users, Bell, CreditCard, Plus, Pencil, Trash2, Check, Star, X, AlertTriangle, Plug, ChevronDown, ChevronUp, Eye, EyeOff, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Building, CalendarDays, ToggleLeft, Users, Bell, CreditCard, Plus, Pencil, Trash2, Check, Star, X, AlertTriangle, Plug, ChevronDown, ChevronUp, Eye, EyeOff, Loader2, CheckCircle2, AlertCircle, BookOpen, Palette } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAcademicYear } from '@/context/AcademicYearContext';
 import type { AcademicYear } from '@/context/AcademicYearContext';
@@ -54,7 +54,7 @@ const moduleGroups = [
   },
 ];
 
-type Tab = 'profile' | 'sessions' | 'modules' | 'roles' | 'notifications' | 'billing' | 'integrations';
+type Tab = 'profile' | 'sessions' | 'subjects' | 'modules' | 'roles' | 'notifications' | 'billing' | 'integrations';
 
 // ─── Integrations Tab ─────────────────────────────────────────────────────────
 
@@ -486,6 +486,239 @@ function IntegrationsTab() {
   );
 }
 
+// ─── Subjects tab ─────────────────────────────────────────────────────────────
+
+const SUBJECT_COLORS = [
+  '#1E2761', '#028090', '#534AB7', '#D85A30', '#3B6D11',
+  '#993556', '#BA7517', '#F5C542', '#0369a1', '#7c3aed',
+  '#be185d', '#065f46', '#9a3412', '#1e40af', '#4d7c0f',
+];
+
+type SubjectRow = {
+  id: string; name: string; code: string | null; colorHex: string | null;
+  isElective: boolean; isLanguage: boolean; isPractical: boolean;
+  _count: { teacherSubjects: number; timetableEntries: number };
+};
+
+function SubjectsTab() {
+  const [subjects, setSubjects] = useState<SubjectRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    name: '', code: '', colorHex: SUBJECT_COLORS[0],
+    isElective: false, isLanguage: false, isPractical: false,
+  });
+  const [search, setSearch] = useState('');
+
+  const load = async () => {
+    setLoading(true);
+    const res = await fetch('/api/hr/subjects');
+    const json = await res.json();
+    setSubjects(json.subjects ?? []);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const openNew = () => {
+    setEditId(null);
+    setForm({ name: '', code: '', colorHex: SUBJECT_COLORS[0], isElective: false, isLanguage: false, isPractical: false });
+    setShowForm(true);
+  };
+
+  const openEdit = (s: SubjectRow) => {
+    setEditId(s.id);
+    setForm({ name: s.name, code: s.code ?? '', colorHex: s.colorHex ?? SUBJECT_COLORS[0], isElective: s.isElective, isLanguage: s.isLanguage, isPractical: s.isPractical });
+    setShowForm(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.name.trim()) { toast.error('Subject name is required'); return; }
+    setSaving(true);
+    try {
+      const url = editId ? `/api/hr/subjects/${editId}` : '/api/hr/subjects';
+      const method = editId ? 'PATCH' : 'POST';
+      const res = await fetch(url, {
+        method, headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) { const d = await res.json(); toast.error(d.error || 'Failed'); return; }
+      await load();
+      setShowForm(false);
+      toast.success(editId ? 'Subject updated' : 'Subject created');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (s: SubjectRow) => {
+    if (s._count.teacherSubjects > 0 || s._count.timetableEntries > 0) {
+      toast.error('Cannot delete — subject is assigned to teachers or timetable');
+      return;
+    }
+    const res = await fetch(`/api/hr/subjects/${s.id}`, { method: 'DELETE' });
+    if (!res.ok) { const d = await res.json(); toast.error(d.error || 'Failed'); return; }
+    await load();
+    toast.success(`${s.name} deleted`);
+  };
+
+  const filtered = subjects.filter(s =>
+    s.name.toLowerCase().includes(search.toLowerCase()) ||
+    (s.code ?? '').toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+      <div className="flex items-center justify-between mb-1">
+        <div>
+          <h3 className="font-sora font-semibold text-navy">Subjects</h3>
+          <p className="text-xs text-gray-400 mt-0.5">Define all subjects taught in the school — used for timetable and teacher capability mapping</p>
+        </div>
+        <button onClick={openNew} className="flex items-center gap-1.5 px-3 py-2 bg-navy text-white text-xs font-semibold rounded-xl hover:bg-navyMid transition-colors">
+          <Plus className="w-3.5 h-3.5" /> Add Subject
+        </button>
+      </div>
+
+      {/* Search */}
+      <div className="relative mt-4 mb-4">
+        <input
+          value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Search subjects…"
+          className="w-full text-sm border border-gray-200 rounded-xl pl-4 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-navy/20"
+        />
+      </div>
+
+      {/* Add / Edit form */}
+      {showForm && (
+        <div className="bg-iceLight border border-ice rounded-2xl p-4 mb-4 space-y-3">
+          <p className="text-xs font-semibold text-navy">{editId ? 'Edit Subject' : 'New Subject'}</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide block mb-1">Name *</label>
+              <input
+                value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="e.g. Mathematics"
+                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-navy/20 bg-white"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide block mb-1">Short Code</label>
+              <input
+                value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))}
+                placeholder="e.g. MATH"
+                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-navy/20 bg-white"
+              />
+            </div>
+          </div>
+
+          {/* Color picker */}
+          <div>
+            <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide block mb-2">
+              <Palette className="w-3 h-3 inline mr-1" />Colour (shown in timetable)
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {SUBJECT_COLORS.map(c => (
+                <button
+                  key={c}
+                  onClick={() => setForm(f => ({ ...f, colorHex: c }))}
+                  className={`w-7 h-7 rounded-lg transition-transform ${form.colorHex === c ? 'ring-2 ring-offset-1 ring-navy scale-110' : 'hover:scale-105'}`}
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Flags */}
+          <div className="flex gap-4">
+            {([
+              { key: 'isElective', label: 'Elective' },
+              { key: 'isLanguage', label: 'Language' },
+              { key: 'isPractical', label: 'Has Practical' },
+            ] as const).map(({ key, label }) => (
+              <label key={key} className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={form[key]}
+                  onChange={e => setForm(f => ({ ...f, [key]: e.target.checked }))}
+                  className="w-3.5 h-3.5 accent-navy"
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+
+          <div className="flex gap-2">
+            <button onClick={() => setShowForm(false)} className="flex-1 py-2 text-xs font-semibold text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">Cancel</button>
+            <button onClick={handleSave} disabled={saving} className="flex-1 py-2 text-xs font-semibold bg-navy text-white rounded-xl hover:bg-navyMid transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5">
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              {editId ? 'Update' : 'Create Subject'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Subject list */}
+      {loading ? (
+        <div className="py-10 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-navy" /></div>
+      ) : filtered.length === 0 ? (
+        <div className="py-10 text-center text-gray-400">
+          <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-30" />
+          <p className="text-sm">{search ? 'No subjects match your search' : 'No subjects yet — click Add Subject to get started'}</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map(s => (
+            <div key={s.id} className="flex items-center gap-3 border border-gray-100 rounded-xl px-4 py-3 hover:border-gray-200 transition-colors group">
+              {/* Color dot */}
+              <div className="w-4 h-4 rounded-full flex-shrink-0 ring-2 ring-offset-1 ring-white" style={{ backgroundColor: s.colorHex ?? '#1E2761' }} />
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-sm text-gray-800">{s.name}</span>
+                  {s.code && <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-md font-mono">{s.code}</span>}
+                  {s.isElective && <span className="text-[9px] bg-purple/10 text-purple border border-purple/20 px-1.5 py-0.5 rounded-full font-semibold">Elective</span>}
+                  {s.isLanguage && <span className="text-[9px] bg-teal/10 text-teal border border-teal/20 px-1.5 py-0.5 rounded-full font-semibold">Language</span>}
+                  {s.isPractical && <span className="text-[9px] bg-amber/10 text-amber border border-amber/20 px-1.5 py-0.5 rounded-full font-semibold">Practical</span>}
+                </div>
+                <div className="text-[10px] text-gray-400 mt-0.5">
+                  {s._count.teacherSubjects} teacher{s._count.teacherSubjects !== 1 ? 's' : ''} assigned
+                  {s._count.timetableEntries > 0 && ` · ${s._count.timetableEntries} timetable entries`}
+                </div>
+              </div>
+              {/* Actions */}
+              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onClick={() => openEdit(s)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => handleDelete(s)}
+                  disabled={s._count.teacherSubjects > 0 || s._count.timetableEntries > 0}
+                  className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  title={s._count.teacherSubjects > 0 ? 'Cannot delete — assigned to teachers' : ''}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Summary footer */}
+      {!loading && subjects.length > 0 && (
+        <div className="mt-4 pt-3 border-t border-gray-100 flex gap-4 text-xs text-gray-500">
+          <span>{subjects.length} total subjects</span>
+          <span>{subjects.filter(s => !s.isElective).length} core</span>
+          <span>{subjects.filter(s => s.isElective).length} elective</span>
+          <span>{subjects.filter(s => s.isPractical).length} with practical</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Academic Sessions tab ─────────────────────────────────────────────────
 
 function AcademicSessionsTab() {
@@ -792,6 +1025,7 @@ export default function SettingsPage() {
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
     { id: 'profile',       label: 'School Profile',  icon: Building },
     { id: 'sessions',      label: 'Sessions',        icon: CalendarDays },
+    { id: 'subjects',      label: 'Subjects',        icon: BookOpen },
     { id: 'modules',       label: 'Modules',         icon: ToggleLeft },
     { id: 'roles',         label: 'User Roles',      icon: Users },
     { id: 'notifications', label: 'Notifications',   icon: Bell },
@@ -866,6 +1100,9 @@ export default function SettingsPage() {
               <AcademicSessionsTab />
             </div>
           )}
+
+          {/* Subjects */}
+          {activeTab === 'subjects' && <SubjectsTab />}
 
           {/* Module Activation */}
           {activeTab === 'modules' && (
