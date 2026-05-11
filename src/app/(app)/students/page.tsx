@@ -99,6 +99,8 @@ function StudentDrawer({ mode, student, grades, onClose, onSaved }: StudentDrawe
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [feeGuard, setFeeGuard] = useState<'idle' | 'checking' | 'ok' | 'missing'>('idle');
+  const [admNoMode, setAdmNoMode] = useState<'auto' | 'manual'>('auto');
+  const [admNoLoading, setAdmNoLoading] = useState(false);
 
   const availableSections = grades.find(g => g.id === form.gradeId)?.sections ?? [];
 
@@ -123,6 +125,24 @@ function StudentDrawer({ mode, student, grades, onClose, onSaved }: StudentDrawe
       }
     }
   }, [mode, student, grades]);
+
+  const fetchNextAdmNo = useCallback(async () => {
+    setAdmNoLoading(true);
+    try {
+      const res = await fetch('/api/students/next-admission-no');
+      if (res.ok) {
+        const data = await res.json();
+        setForm(f => ({ ...f, admissionNo: data.admissionNo ?? '' }));
+      }
+    } finally {
+      setAdmNoLoading(false);
+    }
+  }, []);
+
+  // Auto-fetch when drawer opens in add mode with auto mode selected
+  useEffect(() => {
+    if (mode === 'add' && admNoMode === 'auto') fetchNextAdmNo();
+  }, [mode, admNoMode, fetchNextAdmNo]);
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -188,11 +208,49 @@ function StudentDrawer({ mode, student, grades, onClose, onSaved }: StudentDrawe
 
         <div className="overflow-y-auto flex-1 p-5 space-y-4">
           {mode === 'add' && (
-            <Field label="Admission Number *" error={errors.admissionNo}>
-              <input type="text" placeholder="e.g. STU2025-001" value={form.admissionNo}
-                onChange={e => setForm(f => ({ ...f, admissionNo: e.target.value }))}
-                className={`w-full px-3 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 ${errors.admissionNo ? 'border-coral' : 'border-gray-200'}`} />
-            </Field>
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-gray-700">Student Code / Admission No. *</label>
+                <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setAdmNoMode('auto')}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors ${admNoMode === 'auto' ? 'bg-white text-navy shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                    Auto-generate
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAdmNoMode('manual')}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors ${admNoMode === 'manual' ? 'bg-white text-navy shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                    Manual
+                  </button>
+                </div>
+              </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder={admNoMode === 'auto' ? 'Generating...' : 'e.g. STU2025-001'}
+                  value={form.admissionNo}
+                  readOnly={admNoMode === 'auto'}
+                  onChange={admNoMode === 'manual' ? e => setForm(f => ({ ...f, admissionNo: e.target.value })) : undefined}
+                  className={`w-full px-3 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 pr-10 ${errors.admissionNo ? 'border-coral' : 'border-gray-200'} ${admNoMode === 'auto' ? 'bg-gray-50 text-gray-600 cursor-default' : ''}`}
+                />
+                {admNoMode === 'auto' && (
+                  <button
+                    type="button"
+                    onClick={fetchNextAdmNo}
+                    disabled={admNoLoading}
+                    title="Refresh suggestion"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-navy transition-colors disabled:opacity-40">
+                    <RefreshCw className={`w-3.5 h-3.5 ${admNoLoading ? 'animate-spin' : ''}`} />
+                  </button>
+                )}
+              </div>
+              {errors.admissionNo && <p className="text-xs text-coral mt-1">{errors.admissionNo}</p>}
+              {admNoMode === 'auto' && (
+                <p className="text-[10px] text-gray-400 mt-1">Suggested next number — click <RefreshCw className="w-2.5 h-2.5 inline" /> to regenerate</p>
+              )}
+            </div>
           )}
 
           <Field label="Student Name *" error={errors.name}>
