@@ -20,10 +20,8 @@ export async function POST(req: NextRequest) {
     data: { isCurrent: false },
   });
 
-  const year = await db.academicYear.upsert({
-    where: { tenantId_label: { tenantId: session.user.tenantId, label } },
-    update: { startDate: new Date(startDate), endDate: new Date(endDate), isCurrent: true },
-    create: {
+  const year = await db.academicYear.create({
+    data: {
       tenantId: session.user.tenantId,
       label,
       startDate: new Date(startDate),
