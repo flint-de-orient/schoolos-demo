@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   Plus, ChevronDown, Users, BookOpen, ToggleLeft, ToggleRight,
-  Check, X, Layers, AlertCircle, RefreshCw,
+  Check, X, Layers, AlertCircle, RefreshCw, Pencil,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -320,9 +320,11 @@ function GradeCard({
             {visibleSections.map((section) => (
               <SectionChip
                 key={section.id}
+                gradeId={grade.id}
                 section={section}
                 toggling={togglingId === section.id}
                 onToggle={() => toggleSection(section)}
+                onUpdate={onSectionUpdated}
               />
             ))}
           </div>
@@ -370,12 +372,76 @@ function GradeCard({
 // ─── Section Chip ──────────────────────────────────────────────────────────────
 
 function SectionChip({
-  section, toggling, onToggle,
+  gradeId, section, toggling, onToggle, onUpdate,
 }: {
+  gradeId: string;
   section: SectionData;
   toggling: boolean;
   onToggle: () => void;
+  onUpdate: (s: SectionData) => void;
 }) {
+  const [editMode, setEditMode] = useState(false);
+  const [nameVal, setNameVal] = useState(section.name);
+  const [roomVal, setRoomVal] = useState(section.roomNumber ?? '');
+  const [saving, setSaving] = useState(false);
+
+  function openEdit() {
+    setNameVal(section.name);
+    setRoomVal(section.roomNumber ?? '');
+    setEditMode(true);
+  }
+
+  async function saveEdit() {
+    if (!nameVal.trim()) return;
+    setSaving(true);
+    const res = await fetch(`/api/grades/${gradeId}/sections/${section.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: nameVal.trim(), roomNumber: roomVal.trim() }),
+    });
+    const data = await res.json();
+    setSaving(false);
+    if (!res.ok) { toast.error(data.error ?? 'Failed to update section'); return; }
+    onUpdate(data);
+    setEditMode(false);
+    toast.success('Section updated');
+  }
+
+  if (editMode) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-navy/30 bg-iceLight text-sm">
+        <input
+          autoFocus
+          value={nameVal}
+          onChange={(e) => setNameVal(e.target.value)}
+          placeholder="Name"
+          className="w-20 bg-white border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-navy/40 font-semibold"
+          onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
+        />
+        <input
+          value={roomVal}
+          onChange={(e) => setRoomVal(e.target.value)}
+          placeholder="Room no."
+          className="w-24 bg-white border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-navy/40"
+          onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
+        />
+        <button
+          onClick={saveEdit}
+          disabled={saving || !nameVal.trim()}
+          className="text-xs font-semibold px-2 py-1 rounded-lg bg-navy text-white hover:bg-navyMid disabled:opacity-50 flex items-center gap-1"
+        >
+          {saving ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+        </button>
+        <button
+          onClick={() => setEditMode(false)}
+          className="text-xs text-gray-400 hover:text-gray-600 px-1 py-1 rounded"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className={`group flex items-center gap-2 px-3 py-2 rounded-xl border text-sm transition-all ${
       section.isActive
@@ -387,6 +453,15 @@ function SectionChip({
       {section.roomNumber && (
         <span className="text-xs opacity-50">· {section.roomNumber}</span>
       )}
+      {/* Edit button — visible on hover */}
+      <button
+        onClick={openEdit}
+        title="Edit section"
+        className="opacity-0 group-hover:opacity-100 transition-opacity text-xs px-1 py-0.5 rounded text-navy/60 hover:text-navy hover:bg-navy/10"
+      >
+        <Pencil className="w-3 h-3" />
+      </button>
+      {/* Toggle active/inactive */}
       <button
         onClick={onToggle}
         disabled={toggling}
