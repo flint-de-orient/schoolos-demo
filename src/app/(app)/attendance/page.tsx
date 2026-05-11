@@ -28,6 +28,7 @@ interface SectionRow {
   absent: number;
   late: number;
   percent: number;
+  gateCount: number;
 }
 
 interface Absentee {
@@ -100,12 +101,13 @@ export default function AttendancePage() {
         const sessionRows: SectionRow[] = (data.sessions ?? []).map((s: {
           id: string;
           section: { id: string; name: string; grade: { name: string; displayOrder: number } };
-          records: { status: string }[];
+          records: { status: string; source?: string }[];
         }) => {
           const total = s.records.length;
           const present = s.records.filter(r => r.status === 'PRESENT').length;
           const late = s.records.filter(r => r.status === 'LATE').length;
           const absent = total - present - late;
+          const gateCount = s.records.filter(r => r.source === 'GATE_RFID' || r.source === 'GATE_FACE').length;
           return {
             sectionId: s.section.id,
             sectionName: s.section.name,
@@ -117,6 +119,7 @@ export default function AttendancePage() {
             absent,
             late,
             percent: total > 0 ? Math.round(((present + late) / total) * 100) : 0,
+            gateCount,
           };
         });
 
@@ -132,7 +135,7 @@ export default function AttendancePage() {
                   gradeName: g.name,
                   gradeOrder: 0,
                   sessionId: null,
-                  total: 0, present: 0, absent: 0, late: 0, percent: 0,
+                  total: 0, present: 0, absent: 0, late: 0, percent: 0, gateCount: 0,
                 });
               }
             }
@@ -265,9 +268,16 @@ export default function AttendancePage() {
                           <td className="px-4 py-3 font-semibold text-green">{row.present}</td>
                           <td className="px-4 py-3 font-semibold text-coral">{row.absent}</td>
                           <td className="px-4 py-3">
-                            <span className={`text-xs font-bold px-2 py-0.5 rounded-lg border ${pctBg(row.percent)} ${pctColor(row.percent)}`}>
-                              {row.percent}%
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className={`text-xs font-bold px-2 py-0.5 rounded-lg border ${pctBg(row.percent)} ${pctColor(row.percent)}`}>
+                                {row.percent}%
+                              </span>
+                              {row.gateCount > 0 && (
+                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-teal/10 text-teal" title="Auto-marked via Gate RFID">
+                                  RFID {row.gateCount}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="px-4 py-3 text-right">
                             {isToday && (

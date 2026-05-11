@@ -4,9 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import PageWrapper from '@/components/layout/PageWrapper';
 import { toast } from 'sonner';
 import {
-  Wifi, WifiOff, Plus, Trash2, Copy, Check, Monitor,
+  Wifi, Plus, Trash2, Copy, Check, Monitor,
   CreditCard, Users, ArrowRightCircle, ArrowLeftCircle,
-  RefreshCw, Shield, Smartphone, Eye, EyeOff,
+  RefreshCw, Shield, Smartphone, Eye, EyeOff, CalendarCheck,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -26,9 +26,12 @@ type StudentCard = {
 type GateEvent = {
   id: string; type: 'ENTRY' | 'EXIT'; rawUid: string | null; resolved: boolean;
   timestamp: string; scanMethod: string | null;
+  attendanceStatus: string | null;
   student: { id: string; name: string; admissionNo: string; grade: { name: string }; section: { name: string } } | null;
   gateDevice: { label: string; location: string | null; deviceType: string } | null;
 };
+
+type AttendanceSummary = { total: number; present: number; late: number };
 
 type Student = { id: string; name: string; admissionNo: string; grade: { name: string }; section: { name: string } };
 
@@ -75,6 +78,7 @@ export default function GatePage() {
 function LiveGateTab() {
   const [events, setEvents] = useState<GateEvent[]>([]);
   const [insideCount, setInsideCount] = useState(0);
+  const [attendance, setAttendance] = useState<AttendanceSummary>({ total: 0, present: 0, late: 0 });
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -83,13 +87,13 @@ function LiveGateTab() {
       const d = await res.json();
       setEvents(d.data?.events ?? []);
       setInsideCount(d.data?.insideCount ?? 0);
+      setAttendance(d.data?.attendanceSummary ?? { total: 0, present: 0, late: 0 });
     }
     setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  // Auto-refresh every 15s
   useEffect(() => {
     const t = setInterval(load, 15000);
     return () => clearInterval(t);
@@ -101,7 +105,7 @@ function LiveGateTab() {
 
   return (
     <div className="space-y-4">
-      {/* Stats */}
+      {/* Stats row 1 — gate counts */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: 'Currently Inside', value: insideCount, color: 'text-green', bg: 'bg-green/10', icon: <Users className="w-5 h-5" /> },
@@ -119,6 +123,33 @@ function LiveGateTab() {
         ))}
       </div>
 
+      {/* Attendance auto-mark summary */}
+      <div className="bg-teal/5 border border-teal/20 rounded-xl p-4 flex items-center gap-4">
+        <div className="w-10 h-10 rounded-xl bg-teal/10 text-teal flex items-center justify-center flex-shrink-0">
+          <CalendarCheck className="w-5 h-5" />
+        </div>
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-teal">Auto-Attendance via Gate RFID</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Attendance is automatically marked when a student&apos;s card is read for the first time each day.
+          </p>
+        </div>
+        <div className="flex items-center gap-6 text-center">
+          <div>
+            <p className="text-xl font-sora font-bold text-teal">{attendance.total}</p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wide">Marked</p>
+          </div>
+          <div>
+            <p className="text-xl font-sora font-bold text-green">{attendance.present}</p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wide">Present</p>
+          </div>
+          <div>
+            <p className="text-xl font-sora font-bold text-amber">{attendance.late}</p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wide">Late</p>
+          </div>
+        </div>
+      </div>
+
       {/* Event feed */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
@@ -131,7 +162,7 @@ function LiveGateTab() {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
-                {['Time', 'Student', 'Class', 'Event', 'Device', 'Status'].map(h => (
+                {['Time', 'Student', 'Class', 'Event', 'Attendance', 'Device', 'ID'].map(h => (
                   <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
@@ -139,10 +170,10 @@ function LiveGateTab() {
             <tbody className="divide-y divide-gray-50">
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i}><td colSpan={6} className="px-4 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
+                  <tr key={i}><td colSpan={7} className="px-4 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
                 ))
               ) : events.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">No gate events today</td></tr>
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-400">No gate events today</td></tr>
               ) : events.map(e => (
                 <tr key={e.id} className="hover:bg-gray-50/60 transition-colors">
                   <td className="px-4 py-3 text-xs font-mono text-gray-600">
@@ -164,10 +195,23 @@ function LiveGateTab() {
                       {e.type}
                     </span>
                   </td>
+                  <td className="px-4 py-3">
+                    {e.attendanceStatus ? (
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                        e.attendanceStatus === 'PRESENT' ? 'bg-green/10 text-green' :
+                        e.attendanceStatus === 'LATE' ? 'bg-amber/10 text-amber' :
+                        'bg-gray-100 text-gray-500'
+                      }`}>
+                        {e.attendanceStatus}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-300">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-xs text-gray-500">{e.gateDevice?.label ?? '—'}</td>
                   <td className="px-4 py-3">
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${e.resolved ? 'bg-green/10 text-green' : 'bg-coral/10 text-coral'}`}>
-                      {e.resolved ? 'Identified' : 'Unknown'}
+                      {e.resolved ? 'Known' : 'Unknown'}
                     </span>
                   </td>
                 </tr>

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { ok, err } from '@/lib/api-auth';
-import { GateEventType } from '@prisma/client';
+import { GateEventType, AttendanceSource } from '@prisma/client';
 import { notifyGateEvent } from '@/lib/notifications';
 
 /**
@@ -12,13 +12,9 @@ import { notifyGateEvent } from '@/lib/notifications';
  * Body:
  *   { uid?: string, faceId?: string, direction: "ENTRY"|"EXIT", timestamp?: string }
  *
- * Works for all three hardware types:
- *   HF_RFID  — uid is the card UID read at close range
- *   UHF_RFID — uid is the card UID read at gate antenna
- *   FACE_CAM — faceId is the person ID returned by the camera vendor
+ * On first ENTRY of the day for a resolved student, auto-marks AttendanceRecord.
  */
 export async function POST(req: NextRequest) {
-  // Authenticate device via Bearer token
   const authHeader = req.headers.get('authorization') ?? '';
   const deviceToken = authHeader.replace('Bearer ', '').trim();
   if (!deviceToken) return err('Authorization header required', 401);
@@ -29,7 +25,6 @@ export async function POST(req: NextRequest) {
   });
   if (!device || !device.isActive) return err('Device not found or inactive', 401);
 
-  // Update last seen
   await db.gateDevice.update({
     where: { id: device.id },
     data: { lastSeenAt: new Date() },
@@ -59,6 +54,7 @@ export async function POST(req: NextRequest) {
         select: {
           id: true,
           name: true,
+          sectionId: true,
           parents: {
             where: { isPrimary: true },
             take: 1,
@@ -87,6 +83,72 @@ export async function POST(req: NextRequest) {
       timestamp: tappedAt,
     },
   });
+
+  let attendanceMarked = false;
+  let attendanceStatus: string | null = null;
+
+  // Auto-mark attendance on first ENTRY of the day
+  if (resolved && card && direction === 'ENTRY') {
+    const todayStart = new Date(tappedAt);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(tappedAt);
+    todayEnd.setHours(23, 59, 59, 999);
+
+    // Check if attendance already marked today for this student (any session)
+    const existingRecord = await db.attendanceRecord.findFirst({
+      where: {
+        studentId: card.student.id,
+        session: { date: { gte: todayStart, lte: todayEnd } },
+      },
+    });
+
+    if (!existingRecord) {
+      // Determine PRESENT or LATE based on school settings
+      const settings = await db.tenantGateSettings.findUnique({ where: { tenantId } });
+      const schoolStartTime = settings?.schoolStartTime ?? '08:00';
+      const lateThresholdMins = settings?.lateThresholdMins ?? 15;
+
+      const [sh, sm] = schoolStartTime.split(':').map(Number);
+      const schoolStartMs = (sh * 60 + sm + lateThresholdMins) * 60 * 1000;
+      const tappedMs = (tappedAt.getHours() * 60 + tappedAt.getMinutes()) * 60 * 1000;
+      const status = tappedMs > schoolStartMs ? 'LATE' : 'PRESENT';
+
+      const source: AttendanceSource = faceId ? 'GATE_FACE' : 'GATE_RFID';
+
+      // Find or create today's whole-day session for this section
+      const dateOnly = new Date(todayStart);
+      const session = await db.attendanceSession.upsert({
+        where: {
+          sectionId_date_periodNo: {
+            sectionId: card.student.sectionId,
+            date: dateOnly,
+            periodNo: 0,
+          },
+        },
+        create: {
+          tenantId,
+          sectionId: card.student.sectionId,
+          date: dateOnly,
+          periodNo: 0,
+          markedAt: new Date(),
+        },
+        update: {},
+      });
+
+      await db.attendanceRecord.create({
+        data: {
+          sessionId: session.id,
+          studentId: card.student.id,
+          status: status === 'LATE' ? 'LATE' : 'PRESENT',
+          source,
+          markedAt: tappedAt,
+        },
+      });
+
+      attendanceMarked = true;
+      attendanceStatus = status;
+    }
+  }
 
   // Send notification if student identified
   if (resolved && card) {
@@ -123,5 +185,7 @@ export async function POST(req: NextRequest) {
     studentName: card?.student.name ?? null,
     direction,
     timestamp: tappedAt.toISOString(),
+    attendanceMarked,
+    attendanceStatus,
   });
 }

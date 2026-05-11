@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
         include: {
           student: { select: { id: true, name: true, rollNo: true, admissionNo: true } },
         },
+        orderBy: { markedAt: 'asc' },
       },
     },
     orderBy: { section: { grade: { displayOrder: 'asc' } } },
@@ -50,6 +51,7 @@ export async function GET(req: NextRequest) {
             include: {
               student: { select: { id: true, name: true, rollNo: true, admissionNo: true } },
             },
+            orderBy: { markedAt: 'asc' },
           },
         },
         orderBy: { section: { grade: { displayOrder: 'asc' } } },

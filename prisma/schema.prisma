@@ -100,6 +100,12 @@ enum AttendanceStatus {
   LEAVE
 }
 
+enum AttendanceSource {
+  MANUAL
+  GATE_RFID
+  GATE_FACE
+}
+
 enum GateEventType {
   ENTRY
   EXIT
@@ -1405,7 +1411,7 @@ model AttendanceSession {
   id          String   @id @default(cuid())
   tenantId    String
   sectionId   String
-  teacherId   String
+  teacherId   String?
   date        DateTime @db.Date
   periodNo    Int?
   isHoliday   Boolean  @default(false)
@@ -1424,6 +1430,7 @@ model AttendanceRecord {
   sessionId   String
   studentId   String
   status      AttendanceStatus @default(PRESENT)
+  source      AttendanceSource @default(MANUAL)
   reason      String?
   parentNotified Boolean      @default(false)
   markedAt    DateTime        @default(now())
