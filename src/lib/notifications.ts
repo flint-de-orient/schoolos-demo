@@ -112,3 +112,33 @@ export async function notifyFeeConfirmed(
     parentName
   );
 }
+
+// Gate entry/exit notification
+export async function notifyGateEvent(
+  tenantId: string,
+  parentPhone: string,
+  parentName: string,
+  studentName: string,
+  direction: 'ENTRY' | 'EXIT',
+  timestamp: Date,
+  deviceLabel: string,
+  channel: string,
+) {
+  const tenant = await getTenantInfo(tenantId);
+  if (!tenant) return;
+
+  const timeStr = timestamp.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const dateStr = timestamp.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  const action = direction === 'ENTRY' ? 'entered' : 'left';
+  const emoji = direction === 'ENTRY' ? '🏫' : '🚪';
+
+  // Use WhatsApp for WHATSAPP or BOTH
+  if (channel === 'WHATSAPP' || channel === 'BOTH') {
+    await sendWhatsAppTemplate(
+      tenantId, parentPhone, 'gate_event_notification',
+      [tenant.name, parentName, emoji, studentName, action, tenant.name, timeStr, dateStr, deviceLabel],
+      undefined,
+      parentName
+    );
+  }
+}

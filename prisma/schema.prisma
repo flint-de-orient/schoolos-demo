@@ -107,6 +107,26 @@ enum GateEventType {
   BUS_ALIGHTING
 }
 
+enum DeviceType {
+  UHF_RFID
+  HF_RFID
+  FACE_CAM
+}
+
+enum GateNotifyChannel {
+  WHATSAPP
+  SMS
+  BOTH
+  NONE
+}
+
+enum GateNotifyTrigger {
+  ENTRY
+  EXIT
+  BOTH
+  NONE
+}
+
 enum CertificateType {
   TRANSFER
   BONAFIDE
@@ -329,6 +349,8 @@ model Tenant {
   communications  Communication[]
   ptmSessions     PTMSession[]
   gateDevices     GateDevice[]
+  studentCards    StudentCard[]
+  gateSettings    TenantGateSettings?
   biometricIntegrations BiometricIntegration[]
   interviewSchedules   InterviewSchedule[]
   interviewSlotConfig  InterviewSlotConfig?
@@ -766,6 +788,7 @@ model Student {
   attendanceRecords AttendanceRecord[]
   bookIssues   BookIssue[]
   gateEvents   GateEvent[]
+  studentCards StudentCard[]
   markEntries  MarkEntry[]
   healthLogs   NurseLog[]
   idCard       IDCard?
@@ -1413,18 +1436,21 @@ model AttendanceRecord {
 }
 
 model GateEvent {
-  id          String       @id @default(cuid())
+  id          String        @id @default(cuid())
   tenantId    String
-  studentId   String
+  studentId   String?
   type        GateEventType
-  deviceId    String?
+  gateDeviceId String?
+  rawUid      String?
+  resolved    Boolean       @default(false)
   scanMethod  String?
   lat         Float?
   lng         Float?
-  timestamp   DateTime     @default(now())
+  timestamp   DateTime      @default(now())
   busRouteId  String?
 
-  student Student @relation(fields: [studentId], references: [id])
+  student    Student?    @relation(fields: [studentId], references: [id])
+  gateDevice GateDevice? @relation(fields: [gateDeviceId], references: [id])
 
   @@index([tenantId, timestamp])
   @@index([studentId])
@@ -1446,18 +1472,53 @@ model ParentPickupOTP {
 }
 
 model GateDevice {
-  id          String   @id @default(cuid())
-  tenantId    String
-  deviceId    String
-  label       String
-  location    String?
-  isActive    Boolean  @default(true)
-  lastSeenAt  DateTime?
-  registeredAt DateTime @default(now())
+  id           String     @id @default(cuid())
+  tenantId     String
+  deviceId     String
+  label        String
+  location     String?
+  deviceType   DeviceType @default(HF_RFID)
+  deviceToken  String     @unique @default(cuid())
+  isActive     Boolean    @default(true)
+  lastSeenAt   DateTime?
+  registeredAt DateTime   @default(now())
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  tenant     Tenant       @relation(fields: [tenantId], references: [id])
+  gateEvents GateEvent[]
 
   @@unique([tenantId, deviceId])
+}
+
+model StudentCard {
+  id         String     @id @default(cuid())
+  tenantId   String
+  studentId  String
+  cardUid    String?
+  faceId     String?
+  deviceType DeviceType
+  isActive   Boolean    @default(true)
+  assignedAt DateTime   @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@unique([tenantId, cardUid])
+  @@unique([tenantId, faceId])
+  @@index([tenantId])
+}
+
+model TenantGateSettings {
+  id              String             @id @default(cuid())
+  tenantId        String             @unique
+  notifyTrigger   GateNotifyTrigger  @default(BOTH)
+  notifyChannel   GateNotifyChannel  @default(WHATSAPP)
+  schoolStartTime String             @default("08:00")
+  schoolEndTime   String             @default("15:00")
+  lateThresholdMins Int              @default(15)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
 }
 
 model BiometricIntegration {

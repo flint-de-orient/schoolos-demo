@@ -7,7 +7,7 @@ import {
   FileText, CreditCard, Library, Bus, Heart, Users,
   Smartphone, ShoppingBag, Brain, BarChart3, Settings,
   Sparkles, GraduationCap, ChevronRight, BookUser, IdCard, Globe,
-  LogOut, Bell, Layers,
+  LogOut, Bell, Layers, ScanLine,
 } from 'lucide-react';
 import { useTenantSafe } from '@/context/TenantContext';
 import { signOut } from 'next-auth/react';
@@ -30,6 +30,7 @@ const allNavGroups = [
       { moduleId: 'examinations', href: '/examinations', label: 'Examinations',        icon: FileText },
       { moduleId: 'transport',    href: '/transport',    label: 'Transport',           icon: Bus },
       { moduleId: 'health',       href: '/health',       label: 'Health',              icon: Heart },
+      { moduleId: 'gate',         href: '/gate',         label: 'Gate & RFID',         icon: ScanLine },
     ],
   },
   {

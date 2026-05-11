@@ -132,6 +132,113 @@ const PROVIDERS: ProviderDef[] = [
   },
 ];
 
+// ─── Gate Notification Settings ───────────────────────────────────────────────
+
+function GateNotificationSettings() {
+  const [settings, setSettings] = useState({
+    notifyTrigger: 'BOTH' as string,
+    notifyChannel: 'WHATSAPP' as string,
+    schoolStartTime: '08:00',
+    schoolEndTime: '15:00',
+    lateThresholdMins: 15,
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/gate/settings').then(r => r.json()).then(d => {
+      if (d.data) setSettings(s => ({ ...s, ...d.data }));
+      setLoading(false);
+    });
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    const res = await fetch('/api/gate/settings', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    });
+    setSaving(false);
+    if (res.ok) toast.success('Gate notification settings saved');
+    else toast.error('Failed to save settings');
+  };
+
+  if (loading) return <div className="h-40 bg-gray-100 rounded-xl animate-pulse" />;
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="font-sora font-semibold text-navy">Gate & RFID — Parent Notifications</h3>
+          <p className="text-xs text-gray-400 mt-0.5">Choose when and how parents are notified when their child enters or exits school via RFID / face recognition.</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Trigger */}
+        <div>
+          <label className="text-xs font-semibold text-gray-600 mb-2 block">Notify parents on</label>
+          <div className="grid grid-cols-2 gap-2">
+            {([['ENTRY', 'Entry only'], ['EXIT', 'Exit only'], ['BOTH', 'Entry & Exit'], ['NONE', 'Disabled']] as const).map(([val, label]) => (
+              <button key={val} onClick={() => setSettings(s => ({ ...s, notifyTrigger: val }))}
+                className={`px-3 py-2.5 text-sm font-semibold rounded-xl border-2 transition-colors text-left ${settings.notifyTrigger === val ? 'border-navy bg-navy text-white' : 'border-gray-200 text-gray-600 hover:border-navy/30'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Channel */}
+        <div>
+          <label className="text-xs font-semibold text-gray-600 mb-2 block">Notification channel</label>
+          <div className="grid grid-cols-1 gap-2">
+            {([['WHATSAPP', 'WhatsApp only'], ['SMS', 'SMS only'], ['BOTH', 'WhatsApp + SMS'], ['NONE', 'No notifications']] as const).map(([val, label]) => (
+              <button key={val} onClick={() => setSettings(s => ({ ...s, notifyChannel: val }))}
+                className={`px-3 py-2 text-sm font-semibold rounded-xl border-2 transition-colors text-left ${settings.notifyChannel === val ? 'border-teal bg-teal/10 text-teal' : 'border-gray-200 text-gray-600 hover:border-teal/30'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* School times */}
+        <div>
+          <label className="text-xs font-semibold text-gray-600 mb-2 block">School start time</label>
+          <input type="time" value={settings.schoolStartTime}
+            onChange={e => setSettings(s => ({ ...s, schoolStartTime: e.target.value }))}
+            className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20" />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-gray-600 mb-2 block">School end time</label>
+          <input type="time" value={settings.schoolEndTime}
+            onChange={e => setSettings(s => ({ ...s, schoolEndTime: e.target.value }))}
+            className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20" />
+        </div>
+
+        {/* Late threshold */}
+        <div className="md:col-span-2">
+          <label className="text-xs font-semibold text-gray-600 mb-2 block">
+            Late arrival threshold: <span className="text-navy">{settings.lateThresholdMins} minutes</span> after school start
+          </label>
+          <input type="range" min={0} max={60} value={settings.lateThresholdMins}
+            onChange={e => setSettings(s => ({ ...s, lateThresholdMins: Number(e.target.value) }))}
+            className="w-full accent-navy" />
+          <div className="flex justify-between text-[10px] text-gray-400 mt-0.5">
+            <span>0 min (exact)</span><span>30 min</span><span>60 min</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-5 pt-4 border-t border-gray-100">
+        <button onClick={save} disabled={saving}
+          className="px-5 py-2.5 bg-navy text-white text-sm font-semibold rounded-xl hover:bg-navy/90 disabled:opacity-60 transition-colors">
+          {saving ? 'Saving…' : 'Save Gate Settings'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function IntegrationsTab() {
   const [rows, setRows]       = useState<IntegrationRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -821,30 +928,33 @@ export default function SettingsPage() {
 
           {/* Notifications */}
           {activeTab === 'notifications' && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-              <h3 className="font-sora font-semibold text-navy mb-4">Notification Channels</h3>
-              <div className="space-y-3">
-                {[
-                  { name: 'WhatsApp Alerts', desc: 'Attendance, fee reminders, emergency', enabled: true },
-                  { name: 'Email Reports', desc: 'Daily summary, weekly analytics', enabled: true },
-                  { name: 'SMS (Bulk)', desc: 'Critical alerts only', enabled: true },
-                  { name: 'In-App Push', desc: 'Real-time notifications in parent app', enabled: false },
-                  { name: 'Daily Summary Email', desc: 'End-of-day report to principal', enabled: false },
-                ].map((n, i) => (
-                  <div key={n.name} className="flex items-center justify-between p-3 rounded-xl border border-gray-100">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-700">{n.name}</p>
-                      <p className="text-[11px] text-gray-400">{n.desc}</p>
+            <div className="space-y-5">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                <h3 className="font-sora font-semibold text-navy mb-4">Notification Channels</h3>
+                <div className="space-y-3">
+                  {[
+                    { name: 'WhatsApp Alerts', desc: 'Attendance, fee reminders, emergency', enabled: true },
+                    { name: 'Email Reports', desc: 'Daily summary, weekly analytics', enabled: true },
+                    { name: 'SMS (Bulk)', desc: 'Critical alerts only', enabled: true },
+                    { name: 'In-App Push', desc: 'Real-time notifications in parent app', enabled: false },
+                    { name: 'Daily Summary Email', desc: 'End-of-day report to principal', enabled: false },
+                  ].map((n) => (
+                    <div key={n.name} className="flex items-center justify-between p-3 rounded-xl border border-gray-100">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-700">{n.name}</p>
+                        <p className="text-[11px] text-gray-400">{n.desc}</p>
+                      </div>
+                      <button
+                        onClick={() => toast.success(`${n.name} ${n.enabled ? 'disabled' : 'enabled'}`)}
+                        className={`w-10 h-5 rounded-full relative transition-colors flex-shrink-0 ${n.enabled ? 'bg-teal' : 'bg-gray-200'}`}
+                      >
+                        <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${n.enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => toast.success(`${n.name} ${n.enabled ? 'disabled' : 'enabled'}`)}
-                      className={`w-10 h-5 rounded-full relative transition-colors flex-shrink-0 ${n.enabled ? 'bg-teal' : 'bg-gray-200'}`}
-                    >
-                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${n.enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                    </button>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
+              <GateNotificationSettings />
             </div>
           )}
 
