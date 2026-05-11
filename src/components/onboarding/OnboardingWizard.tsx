@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signIn } from 'next-auth/react';
 import { toast } from 'sonner';
 import {
   School, CalendarDays, BookOpen, CheckCircle2,
@@ -169,11 +168,8 @@ export default function OnboardingWizard({ tenant }: { tenant: TenantData }) {
   const completeOnboarding = async () => {
     setLoading(true);
     await fetch('/api/onboarding/complete', { method: 'POST' });
-    // Force session refresh by re-signing in
-    await signIn('credentials', { redirect: false });
     setLoading(false);
-    router.push('/dashboard');
-    router.refresh();
+    window.location.href = '/dashboard';
   };
 
   return (
