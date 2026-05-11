@@ -7,7 +7,7 @@ import {
   FileText, CreditCard, Library, Bus, Heart, Users,
   Smartphone, ShoppingBag, Brain, BarChart3, Settings,
   Sparkles, GraduationCap, ChevronRight, BookUser, IdCard, Globe,
-  LogOut, Bell,
+  LogOut, Bell, Layers,
 } from 'lucide-react';
 import { useTenantSafe } from '@/context/TenantContext';
 import { signOut } from 'next-auth/react';
@@ -35,9 +35,10 @@ const allNavGroups = [
   {
     label: 'Learning',
     items: [
-      { moduleId: 'academics',    href: '/academics',    label: 'Academics',           icon: GraduationCap },
-      { moduleId: 'exam_engine',  href: '/exam-engine',  label: 'Exam Engine',         icon: FileText, ai: true as const },
-      { moduleId: 'library',      href: '/library',      label: 'Library',             icon: Library },
+      { moduleId: 'academics',    href: '/academics',         label: 'Academics',           icon: GraduationCap },
+      { moduleId: 'academics',    href: '/academics/classes', label: 'Classes & Sections',  icon: Layers },
+      { moduleId: 'exam_engine',  href: '/exam-engine',       label: 'Exam Engine',         icon: FileText, ai: true as const },
+      { moduleId: 'library',      href: '/library',           label: 'Library',             icon: Library },
     ],
   },
   {

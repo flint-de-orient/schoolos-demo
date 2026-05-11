@@ -447,6 +447,7 @@ model Grade {
   displayOrder   Int
   board          Board
   isExamClass    Boolean  @default(false)
+  isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
 
   tenant       Tenant       @relation(fields: [tenantId], references: [id])
@@ -472,6 +473,7 @@ model Section {
   classTeacherId String?
   roomNumber     String?
   strength       Int      @default(0)
+  isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
 
   tenant         Tenant       @relation(fields: [tenantId], references: [id])
