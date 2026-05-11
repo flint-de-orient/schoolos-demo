@@ -309,8 +309,24 @@ export default function FeePage() {
               }
             }}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-purple/40 text-purple rounded-lg hover:bg-purple/5 transition-colors"
-            title="Re-run fee plan assignment for students who have no fee account yet">
+            title="Create fee accounts for students who don't have one yet">
             <RefreshCw className="w-3.5 h-3.5" /> Sync Accounts
+          </button>
+          <button
+            onClick={async () => {
+              toast.info('Recalculating balances…');
+              const res = await fetch('/api/fee/recalculate', { method: 'POST' });
+              const d = await res.json().catch(() => ({}));
+              if (res.ok) {
+                toast.success(`Balances fixed for ${d.fixed ?? 0} account(s)`);
+                loadAll();
+              } else {
+                toast.error(d.error ?? 'Recalculate failed');
+              }
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-teal/50 text-teal rounded-lg hover:bg-teal/5 transition-colors"
+            title="Recompute totalDue/balance/status from actual installments">
+            <RefreshCw className="w-3.5 h-3.5" /> Fix Balances
           </button>
           {(activeTab === 'overview' || activeTab === 'records') && (
             <button onClick={bulkRemind}

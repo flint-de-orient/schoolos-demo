@@ -108,15 +108,6 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const newPaid = Number(account.totalPaid) + Number(amount);
-    const newBalance = Number(account.totalDue) - newPaid;
-    const newStatus: FeeStatus = newBalance <= 0 ? 'PAID' : 'PENDING';
-
-    await tx.feeAccount.update({
-      where: { id: feeAccountId },
-      data: { totalPaid: newPaid, balance: newBalance > 0 ? newBalance : 0, status: newStatus },
-    });
-
     // Mark each selected installment as PAID
     if (instIds.length > 0) {
       for (const iId of instIds) {
@@ -129,6 +120,23 @@ export async function POST(req: NextRequest) {
         }
       }
     }
+
+    // Recompute account totals from installments (ground truth — avoids stale totalDue)
+    const allInst = await tx.feeInstallment.findMany({
+      where: { feeAccountId },
+      select: { amount: true, paidAmount: true, status: true },
+    });
+    const totalDue  = allInst.reduce((s, i) => s + Number(i.amount), 0);
+    const totalPaid = allInst.reduce((s, i) => s + Number(i.paidAmount), 0);
+    const balance   = Math.max(0, totalDue - totalPaid);
+    const allPaid   = allInst.length > 0 && allInst.every(i => i.status === 'PAID' || i.status === 'WAIVED');
+    const hasOverdue = allInst.some(i => i.status === 'OVERDUE');
+    const newStatus: FeeStatus = allPaid ? 'PAID' : hasOverdue ? 'OVERDUE' : 'PENDING';
+
+    await tx.feeAccount.update({
+      where: { id: feeAccountId },
+      data: { totalDue, totalPaid, balance, status: newStatus },
+    });
 
     return t;
   });
