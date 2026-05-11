@@ -53,6 +53,7 @@ export async function PUT(
 
   const student = await db.student.findFirst({
     where: { id: params.id, tenantId: session.user.tenantId, deletedAt: null },
+    include: { parents: { where: { isPrimary: true }, take: 1 } },
   });
   if (!student) return err('Student not found', 404);
 
@@ -79,6 +80,45 @@ export async function PUT(
       section: { select: { name: true } },
     },
   });
+
+  // Upsert parent data if provided
+  const { fatherName, motherName, phone, email, occupation } = body;
+  if (fatherName !== undefined || motherName !== undefined || phone !== undefined) {
+    const existingLink = student.parents[0];
+    if (existingLink) {
+      // Update the existing primary parent record
+      await db.parent.update({
+        where: { id: existingLink.parentId },
+        data: {
+          ...(fatherName !== undefined && { fatherName: fatherName || null }),
+          ...(motherName !== undefined && { motherName: motherName || null }),
+          ...(phone && { phone }),
+          ...(email !== undefined && { email: email || null }),
+          ...(occupation !== undefined && { occupation: occupation || null }),
+        },
+      });
+    } else if (fatherName || motherName || phone) {
+      // No parent yet — create one
+      const parent = await db.parent.create({
+        data: {
+          tenantId: session.user.tenantId,
+          fatherName: fatherName || null,
+          motherName: motherName || null,
+          phone: phone || '0000000000',
+          email: email || null,
+          occupation: occupation || null,
+        },
+      });
+      await db.studentParent.create({
+        data: {
+          studentId: params.id,
+          parentId: parent.id,
+          relation: fatherName ? 'Father' : 'Mother',
+          isPrimary: true,
+        },
+      });
+    }
+  }
 
   return ok(updated);
 }
