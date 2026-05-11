@@ -1326,8 +1326,8 @@ export default function HRPage() {
               {/* KPI cards */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
-                  { label: 'Avg Tenure', value: `${Math.round(staffList.reduce((s, x) => s + (new Date().getFullYear() - new Date(x.joiningDate).getFullYear()), 0) / staffList.length)} yrs`, icon: Star, color: 'text-gold' },
-                  { label: 'Avg Salary', value: `₹${Math.round(staffList.reduce((s, x) => s + x.salary, 0) / staffList.length / 1000)}k`, icon: DollarSign, color: 'text-green' },
+                  { label: 'Avg Tenure', value: staffList.length ? `${Math.round(staffList.reduce((s, x) => s + (new Date().getFullYear() - new Date(x.joiningDate).getFullYear()), 0) / staffList.length)} yrs` : '— yrs', icon: Star, color: 'text-gold' },
+                  { label: 'Avg Salary', value: staffList.length ? `₹${Math.round(staffList.reduce((s, x) => s + x.salary, 0) / staffList.length / 1000)}k` : '₹—', icon: DollarSign, color: 'text-green' },
                   { label: 'Qualified Teachers', value: staffList.filter(s => s.qualification.includes('B.Ed') || s.qualification.includes('M.Ed') || s.qualification.includes('PhD')).length, icon: Award, color: 'text-teal' },
                   { label: 'Departments', value: new Set(staffList.map(s => s.department)).size, icon: Building2, color: 'text-purple' },
                 ].map(stat => {
@@ -1346,10 +1346,12 @@ export default function HRPage() {
               <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5">
                 <h3 className="font-sora font-semibold text-navy text-sm mb-4">Top Earners</h3>
                 <div className="space-y-2.5">
+                  {staffList.length === 0 && <p className="text-xs text-gray-400 text-center py-4">No staff records yet</p>}
                   {[...staffList].sort((a, b) => b.salary - a.salary).slice(0, 5).map((s, i) => {
                     const net = s.salary + Math.round(s.salary * 0.2) - Math.round(s.salary * 0.12);
-                    const maxNet = staffList[0].salary + Math.round(staffList[0].salary * 0.2) - Math.round(staffList[0].salary * 0.12);
-                    const pct = Math.round((net / maxNet) * 100);
+                    const topSalary = staffList[0]?.salary ?? s.salary;
+                    const maxNet = topSalary + Math.round(topSalary * 0.2) - Math.round(topSalary * 0.12);
+                    const pct = maxNet > 0 ? Math.round((net / maxNet) * 100) : 0;
                     return (
                       <div key={s.id} className="flex items-center gap-3">
                         <span className="text-xs font-bold text-gray-400 w-4">{i + 1}</span>
