@@ -17,21 +17,27 @@ export async function POST() {
     select: { id: true },
   });
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   let fixed = 0;
 
   for (const { id } of accounts) {
     const installments = await db.feeInstallment.findMany({
       where: { feeAccountId: id },
-      select: { amount: true, paidAmount: true, status: true },
+      select: { amount: true, paidAmount: true, status: true, dueDate: true },
     });
 
     if (installments.length === 0) continue;
 
+    const raised     = installments.filter(i => i.dueDate <= today);
     const totalDue   = installments.reduce((s, i) => s + Number(i.amount), 0);
     const totalPaid  = installments.reduce((s, i) => s + Number(i.paidAmount), 0);
-    const balance    = Math.max(0, totalDue - totalPaid);
+    const balance    = raised
+      .filter(i => i.status !== 'PAID' && i.status !== 'WAIVED')
+      .reduce((s, i) => s + Number(i.amount), 0);
     const allPaid    = installments.every(i => i.status === 'PAID' || i.status === 'WAIVED');
-    const hasOverdue = installments.some(i => i.status === 'OVERDUE');
+    const hasOverdue = raised.some(i => i.status === 'OVERDUE');
     const status: FeeStatus = allPaid ? 'PAID' : hasOverdue ? 'OVERDUE' : 'PENDING';
 
     await db.feeAccount.update({

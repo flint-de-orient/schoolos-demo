@@ -121,16 +121,24 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Recompute account totals from installments (ground truth — avoids stale totalDue)
+    // Recompute account totals from installments (ground truth).
+    // balance = only unpaid raised installments (dueDate ≤ today).
+    // Future months exist in DB for scheduling but are not yet demanded.
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     const allInst = await tx.feeInstallment.findMany({
       where: { feeAccountId },
-      select: { amount: true, paidAmount: true, status: true },
+      select: { amount: true, paidAmount: true, status: true, dueDate: true },
     });
+    const raised    = allInst.filter(i => i.dueDate <= today);
     const totalDue  = allInst.reduce((s, i) => s + Number(i.amount), 0);
     const totalPaid = allInst.reduce((s, i) => s + Number(i.paidAmount), 0);
-    const balance   = Math.max(0, totalDue - totalPaid);
-    const allPaid   = allInst.length > 0 && allInst.every(i => i.status === 'PAID' || i.status === 'WAIVED');
-    const hasOverdue = allInst.some(i => i.status === 'OVERDUE');
+    const balance   = raised
+      .filter(i => i.status !== 'PAID' && i.status !== 'WAIVED')
+      .reduce((s, i) => s + Number(i.amount), 0);
+    const allPaid    = allInst.length > 0 && allInst.every(i => i.status === 'PAID' || i.status === 'WAIVED');
+    const hasOverdue = raised.some(i => i.status === 'OVERDUE');
     const newStatus: FeeStatus = allPaid ? 'PAID' : hasOverdue ? 'OVERDUE' : 'PENDING';
 
     await tx.feeAccount.update({
