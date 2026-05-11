@@ -6,6 +6,7 @@ export function middleware(req: NextRequest) {
   // Public routes that don't need auth
   if (
     pathname.startsWith('/login') ||
+    pathname.startsWith('/onboarding') ||
     pathname.startsWith('/privacy') ||
     pathname.startsWith('/terms') ||
     pathname.startsWith('/api/auth') ||

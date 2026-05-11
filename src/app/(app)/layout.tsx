@@ -6,5 +6,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const session = await auth();
   if (!session?.user) redirect('/login');
   if (session.user.role === 'SUPER_ADMIN') redirect('/superadmin/tenants');
+  if (!session.user.tenant.isOnboarded) redirect('/onboarding');
   return <TenantShell tenant={session.user.tenant}>{children}</TenantShell>;
 }

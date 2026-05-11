@@ -55,6 +55,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           modules: user.tenant.modules
             .filter((m) => m.isActive)
             .map((m) => m.module as string),
+          isOnboarded: user.tenant.isOnboarded,
         };
 
         return {

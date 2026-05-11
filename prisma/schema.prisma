@@ -290,8 +290,9 @@ model Tenant {
   headName    String
   timezone    String  @default("Asia/Kolkata")
   locale      Language @default(en)
-  isActive    Boolean @default(true)
-  trialEndsAt DateTime?
+  isActive      Boolean @default(true)
+  isOnboarded   Boolean @default(false)
+  trialEndsAt   DateTime?
   plan        String  @default("growth")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

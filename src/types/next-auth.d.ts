@@ -12,6 +12,7 @@ export interface SessionTenant {
   headTitle: string;
   headName: string;
   modules: string[];
+  isOnboarded: boolean;
 }
 
 declare module 'next-auth' {
