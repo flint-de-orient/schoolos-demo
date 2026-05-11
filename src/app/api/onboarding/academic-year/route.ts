@@ -20,15 +20,18 @@ export async function POST(req: NextRequest) {
     data: { isCurrent: false },
   });
 
-  const year = await db.academicYear.create({
-    data: {
-      tenantId: session.user.tenantId,
-      label,
-      startDate: new Date(startDate),
-      endDate: new Date(endDate),
-      isCurrent: true,
-    },
-  });
-
-  return ok(year, 201);
+  try {
+    const year = await db.academicYear.create({
+      data: {
+        tenantId: session.user.tenantId,
+        label,
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+        isCurrent: true,
+      },
+    });
+    return ok(year, 201);
+  } catch (e) {
+    return err(e instanceof Error ? e.message : 'Failed to create academic year', 500);
+  }
 }

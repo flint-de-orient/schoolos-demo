@@ -42,28 +42,35 @@ const STEPS = [
   { label: 'Done',           icon: CheckCircle2 },
 ];
 
-export default function OnboardingWizard({
-  tenantName,
-  tenantBoard,
-}: {
-  tenantName: string;
-  tenantBoard: string;
-}) {
+interface TenantData {
+  name: string;
+  shortName: string;
+  board: string;
+  phone: string | null;
+  address: string | null;
+  city: string;
+  state: string;
+  website: string | null;
+  headTitle: string;
+  headName: string;
+}
+
+export default function OnboardingWizard({ tenant }: { tenant: TenantData }) {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  // Step 1 — School Profile
+  // Step 1 — School Profile (pre-filled from superadmin creation)
   const [profile, setProfile] = useState({
-    name:       tenantName,
-    shortName:  '',
-    phone:      '',
-    address:    '',
-    city:       '',
-    state:      '',
-    website:    '',
-    headTitle:  'Principal',
-    headName:   '',
+    name:      tenant.name,
+    shortName: tenant.shortName ?? '',
+    phone:     tenant.phone ?? '',
+    address:   tenant.address ?? '',
+    city:      tenant.city ?? '',
+    state:     tenant.state ?? '',
+    website:   tenant.website ?? '',
+    headTitle: tenant.headTitle ?? 'Principal',
+    headName:  tenant.headName ?? '',
   });
 
   // Step 2 — Academic Year
@@ -133,7 +140,7 @@ export default function OnboardingWizard({
     setLoading(false);
     const data = await res.json();
     if (!res.ok) { toast.error(data.error ?? 'Failed to create academic year'); return; }
-    setAcademicYearId(data.data.id);
+    setAcademicYearId(data.id);
     setStep(2);
   };
 
@@ -387,7 +394,7 @@ export default function OnboardingWizard({
             <div>
               <h2 className="text-2xl font-sora font-semibold text-navy">You&apos;re all set!</h2>
               <p className="text-sm text-gray-500 mt-2">
-                <strong>{profile.name}</strong> is ready to go. Your dashboard, fee module, attendance, and all other modules are now active.
+                <strong>{profile.name || tenant.name}</strong> is ready to go. Your dashboard, fee module, attendance, and all other modules are now active.
               </p>
             </div>
             <div className="bg-iceLight rounded-xl p-4 text-left space-y-2">
@@ -414,7 +421,7 @@ export default function OnboardingWizard({
       </div>
 
       <p className="text-center text-ice/40 text-xs mt-6">
-        SchoolOS · Powered by Flint De Orient · {tenantBoard} Board
+        SchoolOS · Powered by Flint De Orient · {tenant.board} Board
       </p>
     </div>
   );
