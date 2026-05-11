@@ -506,7 +506,7 @@ function ActionsMenu({ student, onEdit, onPromote, onToggleActive, onDelete }: A
   return (
     <div className="relative">
       <button onClick={() => setOpen(o => !o)}
-        className="w-7 h-7 flex items-center justify-center text-gray-600 hover:text-navy hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors">
+        className="w-8 h-8 flex items-center justify-center text-gray-700 bg-gray-100 hover:bg-gray-200 hover:text-navy rounded-lg transition-colors">
         <MoreVertical className="w-4 h-4" />
       </button>
       {open && (
