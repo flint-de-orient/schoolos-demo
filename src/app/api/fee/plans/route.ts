@@ -6,12 +6,17 @@ export async function GET(req: NextRequest) {
   const { session, error } = await requireSession();
   if (error) return error;
 
-  const academicYearId = req.nextUrl.searchParams.get('academicYearId') ?? undefined;
+  const { searchParams } = req.nextUrl;
+  const academicYearId = searchParams.get('academicYearId') ?? undefined;
+  const gradeId        = searchParams.get('gradeId') ?? undefined;
+  const activeOnly     = searchParams.get('active') === 'true';
 
   const plans = await db.feePlan.findMany({
     where: {
       tenantId: session.user.tenantId,
       ...(academicYearId && { academicYearId }),
+      ...(activeOnly && { isActive: true }),
+      ...(gradeId && { grades: { some: { gradeId } } }),
     },
     include: {
       studentCategory: { select: { id: true, name: true } },

@@ -98,8 +98,21 @@ function StudentDrawer({ mode, student, grades, onClose, onSaved }: StudentDrawe
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [feeGuard, setFeeGuard] = useState<'idle' | 'checking' | 'ok' | 'missing'>('idle');
 
   const availableSections = grades.find(g => g.id === form.gradeId)?.sections ?? [];
+
+  // Enrollment guard — check if an active fee plan covers the selected grade
+  useEffect(() => {
+    if (mode !== 'add' || !form.gradeId) { setFeeGuard('idle'); return; }
+    const grade = grades.find(g => g.id === form.gradeId);
+    if (!grade) { setFeeGuard('idle'); return; }
+    setFeeGuard('checking');
+    fetch(`/api/fee/plans?gradeId=${form.gradeId}&academicYearId=${grade.academicYearId}&active=true`)
+      .then(r => r.json())
+      .then((data: unknown[]) => setFeeGuard(Array.isArray(data) && data.length > 0 ? 'ok' : 'missing'))
+      .catch(() => setFeeGuard('idle'));
+  }, [form.gradeId, mode, grades]);
 
   useEffect(() => {
     if (mode === 'edit' && student) {
@@ -285,14 +298,33 @@ function StudentDrawer({ mode, student, grades, onClose, onSaved }: StudentDrawe
           </Field>
         </div>
 
+        {/* Fee structure guard — only shown during new enrollment when no plan exists */}
+        {mode === 'add' && feeGuard === 'missing' && (
+          <div className="mx-5 mb-3 flex items-start gap-3 bg-coral/8 border border-coral/25 rounded-xl px-4 py-3">
+            <AlertTriangle className="w-4 h-4 text-coral flex-shrink-0 mt-0.5" />
+            <div className="text-xs text-coral">
+              <p className="font-semibold">No active fee plan for this class.</p>
+              <p className="mt-0.5 text-coral/80">
+                Set up a fee plan before enrolling students.{' '}
+                <a href="/fee" className="underline font-semibold hover:text-coral">
+                  Go to Fee Structure →
+                </a>
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="flex gap-3 p-5 border-t border-gray-100 flex-shrink-0">
           <button onClick={onClose}
             className="flex-1 py-2.5 text-sm font-semibold text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
             Cancel
           </button>
-          <button onClick={handleSubmit} disabled={saving}
-            className="flex-1 py-2.5 text-sm font-bold bg-gold text-navy rounded-xl hover:bg-gold/90 transition-colors disabled:opacity-60">
-            {saving ? 'Saving...' : mode === 'add' ? 'Enrol Student' : 'Save Changes'}
+          <button
+            onClick={handleSubmit}
+            disabled={saving || feeGuard === 'missing' || feeGuard === 'checking'}
+            className="flex-1 py-2.5 text-sm font-bold bg-gold text-navy rounded-xl hover:bg-gold/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+          >
+            {saving ? 'Saving...' : feeGuard === 'checking' ? 'Checking fee plan…' : mode === 'add' ? 'Enrol Student' : 'Save Changes'}
           </button>
         </div>
       </div>
