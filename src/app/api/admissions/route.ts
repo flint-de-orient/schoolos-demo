@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { requireSession, ok, err } from '@/lib/api-auth';
 import { AdmissionStage, AdmissionSource } from '@prisma/client';
+import { notifyAdmissionStage } from '@/lib/notifications';
 
 export async function GET(req: NextRequest) {
   const { session, error } = await requireSession();
@@ -96,6 +97,18 @@ export async function PATCH(req: NextRequest) {
       assignedTo,
     },
   });
+
+  // Fire WhatsApp notification for stage change (non-blocking)
+  if (updated.phone) {
+    notifyAdmissionStage(
+      session.user.tenantId,
+      updated.phone,
+      updated.parentName,
+      updated.studentName,
+      updated.applyingForGrade,
+      stage
+    ).catch(() => {});
+  }
 
   return ok(updated);
 }

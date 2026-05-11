@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { requireSession, ok, err } from '@/lib/api-auth';
 import { AttendanceStatus } from '@prisma/client';
+import { notifyAbsent } from '@/lib/notifications';
 
 export async function GET(req: NextRequest) {
   const { session, error } = await requireSession();
@@ -135,6 +136,41 @@ export async function POST(req: NextRequest) {
       });
     })
   );
+
+  // Fire WhatsApp notifications for absent students (non-blocking)
+  const absentRecords = records.filter((r: { studentId: string; status: string }) => r.status === 'ABSENT');
+  if (absentRecords.length > 0) {
+    const dateStr = targetDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    Promise.all(
+      absentRecords.map(async (r: { studentId: string }) => {
+        const student = await db.student.findUnique({
+          where: { id: r.studentId },
+          include: {
+            section: { include: { grade: { select: { name: true } } } },
+            parents: {
+              where: { isPrimary: true },
+              take: 1,
+              include: { parent: { select: { phone: true, fatherName: true, motherName: true, guardianName: true } } },
+            },
+          },
+        });
+        if (!student) return;
+        const sp = student.parents[0];
+        if (!sp?.parent?.phone) return;
+        const p = sp.parent;
+        const parentName = p.fatherName ?? p.motherName ?? p.guardianName ?? 'Parent';
+        const className = `${student.section.grade.name} - ${student.section.name}`;
+        await notifyAbsent(
+          session.user.tenantId,
+          sp.parent.phone,
+          parentName,
+          student.name,
+          className,
+          dateStr
+        );
+      })
+    ).catch(() => { /* non-blocking — never fail the main response */ });
+  }
 
   return ok({ sessionId: attendanceSession.id, recorded: records.length });
 }

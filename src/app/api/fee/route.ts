@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { requireSession, ok, err } from '@/lib/api-auth';
 import { FeeStatus, TransactionMode } from '@prisma/client';
+import { notifyFeeConfirmed } from '@/lib/notifications';
 
 export async function GET(req: NextRequest) {
   const { session, error } = await requireSession();
@@ -116,6 +117,37 @@ export async function POST(req: NextRequest) {
 
     return t;
   });
+
+  // Fire WhatsApp payment confirmation (non-blocking)
+  const fullAccount = await db.feeAccount.findUnique({
+    where: { id: feeAccountId },
+    include: {
+      student: {
+        include: {
+          parents: {
+            where: { isPrimary: true },
+            take: 1,
+            include: { parent: { select: { phone: true, fatherName: true, motherName: true, guardianName: true } } },
+          },
+        },
+      },
+    },
+  });
+  const sp = fullAccount?.student?.parents?.[0];
+  if (sp?.parent?.phone) {
+    const p = sp.parent;
+    const parentName = p.fatherName ?? p.motherName ?? p.guardianName ?? 'Parent';
+    const paidDate = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    notifyFeeConfirmed(
+      session.user.tenantId,
+      p.phone,
+      parentName,
+      Number(amount),
+      fullAccount!.student.name,
+      paidDate,
+      receiptNo
+    ).catch(() => {});
+  }
 
   return ok(transaction, 201);
 }
