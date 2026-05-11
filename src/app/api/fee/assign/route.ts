@@ -4,6 +4,10 @@ import { requireSession, ok, err } from '@/lib/api-auth';
 import { Decimal } from '@prisma/client/runtime/library';
 import { generateInstallments } from '@/lib/fee-installment-gen';
 
+const FREQ_COUNT: Record<string, number> = {
+  ONE_TIME: 1, ANNUAL: 1, HALF_YEARLY: 2, QUARTERLY: 4, BI_MONTHLY: 6, MONTHLY: 12,
+};
+
 export async function GET(req: NextRequest) {
   try {
     const { session, error } = await requireSession();
@@ -87,7 +91,9 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      const totalDue = plan.items.reduce((sum, item) => sum.add(item.amount), new Decimal(0));
+      const totalDue = plan.customSchedule?.installments?.length
+        ? plan.items.reduce((sum, item) => sum.add(item.amount), new Decimal(0))
+        : plan.items.reduce((sum, item) => sum.add(item.amount.mul(FREQ_COUNT[item.frequency] ?? 1)), new Decimal(0));
 
       const account = await tx.feeAccount.create({
         data: {

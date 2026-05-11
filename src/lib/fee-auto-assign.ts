@@ -2,6 +2,11 @@ import { db } from '@/lib/db';
 import { Decimal } from '@prisma/client/runtime/library';
 import { generateInstallments } from './fee-installment-gen';
 
+// How many installments each frequency generates per academic year
+const FREQ_COUNT: Record<string, number> = {
+  ONE_TIME: 1, ANNUAL: 1, HALF_YEARLY: 2, QUARTERLY: 4, BI_MONTHLY: 6, MONTHLY: 12,
+};
+
 export async function autoAssignFeePlan(
   tenantId: string,
   studentId: string,
@@ -40,7 +45,13 @@ export async function autoAssignFeePlan(
     const eligibleItems = isNewAdmission
       ? plan.items.filter((i) => i.includeForNewAdmission)
       : plan.items;
-    const totalDue = eligibleItems.reduce((s, i) => s.add(i.amount), new Decimal(0));
+
+    // For frequency-based plans, multiply each item's amount by its occurrence count.
+    // For custom-schedule plans, the schedule splits the item total by percentage
+    // (percentages sum to 100%), so totalDue = sum of item amounts.
+    const totalDue = plan.customSchedule?.installments?.length
+      ? eligibleItems.reduce((s, i) => s.add(i.amount), new Decimal(0))
+      : eligibleItems.reduce((s, i) => s.add(i.amount.mul(FREQ_COUNT[i.frequency] ?? 1)), new Decimal(0));
 
     const account = await tx.feeAccount.create({
       data: {

@@ -294,6 +294,24 @@ export default function FeePage() {
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
+          <button
+            onClick={async () => {
+              toast.info('Syncing fee accounts…');
+              const res = await fetch('/api/fee/sync-accounts', { method: 'POST' });
+              const d = await res.json().catch(() => ({}));
+              if (res.ok) {
+                toast.success(`Sync complete — ${d.synced ?? 0} account(s) created`, {
+                  description: d.skipped ? `${d.skipped} student(s) skipped (no matching fee plan)` : undefined,
+                });
+                if (d.synced > 0) loadAll();
+              } else {
+                toast.error(d.error ?? 'Sync failed');
+              }
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-purple/40 text-purple rounded-lg hover:bg-purple/5 transition-colors"
+            title="Re-run fee plan assignment for students who have no fee account yet">
+            <RefreshCw className="w-3.5 h-3.5" /> Sync Accounts
+          </button>
           {(activeTab === 'overview' || activeTab === 'records') && (
             <button onClick={bulkRemind}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-teal text-teal rounded-lg hover:bg-teal/5 transition-colors">
