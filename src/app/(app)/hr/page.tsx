@@ -376,10 +376,18 @@ function StaffDrawer({ staff, onClose, onSalaryUpdate }: { staff: Staff; onClose
         {/* Actions */}
         <div className="p-4 space-y-2">
           <button
-            onClick={() => toast.success(`Payslip generated for ${staff.name}`)}
+            onClick={async () => {
+              const now = new Date();
+              const res = await fetch(`/api/hr/payroll?month=${now.getMonth() + 1}&year=${now.getFullYear()}`);
+              const d = await res.json();
+              const all = d.payrolls ?? d.data?.payrolls ?? [];
+              const record = all.find((p: { staffId: string | null; id: string }) => p.staffId === staff.id);
+              if (record) { window.open(`/payslip/${record.id}`, '_blank'); }
+              else { toast.error('No payroll record found. Generate payroll first.'); }
+            }}
             className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold bg-navy text-white rounded-xl hover:bg-navyMid transition-colors"
           >
-            <FileText className="w-4 h-4" /> Generate Payslip
+            <FileText className="w-4 h-4" /> View Payslip
           </button>
           <button
             onClick={() => toast.success(`Profile of ${staff.name} exported`)}
@@ -1417,7 +1425,7 @@ export default function HRPage() {
                                       Process
                                     </button>
                                   )}
-                                  <button onClick={() => toast.success(`Payslip generated for ${person.name}`)}
+                                  <button onClick={() => window.open(`/payslip/${p.id}`, '_blank')}
                                     className="text-xs text-navyMid hover:text-navy font-semibold border border-gray-200 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1">
                                     <FileText className="w-3 h-3" /> Slip
                                   </button>
