@@ -728,7 +728,10 @@ export default function HRPage() {
   const [payrollMonth, setPayrollMonth] = useState('April 2026');
   const [processedIds, setProcessedIds] = useState<Set<string>>(new Set());
   const [payrollSearch, setPayrollSearch] = useState('');
-  type DBPayroll = { id: string; staffId: string; month: number; year: number; basic: number; allowances: number; pfDeduction: number; tdsDeduction: number; netPay: number; status: string; staff: { id: string; name: string; designation: string; department: string | null } };
+  type DBPayrollPerson = { id: string; name: string; designation: string | null; department: string | null };
+  type DBPayroll = { id: string; staffId: string | null; teacherId: string | null; month: number; year: number; basic: number; allowances: number; pfDeduction: number; tdsDeduction: number; otherDeductions: number; netPay: number; status: string; staff: DBPayrollPerson | null; teacher: DBPayrollPerson | null };
+  function payrollPerson(p: DBPayroll): DBPayrollPerson { return (p.staff ?? p.teacher)!; }
+  function payrollRole(p: DBPayroll): string { return p.teacherId ? 'Teaching' : 'Non-Teaching'; }
   const [dbPayrolls, setDbPayrolls] = useState<DBPayroll[]>([]);
   const [payrollLoading, setPayrollLoading] = useState(false);
   const [payrollGenerated, setPayrollGenerated] = useState(false);
@@ -824,11 +827,13 @@ export default function HRPage() {
       .then(r => r.json())
       .then(d => {
         const records: DBPayroll[] = (d.payrolls ?? []).map((p: any) => ({
-          id: p.id, staffId: p.staffId, month: p.month, year: p.year,
+          id: p.id, staffId: p.staffId ?? null, teacherId: p.teacherId ?? null,
+          month: p.month, year: p.year,
           basic: Number(p.basic), allowances: Number(p.allowances),
           pfDeduction: Number(p.pfDeduction), tdsDeduction: Number(p.tdsDeduction),
+          otherDeductions: Number(p.otherDeductions ?? 0),
           netPay: Number(p.netPay), status: p.status,
-          staff: p.staff,
+          staff: p.staff ?? null, teacher: p.teacher ?? null,
         }));
         setDbPayrolls(records);
         setProcessedIds(new Set(records.filter(p => p.status === 'PAID').map(p => p.id)));
@@ -882,7 +887,7 @@ export default function HRPage() {
     });
     const d = await res.json();
     if (res.ok) {
-      toast.success(`Payroll generated for ${d.generated} staff members`, { description: payrollMonth });
+      toast.success(`Payroll generated for ${d.generated} members (${d.teachers ?? 0} teachers + ${d.staff ?? 0} staff)`, { description: payrollMonth });
       loadPayroll(payrollMonth);
     } else {
       toast.error(d.error ?? 'Failed to generate payroll');
@@ -1294,10 +1299,10 @@ export default function HRPage() {
           {/* ── Payroll ── */}
           {activeTab === 'payroll' && (() => {
             const filteredDB = dbPayrolls.filter(p =>
-              !payrollSearch || p.staff.name.toLowerCase().includes(payrollSearch.toLowerCase())
+              !payrollSearch || payrollPerson(p).name.toLowerCase().includes(payrollSearch.toLowerCase())
             );
             const gross = dbPayrolls.reduce((s, p) => s + p.basic + p.allowances, 0);
-            const deductions = dbPayrolls.reduce((s, p) => s + p.pfDeduction + p.tdsDeduction, 0);
+            const deductions = dbPayrolls.reduce((s, p) => s + p.pfDeduction + p.tdsDeduction + p.otherDeductions, 0);
             const net = dbPayrolls.reduce((s, p) => s + p.netPay, 0);
             return (
               <div>
@@ -1379,20 +1384,25 @@ export default function HRPage() {
                       <tbody>
                         {filteredDB.map((p, i) => {
                           const processed = processedIds.has(p.id);
+                          const person = payrollPerson(p);
+                          const role = payrollRole(p);
                           return (
                             <tr key={p.id} className={`border-b border-gray-50 hover:bg-gray-50/80 ${i % 2 !== 0 ? 'bg-gray-50/30' : ''}`}>
                               <td className="px-4 py-3">
                                 <div className="flex items-center gap-2.5">
-                                  <div className="w-7 h-7 rounded-lg bg-navy flex items-center justify-center flex-shrink-0">
-                                    <span className="text-white text-[10px] font-bold font-sora">{getInitials(p.staff.name)}</span>
+                                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${p.teacherId ? 'bg-purple' : 'bg-navy'}`}>
+                                    <span className="text-white text-[10px] font-bold font-sora">{getInitials(person.name)}</span>
                                   </div>
-                                  <span className="font-semibold text-sm text-gray-800">{p.staff.name}</span>
+                                  <div>
+                                    <span className="font-semibold text-sm text-gray-800 block">{person.name}</span>
+                                    <span className={`text-[10px] font-semibold ${p.teacherId ? 'text-purple' : 'text-navy/60'}`}>{role}</span>
+                                  </div>
                                 </div>
                               </td>
-                              <td className="px-4 py-3 text-xs text-gray-500">{p.staff.designation}</td>
+                              <td className="px-4 py-3 text-xs text-gray-500">{person.designation}</td>
                               <td className="px-4 py-3 text-sm text-gray-700 font-medium">₹{p.basic.toLocaleString('en-IN')}</td>
                               <td className="px-4 py-3 text-sm font-semibold text-green">+₹{p.allowances.toLocaleString('en-IN')}</td>
-                              <td className="px-4 py-3 text-sm font-semibold text-coral">−₹{(p.pfDeduction + p.tdsDeduction).toLocaleString('en-IN')}</td>
+                              <td className="px-4 py-3 text-sm font-semibold text-coral">−₹{(p.pfDeduction + p.tdsDeduction + p.otherDeductions).toLocaleString('en-IN')}</td>
                               <td className="px-4 py-3 text-sm font-bold text-navy">₹{p.netPay.toLocaleString('en-IN')}</td>
                               <td className="px-4 py-3">
                                 <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${processed ? 'bg-green/10 text-green border-green/20' : 'bg-amber/10 text-amber border-amber/20'}`}>
@@ -1402,12 +1412,12 @@ export default function HRPage() {
                               <td className="px-4 py-3">
                                 <div className="flex gap-1.5">
                                   {!processed && (
-                                    <button onClick={() => processPayroll(p.id, p.staff.name)}
+                                    <button onClick={() => processPayroll(p.id, person.name)}
                                       className="text-xs text-green hover:text-green/70 font-semibold border border-green/20 px-2.5 py-1.5 rounded-lg hover:bg-green/5 transition-colors">
                                       Process
                                     </button>
                                   )}
-                                  <button onClick={() => toast.success(`Payslip generated for ${p.staff.name}`)}
+                                  <button onClick={() => toast.success(`Payslip generated for ${person.name}`)}
                                     className="text-xs text-navyMid hover:text-navy font-semibold border border-gray-200 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1">
                                     <FileText className="w-3 h-3" /> Slip
                                   </button>
