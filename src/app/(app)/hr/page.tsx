@@ -593,16 +593,16 @@ export default function HRPage() {
   const [payrollGenerated, setPayrollGenerated] = useState(false);
 
   // Availability state
-  type AvailEntry = { id: string; staffId: string; name: string; type: 'absence' | 'extra'; date: string; timeTo?: string; period: 'full-day' | 'partial' | 'multi-day'; endDate?: string; reason: string; affectedPeriods?: string[]; substitute?: string };
-  const seedAvail: AvailEntry[] = [
-    { id: 'AV001', staffId: 'STF005', name: 'Mr. Arijit Das',      type: 'absence', date: '2026-04-28', period: 'full-day',   reason: 'Medical leave', affectedPeriods: ['P3 Mathematics XI-A', 'P5 Physics X-B', 'P7 Physics IX-A'], substitute: 'Mr. Subhashis Bose' },
-    { id: 'AV002', staffId: 'STF009', name: 'Mr. Tapas Mukherjee', type: 'absence', date: '2026-04-29', timeTo: '12:00', period: 'partial', reason: 'Dentist appointment', affectedPeriods: ['P1 Geography X-A', 'P2 Geography VIII-B'] },
-    { id: 'AV003', staffId: 'STF012', name: 'Mrs. Ranjana Bhaduri', type: 'extra',  date: '2026-04-30', period: 'partial', timeTo: '14:00', reason: 'Available for extra Sanskrit classes' },
-    { id: 'AV004', staffId: 'STF010', name: 'Mrs. Swapna Dey',     type: 'absence', date: '2026-05-02', endDate: '2026-05-03', period: 'multi-day', reason: 'Family function', affectedPeriods: ['Bengali X-A', 'Bengali XI-B', 'Bengali IX-A'] },
-  ];
-  const [availEntries, setAvailEntries] = useState<AvailEntry[]>(seedAvail);
+  type AvailEntry = { id: string; teacherId: string; name: string; type: 'absence' | 'extra'; date: string; reason: string; substitute?: string };
+  type WeeklySlot = { id: string; teacherId: string; teacherName: string; teacherType: string; designation: string; subject: string | null; day: string; startTime: string; endTime: string };
+  type WorkloadEntry = { id: string; name: string; type: string; designation: string | null; subject: string | null; periodsPerWeek: number; maxPeriodsWeek: number };
+  const [availEntries, setAvailEntries] = useState<AvailEntry[]>([]);
+  const [weeklySlots, setWeeklySlots] = useState<WeeklySlot[]>([]);
+  const [workloadData, setWorkloadData] = useState<WorkloadEntry[]>([]);
+  const [availLoading, setAvailLoading] = useState(false);
   const [showAvailModal, setShowAvailModal] = useState(false);
   const [availForm, setAvailForm] = useState({ staffId: '', type: 'absence' as 'absence' | 'extra', date: '', endDate: '', period: 'full-day' as 'full-day' | 'partial' | 'multi-day', timeFrom: '', timeTo: '', reason: '' });
+  const [savingAvail, setSavingAvail] = useState(false);
   const [rebalancing, setRebalancing] = useState(false);
   const [rebalanced, setRebalanced] = useState(false);
   const [workloadView, setWorkloadView] = useState<'week' | 'month' | 'year'>('week');
@@ -697,6 +697,38 @@ export default function HRPage() {
   };
 
   useEffect(() => { if (activeTab === 'payroll') loadPayroll(payrollMonth); }, [activeTab, payrollMonth]);
+
+  const loadAvailability = () => {
+    setAvailLoading(true);
+    Promise.all([
+      fetch('/api/hr/availability').then(r => r.json()),
+      fetch('/api/hr/workload').then(r => r.json()),
+    ]).then(([avData, wkData]) => {
+      const overrides: AvailEntry[] = (avData.overrides ?? []).map((o: any) => ({
+        id: o.id,
+        teacherId: o.teacherId,
+        name: o.teacher?.name ?? 'Unknown',
+        type: o.isAvailable ? 'extra' : 'absence',
+        date: o.date?.split('T')[0] ?? '',
+        reason: o.reason ?? '',
+      }));
+      setAvailEntries(overrides);
+
+      const slots: WeeklySlot[] = (avData.weeklySlots ?? []).map((s: any) => ({
+        id: s.id, teacherId: s.teacherId,
+        teacherName: s.teacher?.name ?? '',
+        teacherType: s.teacher?.type ?? '',
+        designation: s.teacher?.designation ?? '',
+        subject: s.teacher?.subjects?.[0]?.subject?.name ?? null,
+        day: s.day, startTime: s.startTime, endTime: s.endTime,
+      }));
+      setWeeklySlots(slots);
+
+      setWorkloadData(wkData.workload ?? []);
+    }).finally(() => setAvailLoading(false));
+  };
+
+  useEffect(() => { if (activeTab === 'availability') loadAvailability(); }, [activeTab]);
 
   const generatePayroll = async () => {
     const MONTH_MAP: Record<string, number> = { January:1,February:2,March:3,April:4,May:5,June:6,July:7,August:8,September:9,October:10,November:11,December:12 };
@@ -1345,14 +1377,14 @@ export default function HRPage() {
           {activeTab === 'availability' && (
             <div className="space-y-6">
 
-              {/* Header row */}
+              {/* Header */}
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-sora font-semibold text-navy flex items-center gap-2">
                     Availability & Workload Manager
                     <span className="text-[9px] font-bold bg-teal text-white px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Brain className="w-2.5 h-2.5" />AI</span>
                   </h3>
-                  <p className="text-xs text-gray-400 mt-0.5">Log sudden absences, extra availability, and auto-rebalance class assignments</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Log sudden absences, extra availability, and review class assignment workload</p>
                 </div>
                 <button onClick={() => setShowAvailModal(true)}
                   className="flex items-center gap-1.5 bg-gold text-navy font-sora font-bold text-xs px-3 py-2 rounded-xl hover:bg-gold/90 transition-colors">
@@ -1363,10 +1395,10 @@ export default function HRPage() {
               {/* Summary pills */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
-                  { label: 'Absences Today', value: availEntries.filter(a => a.type === 'absence' && a.date === '2026-04-28').length, color: 'text-coral', bg: 'bg-coral/8', icon: UserX },
+                  { label: 'Absences (next 14d)', value: availEntries.filter(a => a.type === 'absence').length, color: 'text-coral', bg: 'bg-coral/8', icon: UserX },
                   { label: 'Extra Available', value: availEntries.filter(a => a.type === 'extra').length, color: 'text-green', bg: 'bg-green/8', icon: UserCheck },
-                  { label: 'Overloaded Teachers', value: staffList.filter(s => 'weeklyLoad' in s && (s.weeklyLoad as { current: number; target: number }).current > (s.weeklyLoad as { current: number; target: number }).target + 3 && (s.weeklyLoad as { target: number }).target > 0).length, color: 'text-amber', bg: 'bg-amber/8', icon: AlertTriangle },
-                  { label: 'Part-Time Staff', value: staffList.filter(s => 'employmentType' in s && s.employmentType === 'part-time').length, color: 'text-purple', bg: 'bg-purple/8', icon: CalendarClock },
+                  { label: 'Overloaded', value: workloadData.filter(w => w.periodsPerWeek > w.maxPeriodsWeek + 3).length, color: 'text-amber', bg: 'bg-amber/8', icon: AlertTriangle },
+                  { label: 'Part-Time', value: workloadData.filter(w => w.type === 'PART_TIME').length, color: 'text-purple', bg: 'bg-purple/8', icon: CalendarClock },
                 ].map(stat => {
                   const Icon = stat.icon;
                   return (
@@ -1381,122 +1413,124 @@ export default function HRPage() {
                 })}
               </div>
 
-              {/* Active availability changes */}
+              {/* Active availability overrides */}
               <div>
                 <h4 className="font-sora font-semibold text-navy text-sm mb-3">Active Availability Changes</h4>
-                <div className="space-y-3">
-                  {availEntries.map(entry => {
-                    const isAbsence = entry.type === 'absence';
-                    return (
-                      <div key={entry.id} className={`border rounded-2xl p-4 ${isAbsence ? 'border-coral/20 bg-coral/3' : 'border-green/20 bg-green/3'}`}>
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-start gap-3">
-                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${isAbsence ? 'bg-coral/15' : 'bg-green/15'}`}>
-                              {isAbsence ? <UserX className={`w-4 h-4 text-coral`} /> : <UserCheck className="w-4 h-4 text-green" />}
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <p className="text-sm font-semibold text-gray-800">{entry.name}</p>
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isAbsence ? 'bg-coral/15 text-coral' : 'bg-green/15 text-green'}`}>
-                                  {isAbsence ? 'ABSENT' : 'EXTRA AVAILABLE'}
-                                </span>
-                                <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">
-                                  {entry.period === 'multi-day' ? `${entry.date} – ${entry.endDate}` : entry.date}
-                                  {entry.period === 'partial' && entry.timeTo && ` until ${entry.timeTo}`}
-                                  {entry.period === 'full-day' && ' · All day'}
-                                </span>
+                {availLoading ? (
+                  <div className="space-y-2">{Array.from({length:3}).map((_,i) => <div key={i} className="h-16 bg-gray-100 rounded-xl animate-pulse" />)}</div>
+                ) : (
+                  <div className="space-y-3">
+                    {availEntries.map(entry => {
+                      const isAbsence = entry.type === 'absence';
+                      return (
+                        <div key={entry.id} className={`border rounded-2xl p-4 ${isAbsence ? 'border-coral/20 bg-coral/3' : 'border-green/20 bg-green/3'}`}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3">
+                              <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${isAbsence ? 'bg-coral/15' : 'bg-green/15'}`}>
+                                {isAbsence ? <UserX className="w-4 h-4 text-coral" /> : <UserCheck className="w-4 h-4 text-green" />}
                               </div>
-                              <p className="text-xs text-gray-500 mt-0.5">{entry.reason}</p>
-                              {entry.affectedPeriods && (
-                                <div className="flex flex-wrap gap-1 mt-2">
-                                  <span className="text-[10px] text-gray-400">Affected:</span>
-                                  {entry.affectedPeriods.map(p => (
-                                    <span key={p} className="text-[10px] bg-coral/8 text-coral border border-coral/15 px-1.5 py-0.5 rounded-md">{p}</span>
-                                  ))}
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="text-sm font-semibold text-gray-800">{entry.name}</p>
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isAbsence ? 'bg-coral/15 text-coral' : 'bg-green/15 text-green'}`}>
+                                    {isAbsence ? 'ABSENT' : 'EXTRA AVAILABLE'}
+                                  </span>
+                                  <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">{entry.date}</span>
                                 </div>
-                              )}
-                              {entry.substitute && (
-                                <div className="flex items-center gap-1.5 mt-2">
-                                  <CheckCircle2 className="w-3 h-3 text-green" />
-                                  <span className="text-[10px] text-green font-semibold">AI Substitute: {entry.substitute}</span>
-                                </div>
-                              )}
+                                <p className="text-xs text-gray-500 mt-0.5">{entry.reason}</p>
+                                {entry.substitute && (
+                                  <div className="flex items-center gap-1.5 mt-1.5">
+                                    <CheckCircle2 className="w-3 h-3 text-green" />
+                                    <span className="text-[10px] text-green font-semibold">AI Substitute: {entry.substitute}</span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            {isAbsence && !entry.substitute && (
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              {isAbsence && !entry.substitute && (
+                                <button
+                                  onClick={() => {
+                                    setAvailEntries(prev => prev.map(e => e.id === entry.id ? { ...e, substitute: 'AI-Assigned' } : e));
+                                    toast.success('AI assigned substitute teacher', { description: 'WhatsApp notification sent to substitute' });
+                                  }}
+                                  className="text-[10px] font-semibold bg-teal/10 text-teal border border-teal/20 px-2 py-1 rounded-lg hover:bg-teal/20 transition-colors flex items-center gap-1">
+                                  <Brain className="w-3 h-3" /> Assign Sub
+                                </button>
+                              )}
                               <button
-                                onClick={() => {
-                                  setAvailEntries(prev => prev.map(e => e.id === entry.id ? { ...e, substitute: 'AI-Assigned' } : e));
-                                  toast.success('AI assigned substitute teacher', { description: 'WhatsApp notification sent to substitute' });
+                                onClick={async () => {
+                                  await fetch(`/api/hr/availability/${entry.id}`, { method: 'DELETE' });
+                                  setAvailEntries(prev => prev.filter(e => e.id !== entry.id));
+                                  toast.success('Entry removed');
                                 }}
-                                className="text-[10px] font-semibold bg-teal/10 text-teal border border-teal/20 px-2 py-1 rounded-lg hover:bg-teal/20 transition-colors flex items-center gap-1">
-                                <Brain className="w-3 h-3" /> Assign Sub
+                                className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
+                                <X className="w-3 h-3" />
                               </button>
-                            )}
-                            <button
-                              onClick={() => {
-                                setAvailEntries(prev => prev.filter(e => e.id !== entry.id));
-                                toast.success('Entry removed');
-                              }}
-                              className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
-                              <X className="w-3 h-3" />
-                            </button>
+                            </div>
                           </div>
                         </div>
+                      );
+                    })}
+                    {availEntries.length === 0 && (
+                      <div className="text-center py-8 bg-gray-50 rounded-2xl border border-gray-100">
+                        <CheckCircle2 className="w-8 h-8 text-green/40 mx-auto mb-2" />
+                        <p className="text-sm text-gray-400">No availability changes logged for the next 14 days</p>
                       </div>
-                    );
-                  })}
-                  {availEntries.length === 0 && (
-                    <div className="text-center py-8 bg-gray-50 rounded-2xl border border-gray-100">
-                      <CheckCircle2 className="w-8 h-8 text-green/40 mx-auto mb-2" />
-                      <p className="text-sm text-gray-400">No active availability changes</p>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {/* Part-time availability grid */}
-              <div>
-                <h4 className="font-sora font-semibold text-navy text-sm mb-3">Part-Time Teacher Weekly Availability</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {staffList.filter(s => 'employmentType' in s && s.employmentType === 'part-time' && s.weeklyAvailability).map(s => {
-                    const avail = (s.weeklyAvailability as unknown) as { day: string; slots: string[] }[];
-                    const dept = getDept(s.department);
-                    return (
-                      <div key={s.id} className="border border-gray-100 rounded-2xl overflow-hidden">
-                        <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border-b border-gray-100">
-                          <div className="w-8 h-8 rounded-lg bg-navy flex items-center justify-center flex-shrink-0">
-                            <span className="text-white text-[10px] font-bold font-sora">{getInitials(s.name)}</span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-gray-800 truncate">{s.name}</p>
-                            <p className="text-[10px] text-gray-400">{s.subject} · <span className="text-purple font-semibold">Part-Time</span></p>
-                          </div>
-                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border flex-shrink-0 ${dept.bg} ${dept.color} ${dept.border}`}>{s.department}</span>
-                        </div>
-                        <div className="p-3 space-y-2">
-                          {avail.map((a) => (
-                            <div key={a.day} className="flex items-center gap-3">
-                              <span className="text-[10px] font-bold text-gray-500 w-8">{a.day.slice(0,3)}</span>
-                              <div className="flex flex-wrap gap-1.5 flex-1">
-                                {a.slots.map((slot) => (
-                                  <span key={slot} className="text-[10px] bg-purple/8 text-purple border border-purple/15 px-2 py-1 rounded-lg font-medium">{slot}</span>
-                                ))}
+              {/* Part-time weekly availability grid */}
+              {(() => {
+                const partTimeTeachers = [...new Map(
+                  weeklySlots.filter(s => s.teacherType === 'PART_TIME').map(s => [s.teacherId, s])
+                ).values()];
+                if (partTimeTeachers.length === 0) return null;
+                return (
+                  <div>
+                    <h4 className="font-sora font-semibold text-navy text-sm mb-3">Part-Time Teacher Weekly Availability</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {partTimeTeachers.map(t => {
+                        const slots = weeklySlots.filter(s => s.teacherId === t.teacherId);
+                        const dept = getDept(t.teacherName);
+                        const days = ['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
+                        return (
+                          <div key={t.teacherId} className="border border-gray-100 rounded-2xl overflow-hidden">
+                            <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border-b border-gray-100">
+                              <div className="w-8 h-8 rounded-lg bg-navy flex items-center justify-center flex-shrink-0">
+                                <span className="text-white text-[10px] font-bold font-sora">{getInitials(t.teacherName)}</span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-gray-800 truncate">{t.teacherName}</p>
+                                <p className="text-[10px] text-gray-400">{t.subject ?? t.designation} · <span className="text-purple font-semibold">Part-Time</span></p>
                               </div>
                             </div>
-                          ))}
-                          <div className="pt-1 border-t border-gray-50 flex items-center justify-between">
-                            <span className="text-[10px] text-gray-400">Capacity: {(s.teachingCapacity as string[]).join(', ')}</span>
-                            <button onClick={() => toast.success(`Availability updated for ${s.name}`)}
-                              className="text-[10px] font-semibold text-teal hover:text-navy transition-colors">Edit</button>
+                            <div className="p-3 space-y-2">
+                              {days.map(day => {
+                                const daySlots = slots.filter(s => s.day === day);
+                                if (daySlots.length === 0) return null;
+                                return (
+                                  <div key={day} className="flex items-center gap-3">
+                                    <span className="text-[10px] font-bold text-gray-500 w-8">{day.slice(0,3)}</span>
+                                    <div className="flex flex-wrap gap-1.5 flex-1">
+                                      {daySlots.map(s => (
+                                        <span key={s.id} className="text-[10px] bg-purple/8 text-purple border border-purple/15 px-2 py-1 rounded-lg font-medium">
+                                          {s.startTime}–{s.endTime}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Workload balance */}
               <div>
@@ -1532,81 +1566,77 @@ export default function HRPage() {
                     <CheckCircle2 className="w-4 h-4 text-green flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="text-xs font-semibold text-green">AI Rebalanced Successfully</p>
-                      <p className="text-[10px] text-gray-600 mt-0.5">Mr. Prosenjit Chatterjee: +4 periods · Mrs. Pamela Sen: +6 periods · Mr. Arijit Das: −6 periods (overload resolved). Timetable regenerated and WhatsApp notifications sent.</p>
+                      <p className="text-[10px] text-gray-600 mt-0.5">Workload redistributed across {workloadData.length} teachers. Timetable regenerated and notifications sent.</p>
                     </div>
                   </div>
                 )}
 
-                <div className="overflow-x-auto rounded-xl border border-gray-100">
-                  <table className="w-full min-w-[600px]">
-                    <thead className="bg-gray-50 border-b border-gray-100">
-                      <tr>
-                        {['Teacher', 'Type', 'Subject', 'Current Periods', 'Target', 'Balance', 'Status'].map(h => (
-                          <th key={h} className="text-left text-xs uppercase tracking-wide text-gray-400 px-4 py-3 font-medium">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {staffList.filter(s => 'weeklyLoad' in s && (s.weeklyLoad as { target: number }).target > 0).map((s, i) => {
-                        const load = s.weeklyLoad as { current: number; target: number };
-                        const current = rebalanced
-                          ? (s.id === 'STF007' ? load.current + 4 : s.id === 'STF008' ? load.current + 6 : s.id === 'STF005' ? load.current - 6 : load.current)
-                          : load.current;
-                        const diff = current - load.target;
-                        const displayVal = workloadView === 'week' ? current : workloadView === 'month' ? current * 4 : current * 40;
-                        const targetVal = workloadView === 'week' ? load.target : workloadView === 'month' ? load.target * 4 : load.target * 40;
-                        return (
-                          <tr key={s.id} className={`border-b border-gray-50 hover:bg-gray-50/60 ${i % 2 !== 0 ? 'bg-gray-50/20' : ''}`}>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-2">
-                                <div className="w-7 h-7 rounded-lg bg-navy flex items-center justify-center flex-shrink-0">
-                                  <span className="text-white text-[10px] font-bold">{getInitials(s.name)}</span>
+                {workloadData.length === 0 ? (
+                  <div className="text-center py-10 bg-gray-50 rounded-xl border border-gray-100 text-sm text-gray-400">
+                    No teachers found. Add teaching staff to see workload distribution.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border border-gray-100">
+                    <table className="w-full min-w-[600px]">
+                      <thead className="bg-gray-50 border-b border-gray-100">
+                        <tr>
+                          {['Teacher', 'Type', 'Subject', 'Current Periods', 'Target', 'Balance', 'Status'].map(h => (
+                            <th key={h} className="text-left text-xs uppercase tracking-wide text-gray-400 px-4 py-3 font-medium">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {workloadData.map((w, i) => {
+                          const current = workloadView === 'week' ? w.periodsPerWeek : workloadView === 'month' ? w.periodsPerWeek * 4 : w.periodsPerWeek * 40;
+                          const target = workloadView === 'week' ? w.maxPeriodsWeek : workloadView === 'month' ? w.maxPeriodsWeek * 4 : w.maxPeriodsWeek * 40;
+                          const diff = w.periodsPerWeek - w.maxPeriodsWeek;
+                          return (
+                            <tr key={w.id} className={`border-b border-gray-50 hover:bg-gray-50/60 ${i % 2 !== 0 ? 'bg-gray-50/20' : ''}`}>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-7 h-7 rounded-lg bg-navy flex items-center justify-center flex-shrink-0">
+                                    <span className="text-white text-[10px] font-bold">{getInitials(w.name)}</span>
+                                  </div>
+                                  <span className="text-sm font-semibold text-gray-800">{w.name}</span>
                                 </div>
-                                <span className="text-sm font-semibold text-gray-800">{s.name}</span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${'employmentType' in s && s.employmentType === 'part-time' ? 'bg-purple/10 text-purple' : 'bg-teal/8 text-teal'}`}>
-                                {'employmentType' in s ? (s.employmentType === 'part-time' ? 'Part-Time' : 'Full-Time') : 'Full-Time'}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-xs text-gray-500">{s.subject ?? '—'}</td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-2">
-                                <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
-                                  <div className={`h-full rounded-full transition-all ${diff > 3 ? 'bg-coral' : diff < -3 ? 'bg-amber' : 'bg-green'}`}
-                                    style={{ width: `${Math.min((displayVal / (targetVal * 1.3)) * 100, 100)}%` }} />
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${w.type === 'PART_TIME' ? 'bg-purple/10 text-purple' : 'bg-teal/8 text-teal'}`}>
+                                  {w.type === 'PART_TIME' ? 'Part-Time' : w.type === 'CONTRACT' ? 'Contract' : 'Full-Time'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-xs text-gray-500">{w.subject ?? '—'}</td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                    <div className={`h-full rounded-full transition-all ${diff > 3 ? 'bg-coral' : diff < -3 ? 'bg-amber' : 'bg-green'}`}
+                                      style={{ width: `${Math.min(target > 0 ? (current / (target * 1.3)) * 100 : 0, 100)}%` }} />
+                                  </div>
+                                  <span className="text-sm font-bold text-gray-700 tabular-nums">{current}</span>
                                 </div>
-                                <span className="text-sm font-bold text-gray-700 tabular-nums">{displayVal}</span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-500">{targetVal}</td>
-                            <td className="px-4 py-3">
-                              <span className={`text-xs font-bold tabular-nums ${diff > 0 ? 'text-coral' : diff < 0 ? 'text-amber' : 'text-green'}`}>
-                                {diff > 0 ? `+${diff}` : diff < 0 ? diff : '±0'}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3">
-                              {diff > 3 ? (
-                                <span className="text-[10px] font-semibold bg-coral/10 text-coral px-2 py-0.5 rounded-full flex items-center gap-1 w-fit">
-                                  <AlertOctagon className="w-3 h-3" /> Overloaded
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-500">{target}</td>
+                              <td className="px-4 py-3">
+                                <span className={`text-xs font-bold tabular-nums ${diff > 0 ? 'text-coral' : diff < 0 ? 'text-amber' : 'text-green'}`}>
+                                  {diff > 0 ? `+${diff}` : diff < 0 ? diff : '±0'}
                                 </span>
-                              ) : diff < -3 ? (
-                                <span className="text-[10px] font-semibold bg-amber/10 text-amber px-2 py-0.5 rounded-full flex items-center gap-1 w-fit">
-                                  <AlertTriangle className="w-3 h-3" /> Underloaded
-                                </span>
-                              ) : (
-                                <span className="text-[10px] font-semibold bg-green/10 text-green px-2 py-0.5 rounded-full flex items-center gap-1 w-fit">
-                                  <CheckCircle2 className="w-3 h-3" /> Balanced
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                              </td>
+                              <td className="px-4 py-3">
+                                {diff > 3 ? (
+                                  <span className="text-[10px] font-semibold bg-coral/10 text-coral px-2 py-0.5 rounded-full flex items-center gap-1 w-fit"><AlertOctagon className="w-3 h-3" /> Overloaded</span>
+                                ) : diff < -3 ? (
+                                  <span className="text-[10px] font-semibold bg-amber/10 text-amber px-2 py-0.5 rounded-full flex items-center gap-1 w-fit"><AlertTriangle className="w-3 h-3" /> Underloaded</span>
+                                ) : (
+                                  <span className="text-[10px] font-semibold bg-green/10 text-green px-2 py-0.5 rounded-full flex items-center gap-1 w-fit"><CheckCircle2 className="w-3 h-3" /> Balanced</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
 
             </div>
@@ -1709,29 +1739,38 @@ export default function HRPage() {
             <div className="flex gap-3 p-5 border-t border-gray-100">
               <button onClick={() => setShowAvailModal(false)} className="flex-1 py-2.5 text-sm font-semibold text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">Cancel</button>
               <button
-                onClick={() => {
+                disabled={savingAvail}
+                onClick={async () => {
                   if (!availForm.staffId || !availForm.date) { toast.error('Please fill in all required fields'); return; }
                   const s = staffList.find(x => x.id === availForm.staffId)!;
-                  setAvailEntries(prev => [{
-                    id: `AV${Date.now()}`,
-                    staffId: availForm.staffId,
-                    name: s.name,
-                    type: availForm.type,
-                    date: availForm.date,
-                    endDate: availForm.endDate || undefined,
-                    timeTo: availForm.timeTo || undefined,
-                    period: availForm.period,
-                    reason: availForm.reason || 'Not specified',
-                    substitute: availForm.type === 'absence' ? 'AI-Assigned' : undefined,
-                  }, ...prev]);
-                  setShowAvailModal(false);
-                  setAvailForm({ staffId: '', type: 'absence', date: '', endDate: '', period: 'full-day', timeFrom: '', timeTo: '', reason: '' });
-                  toast.success(`${availForm.type === 'absence' ? 'Absence logged' : 'Availability logged'} for ${s.name}`, {
-                    description: availForm.type === 'absence' ? 'AI is finding substitute · Affected periods flagged' : 'Timetable updated with extra slots',
-                  });
+                  setSavingAvail(true);
+                  try {
+                    const res = await fetch('/api/hr/availability', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        teacherId: availForm.staffId,
+                        date: availForm.date,
+                        endDate: availForm.period === 'multi-day' ? availForm.endDate : undefined,
+                        isAvailable: availForm.type === 'extra',
+                        reason: availForm.reason,
+                        period: availForm.period,
+                        timeTo: availForm.timeTo || undefined,
+                      }),
+                    });
+                    if (!res.ok) { const d = await res.json(); toast.error(d.error || 'Failed to save'); return; }
+                    await loadAvailability();
+                    setShowAvailModal(false);
+                    setAvailForm({ staffId: '', type: 'absence', date: '', endDate: '', period: 'full-day', timeFrom: '', timeTo: '', reason: '' });
+                    toast.success(`${availForm.type === 'absence' ? 'Absence logged' : 'Availability logged'} for ${s.name}`, {
+                      description: availForm.type === 'absence' ? 'AI is finding substitute · Affected periods flagged' : 'Timetable updated with extra slots',
+                    });
+                  } finally {
+                    setSavingAvail(false);
+                  }
                 }}
-                className="flex-1 py-2.5 text-sm font-semibold bg-navy text-white rounded-xl hover:bg-navyMid transition-colors">
-                Log Change
+                className="flex-1 py-2.5 text-sm font-semibold bg-navy text-white rounded-xl hover:bg-navyMid transition-colors disabled:opacity-60">
+                {savingAvail ? 'Saving…' : 'Log Change'}
               </button>
             </div>
           </div>
