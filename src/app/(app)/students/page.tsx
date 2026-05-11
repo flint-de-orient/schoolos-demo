@@ -68,6 +68,18 @@ function avatarColor(name: string) {
   return colors[name.charCodeAt(0) % colors.length];
 }
 
+// ─── Field wrapper (must live outside StudentDrawer to avoid remount on re-render) ─
+
+function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="text-xs font-semibold text-gray-700 mb-1.5 block">{label}</label>
+      {children}
+      {error && <p className="text-xs text-coral mt-1">{error}</p>}
+    </div>
+  );
+}
+
 // ─── Add / Edit Student Drawer ────────────────────────────────────────────────
 
 interface StudentDrawerProps {
@@ -180,14 +192,6 @@ function StudentDrawer({ mode, student, grades, onClose, onSaved }: StudentDrawe
       setSaving(false);
     }
   };
-
-  const Field = ({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) => (
-    <div>
-      <label className="text-xs font-semibold text-gray-700 mb-1.5 block">{label}</label>
-      {children}
-      {error && <p className="text-xs text-coral mt-1">{error}</p>}
-    </div>
-  );
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
