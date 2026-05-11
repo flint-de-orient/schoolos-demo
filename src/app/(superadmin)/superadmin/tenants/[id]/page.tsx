@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, Building2, CheckCircle2, XCircle, ToggleLeft, ToggleRight, User, Save } from 'lucide-react';
+import { ArrowLeft, Building2, CheckCircle2, XCircle, ToggleLeft, ToggleRight, User, Save, Pencil, X, KeyRound } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 
 const ALL_MODULES = [
   { id: 'dashboard',     label: 'Dashboard',       group: 'Core' },
   { id: 'admissions',    label: 'Admissions',       group: 'Core' },
+  { id: 'students',      label: 'Students',         group: 'Core' },
   { id: 'attendance',    label: 'Attendance',       group: 'Core' },
   { id: 'timetable',     label: 'Timetable',        group: 'Core' },
   { id: 'academics',     label: 'Academics',        group: 'Core' },
@@ -33,12 +34,28 @@ const ALL_MODULES = [
   { id: 'settings',      label: 'Settings',         group: 'System' },
 ];
 
+const HEAD_TITLES = ['Principal', 'Head Master', 'Head Mistress', 'Director', 'Rector'];
+const BOARDS = ['CBSE', 'CISCE', 'WBBSE', 'OTHER'];
+
+interface TenantUser {
+  id: string;
+  displayName: string;
+  email: string;
+  role: string;
+  lastLoginAt?: string;
+}
+
 interface Tenant {
   id: string; slug: string; name: string; shortName: string; board: string;
   city: string; state: string; email: string; phone?: string; headTitle: string;
   headName: string; address?: string; isActive: boolean; plan: string; createdAt: string;
   modules: { module: string; isActive: boolean }[];
-  users: { id: string; displayName: string; email: string; role: string; lastLoginAt?: string }[];
+  users: TenantUser[];
+}
+
+interface ProfileForm {
+  name: string; shortName: string; board: string; email: string; phone: string;
+  headTitle: string; headName: string; city: string; state: string; address: string;
 }
 
 export default function TenantDetailPage() {
@@ -48,12 +65,37 @@ export default function TenantDetailPage() {
   const [activeModules, setActiveModules] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
 
+  // Edit school profile
+  const [editMode, setEditMode] = useState(false);
+  const [profileForm, setProfileForm] = useState<ProfileForm>({
+    name: '', shortName: '', board: '', email: '', phone: '',
+    headTitle: '', headName: '', city: '', state: '', address: '',
+  });
+  const [profileSaving, setProfileSaving] = useState(false);
+
+  // Password reset
+  const [resetUserId, setResetUserId] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordSaving, setPasswordSaving] = useState(false);
+
   useEffect(() => {
     fetch(`/api/superadmin/tenants/${id}`)
       .then((r) => r.json())
       .then((d) => {
         setTenant(d);
         setActiveModules(new Set(d.modules.filter((m: { isActive: boolean }) => m.isActive).map((m: { module: string }) => m.module)));
+        setProfileForm({
+          name: d.name ?? '',
+          shortName: d.shortName ?? '',
+          board: d.board ?? 'CBSE',
+          email: d.email ?? '',
+          phone: d.phone ?? '',
+          headTitle: d.headTitle ?? 'Principal',
+          headName: d.headName ?? '',
+          city: d.city ?? '',
+          state: d.state ?? '',
+          address: d.address ?? '',
+        });
         setLoading(false);
       });
   }, [id]);
@@ -83,6 +125,46 @@ export default function TenantDetailPage() {
     }
   }
 
+  async function saveProfile() {
+    setProfileSaving(true);
+    const res = await fetch(`/api/superadmin/tenants/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(profileForm),
+    });
+    setProfileSaving(false);
+    if (res.ok) {
+      const updated = await res.json();
+      setTenant((prev) => prev ? { ...prev, ...updated } : prev);
+      setEditMode(false);
+      toast.success('School profile updated');
+    } else {
+      toast.error('Failed to update profile');
+    }
+  }
+
+  async function resetPassword() {
+    if (newPassword.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
+    setPasswordSaving(true);
+    const res = await fetch('/api/superadmin/users', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: resetUserId, newPassword }),
+    });
+    setPasswordSaving(false);
+    if (res.ok) {
+      setResetUserId(null);
+      setNewPassword('');
+      toast.success('Password updated successfully');
+    } else {
+      const d = await res.json();
+      toast.error(d.error ?? 'Failed to reset password');
+    }
+  }
+
   if (loading) {
     return <div className="animate-pulse space-y-4">
       {[...Array(4)].map((_, i) => <div key={i} className="h-24 bg-gray-800 rounded-xl" />)}
@@ -90,6 +172,20 @@ export default function TenantDetailPage() {
   }
 
   if (!tenant) return <div className="text-gray-400">Tenant not found</div>;
+
+  function pf(key: keyof ProfileForm, label: string, type = 'text') {
+    return (
+      <div>
+        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1 block">{label}</label>
+        <input
+          type={type}
+          value={profileForm[key]}
+          onChange={(e) => setProfileForm({ ...profileForm, [key]: e.target.value })}
+          className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gold/50"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl space-y-6">
@@ -114,29 +210,93 @@ export default function TenantDetailPage() {
         </button>
       </div>
 
-      {/* Info Card */}
+      {/* School Details / Edit */}
       <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Building2 className="w-4 h-4 text-gold" />
-          <h2 className="font-sora font-semibold text-white">School Details</h2>
-        </div>
-        <div className="grid grid-cols-3 gap-4 text-sm">
-          {[
-            ['Email', tenant.email],
-            ['Phone', tenant.phone ?? '—'],
-            ['Board', tenant.board],
-            ['Head', `${tenant.headTitle} ${tenant.headName}`],
-            ['City', `${tenant.city}, ${tenant.state}`],
-            ['Plan', tenant.plan],
-            ['Status', tenant.isActive ? 'Active' : 'Inactive'],
-            ['Created', new Date(tenant.createdAt).toLocaleDateString('en-IN')],
-          ].map(([label, value]) => (
-            <div key={label}>
-              <p className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">{label}</p>
-              <p className="text-white font-dm-sans">{value}</p>
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-gold" />
+            <h2 className="font-sora font-semibold text-white">School Details</h2>
+          </div>
+          {!editMode ? (
+            <button
+              onClick={() => setEditMode(true)}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-gray-800 text-gray-300 hover:text-white transition-colors"
+            >
+              <Pencil className="w-3.5 h-3.5" /> Edit
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setEditMode(false)}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white"
+              >
+                <X className="w-3.5 h-3.5" /> Cancel
+              </button>
+              <button
+                onClick={saveProfile}
+                disabled={profileSaving}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-gold text-navy hover:bg-gold/90 disabled:opacity-50"
+              >
+                <Save className="w-3.5 h-3.5" />
+                {profileSaving ? 'Saving…' : 'Save Changes'}
+              </button>
             </div>
-          ))}
+          )}
         </div>
+
+        {!editMode ? (
+          <div className="grid grid-cols-3 gap-4 text-sm">
+            {[
+              ['Email', tenant.email],
+              ['Phone', tenant.phone ?? '—'],
+              ['Board', tenant.board],
+              ['Head', `${tenant.headTitle} ${tenant.headName}`],
+              ['City', `${tenant.city}, ${tenant.state}`],
+              ['Address', tenant.address ?? '—'],
+              ['Plan', tenant.plan],
+              ['Status', tenant.isActive ? 'Active' : 'Inactive'],
+              ['Created', new Date(tenant.createdAt).toLocaleDateString('en-IN')],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">{label}</p>
+                <p className="text-white font-dm-sans">{value}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4">
+            {pf('name', 'School Name')}
+            {pf('shortName', 'Short Name')}
+            <div>
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1 block">Board</label>
+              <select
+                value={profileForm.board}
+                onChange={(e) => setProfileForm({ ...profileForm, board: e.target.value })}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gold/50"
+              >
+                {BOARDS.map((b) => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1 block">Head Title</label>
+              <select
+                value={profileForm.headTitle}
+                onChange={(e) => setProfileForm({ ...profileForm, headTitle: e.target.value })}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gold/50"
+              >
+                {HEAD_TITLES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            {pf('headName', 'Head Name')}
+            {pf('email', 'School Email', 'email')}
+            {pf('phone', 'Phone', 'tel')}
+            {pf('city', 'City')}
+            {pf('state', 'State')}
+            <div className="col-span-2">
+              {pf('address', 'Address')}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Module Management */}
@@ -197,17 +357,55 @@ export default function TenantDetailPage() {
         </div>
         <div className="space-y-2">
           {tenant.users.map((u) => (
-            <div key={u.id} className="flex items-center justify-between py-2.5 px-3 bg-gray-800 rounded-lg">
-              <div>
-                <p className="text-sm font-semibold text-white">{u.displayName}</p>
-                <p className="text-xs text-gray-400">{u.email}</p>
+            <div key={u.id} className="rounded-lg overflow-hidden">
+              <div className="flex items-center justify-between py-2.5 px-3 bg-gray-800">
+                <div>
+                  <p className="text-sm font-semibold text-white">{u.displayName}</p>
+                  <p className="text-xs text-gray-400">{u.email}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {u.lastLoginAt && (
+                    <p className="text-[10px] text-gray-500">Last login {new Date(u.lastLoginAt).toLocaleDateString('en-IN')}</p>
+                  )}
+                  <span className="text-xs font-semibold px-2 py-0.5 bg-navy/40 text-ice rounded-full">{u.role}</span>
+                  <button
+                    onClick={() => {
+                      if (resetUserId === u.id) {
+                        setResetUserId(null);
+                        setNewPassword('');
+                      } else {
+                        setResetUserId(u.id);
+                        setNewPassword('');
+                      }
+                    }}
+                    className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg bg-amber/10 text-amber hover:bg-amber/20 transition-colors"
+                  >
+                    <KeyRound className="w-3.5 h-3.5" />
+                    {resetUserId === u.id ? 'Cancel' : 'Change Password'}
+                  </button>
+                </div>
               </div>
-              <div className="text-right">
-                <span className="text-xs font-semibold px-2 py-0.5 bg-navy/40 text-ice rounded-full">{u.role}</span>
-                {u.lastLoginAt && (
-                  <p className="text-[10px] text-gray-500 mt-0.5">Last login {new Date(u.lastLoginAt).toLocaleDateString('en-IN')}</p>
-                )}
-              </div>
+
+              {resetUserId === u.id && (
+                <div className="flex items-center gap-3 px-3 py-3 bg-gray-800/60 border-t border-gray-700">
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="New password (min 8 characters)"
+                    className="flex-1 bg-gray-900 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gold/50 placeholder-gray-600"
+                    onKeyDown={(e) => e.key === 'Enter' && resetPassword()}
+                  />
+                  <button
+                    onClick={resetPassword}
+                    disabled={passwordSaving || newPassword.length < 8}
+                    className="flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-lg bg-gold text-navy hover:bg-gold/90 disabled:opacity-50"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    {passwordSaving ? 'Saving…' : 'Set Password'}
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>

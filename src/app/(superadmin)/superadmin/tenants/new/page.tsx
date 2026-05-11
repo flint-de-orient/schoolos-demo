@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 const ALL_MODULES = [
   { id: 'dashboard',     label: 'Dashboard',          group: 'Core' },
   { id: 'admissions',    label: 'Admissions',          group: 'Core' },
+  { id: 'students',      label: 'Students',            group: 'Core' },
   { id: 'attendance',    label: 'Attendance',          group: 'Core' },
   { id: 'timetable',     label: 'Timetable',           group: 'Core' },
   { id: 'academics',     label: 'Academics',           group: 'Core' },

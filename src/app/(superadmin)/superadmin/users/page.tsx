@@ -16,10 +16,10 @@ interface PlatformUser {
 }
 
 const roleBadge: Record<string, string> = {
-  SUPER_ADMIN: 'bg-coral/10 text-coral',
-  SCHOOL_ADMIN: 'bg-navy/10 text-navy',
-  TEACHER: 'bg-purple/10 text-purple',
-  STAFF: 'bg-gray-100 text-gray-600',
+  SUPER_ADMIN: 'bg-coral/20 text-coral',
+  SCHOOL_ADMIN: 'bg-gold/20 text-gold',
+  TEACHER: 'bg-purple/30 text-violet-300',
+  STAFF: 'bg-gray-700 text-gray-300',
 };
 
 export default function UsersPage() {

@@ -40,7 +40,7 @@ export async function PATCH(
   if (error) return error;
 
   const body = await req.json();
-  const { name, shortName, headName, headTitle, phone, address, isActive, plan } = body;
+  const { name, shortName, headName, headTitle, phone, address, city, state, email, board, isActive, plan } = body;
 
   const tenant = await db.tenant.update({
     where: { id: params.id },
@@ -51,6 +51,10 @@ export async function PATCH(
       ...(headTitle !== undefined && { headTitle }),
       ...(phone !== undefined && { phone }),
       ...(address !== undefined && { address }),
+      ...(city !== undefined && { city }),
+      ...(state !== undefined && { state }),
+      ...(email !== undefined && { email }),
+      ...(board !== undefined && { board }),
       ...(isActive !== undefined && { isActive }),
       ...(plan !== undefined && { plan }),
     },
