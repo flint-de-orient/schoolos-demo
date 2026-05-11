@@ -20,19 +20,17 @@ export async function POST(req: NextRequest) {
     data: { isCurrent: false },
   });
 
-  try {
-    const year = await db.academicYear.create({
-      data: {
-        tenantId: session.user.tenantId,
-        label,
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
-        isCurrent: true,
-      },
-    });
-    return ok(year, 201);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return err(`DB error: ${msg}`, 500);
-  }
+  const year = await db.academicYear.upsert({
+    where: { tenantId_label: { tenantId: session.user.tenantId, label } },
+    update: { startDate: new Date(startDate), endDate: new Date(endDate), isCurrent: true },
+    create: {
+      tenantId: session.user.tenantId,
+      label,
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
+      isCurrent: true,
+    },
+  });
+
+  return ok(year, 201);
 }
