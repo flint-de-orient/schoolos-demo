@@ -347,7 +347,7 @@ export default function TimetablePage() {
               <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
               <div>
                 <p className="text-sm text-gray-700 font-dm-sans">
-                  <strong className="text-amber-700">Today's Substitutions:</strong>{' '}
+                  <strong className="text-amber-700">Today&apos;s Substitutions:</strong>{' '}
                   {substitutions.map((s: any) => `${s.originalTeacher?.name} → ${s.substituteTeacher?.name}`).join('; ')}
                 </p>
                 <button onClick={() => setActiveTab('substitution')} className="mt-1.5 text-xs text-amber-700 font-semibold underline hover:no-underline">
