@@ -9,7 +9,7 @@ export async function GET(_req: NextRequest) {
 
   const tenantId = session.user.tenantId;
 
-  const [config, sections, teacherSubjects, academicYear] = await Promise.all([
+  const [config, sections, teacherSubjects, academicYear, gradeSubjects] = await Promise.all([
     db.timetableConfig.findFirst({
       where: { tenantId },
       include: { periodSlots: { orderBy: { periodNo: 'asc' } } },
@@ -29,10 +29,17 @@ export async function GET(_req: NextRequest) {
       where: { tenantId },
       orderBy: { startDate: 'desc' },
     }),
+    db.gradeSubject.findMany({
+      where: { grade: { tenantId } },
+      select: { gradeId: true, subjectId: true },
+    }),
   ]);
 
   const uniqueSubjectIds = [...new Set(teacherSubjects.map(ts => ts.subjectId))];
   const uniqueTeacherIds = [...new Set(teacherSubjects.map(ts => ts.teacherId))];
+
+  // Which grades have curriculum configured
+  const gradesWithCurriculum = new Set(gradeSubjects.map(gs => gs.gradeId));
 
   const missing: string[] = [];
   if (!config) missing.push('Timetable configuration (school hours & periods)');
@@ -41,6 +48,14 @@ export async function GET(_req: NextRequest) {
   if (teacherSubjects.length === 0) missing.push('Teacher–subject assignments');
   if (!academicYear) missing.push('Academic year');
 
+  const sectionList = sections.map(s => ({
+    id: s.id,
+    label: `${s.grade.name}-${s.name}`,
+    gradeId: s.grade.id,
+    gradeName: s.grade.name,
+    hasCurriculum: gradesWithCurriculum.has(s.grade.id),
+  }));
+
   return ok({
     ready: missing.length === 0,
     missing,
@@ -48,7 +63,7 @@ export async function GET(_req: NextRequest) {
     periodSlotCount: config?.periodSlots.length ?? 0,
     periodsPerDay: config?.periodsPerDay ?? 0,
     workingDays: config?.workingDays ?? [],
-    sections: sections.map(s => ({ id: s.id, label: `${s.grade.name}-${s.name}`, gradeId: s.grade.id })),
+    sections: sectionList,
     subjectCount: uniqueSubjectIds.length,
     teacherCount: uniqueTeacherIds.length,
     subjects: uniqueSubjectIds.map(sid => {
@@ -72,7 +87,7 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Fetch prerequisites ───────────────────────────────────────────────────
-  const [config, teacherSubjects, academicYear] = await Promise.all([
+  const [config, teacherSubjects, academicYear, sections, gradeSubjects] = await Promise.all([
     db.timetableConfig.findFirst({
       where: { tenantId },
       include: { periodSlots: { orderBy: { periodNo: 'asc' } } },
@@ -88,6 +103,14 @@ export async function POST(req: NextRequest) {
       where: { tenantId },
       orderBy: { startDate: 'desc' },
     }),
+    db.section.findMany({
+      where: { id: { in: sectionIds } },
+      include: { grade: { select: { id: true, name: true } } },
+    }),
+    db.gradeSubject.findMany({
+      where: { grade: { tenantId } },
+      select: { gradeId: true, subjectId: true, periodsPerWeek: true },
+    }),
   ]);
 
   if (!config) return err('No timetable configuration found. Set up school configuration first.', 400);
@@ -98,10 +121,9 @@ export async function POST(req: NextRequest) {
   const workingDays = config.workingDays as string[];
   const periodSlots  = config.periodSlots;
 
-  // ── Build subject → teachers map ─────────────────────────────────────────
+  // ── Build subject → teachers map (all subjects) ───────────────────────────
   type SubjectInfo = { subjectId: string; subjectName: string; teachers: { teacherId: string; name: string }[] };
   const subjectMap = new Map<string, SubjectInfo>();
-
   for (const ts of teacherSubjects) {
     if (!subjectMap.has(ts.subjectId)) {
       subjectMap.set(ts.subjectId, { subjectId: ts.subjectId, subjectName: ts.subject.name, teachers: [] });
@@ -109,8 +131,16 @@ export async function POST(req: NextRequest) {
     subjectMap.get(ts.subjectId)!.teachers.push({ teacherId: ts.teacherId, name: ts.teacher.name });
   }
 
-  const subjects = [...subjectMap.values()];
-  if (subjects.length === 0) return err('No subjects with teacher assignments found.', 400);
+  // ── Build grade → curriculum subjects map ─────────────────────────────────
+  const gradeCurriculumMap = new Map<string, string[]>(); // gradeId → [subjectId]
+  for (const gs of gradeSubjects) {
+    if (!gradeCurriculumMap.has(gs.gradeId)) gradeCurriculumMap.set(gs.gradeId, []);
+    gradeCurriculumMap.get(gs.gradeId)!.push(gs.subjectId);
+  }
+
+  // ── Section → grade lookup ────────────────────────────────────────────────
+  const sectionGradeMap = new Map<string, string>(); // sectionId → gradeId
+  for (const s of sections) sectionGradeMap.set(s.id, s.grade.id);
 
   // ── Archive existing active timetable ────────────────────────────────────
   await db.timetable.updateMany({
@@ -118,16 +148,36 @@ export async function POST(req: NextRequest) {
     data: { status: 'ARCHIVED' },
   });
 
-  // ── Generate entries ──────────────────────────────────────────────────────
-  // usedSlots: teacher cannot be in two places at the same (day, periodSlotId)
+  // ── Generate entries per section ─────────────────────────────────────────
   const usedSlots = new Set<string>(); // `${teacherId}-${day}-${periodSlotId}`
   const allEntries: {
     sectionId: string; subjectId: string; teacherId: string; periodSlotId: string; day: string; roomNumber: string;
   }[] = [];
 
+  const warnings: string[] = [];
+
   for (const sectionId of sectionIds) {
-    // Build day schedule: rotate subjects to avoid same subject twice per day
-    const N = subjects.length;
+    const gradeId = sectionGradeMap.get(sectionId);
+    const curriculumSubjectIds = gradeId ? (gradeCurriculumMap.get(gradeId) ?? []) : [];
+
+    // Use grade-specific subjects if curriculum is configured; else fall back to all subjects
+    let subjectsForSection: SubjectInfo[];
+    if (curriculumSubjectIds.length > 0) {
+      subjectsForSection = curriculumSubjectIds
+        .map(sid => subjectMap.get(sid))
+        .filter((s): s is SubjectInfo => s !== undefined);
+    } else {
+      subjectsForSection = [...subjectMap.values()];
+      const sectionLabel = sections.find(s => s.id === sectionId);
+      warnings.push(`${sectionLabel?.grade.name ?? sectionId}: No curriculum configured — used all subjects as fallback`);
+    }
+
+    if (subjectsForSection.length === 0) {
+      warnings.push(`Skipped section ${sectionId} — no subjects with teacher assignments in curriculum`);
+      continue;
+    }
+
+    const N = subjectsForSection.length;
 
     for (let d = 0; d < workingDays.length; d++) {
       const day = workingDays[d];
@@ -136,22 +186,21 @@ export async function POST(req: NextRequest) {
       for (let p = 0; p < periodSlots.length; p++) {
         const slot = periodSlots[p];
 
-        // Find a subject not yet taught today
+        // Rotate through subjects, no repeat per day
         let chosenSubject: SubjectInfo | null = null;
         const offset = (d * 2 + p) % N;
         for (let k = 0; k < N; k++) {
-          const candidate = subjects[(offset + k) % N];
+          const candidate = subjectsForSection[(offset + k) % N];
           if (!usedSubjectsToday.has(candidate.subjectId)) {
             chosenSubject = candidate;
             break;
           }
         }
-        // If all subjects already used today, allow repeat (more periods than subjects)
-        if (!chosenSubject) chosenSubject = subjects[p % N];
+        if (!chosenSubject) chosenSubject = subjectsForSection[p % N]; // allow repeat when P > N
 
         usedSubjectsToday.add(chosenSubject.subjectId);
 
-        // Find an available teacher (not already busy at this day+slot)
+        // Find available teacher for this subject at this slot
         let assignedTeacherId: string | null = null;
         for (const teacher of chosenSubject.teachers) {
           const key = `${teacher.teacherId}-${day}-${slot.id}`;
@@ -161,8 +210,7 @@ export async function POST(req: NextRequest) {
             break;
           }
         }
-
-        if (!assignedTeacherId) continue; // Skip — no teacher available (all busy this slot)
+        if (!assignedTeacherId) continue;
 
         allEntries.push({
           sectionId,
@@ -177,10 +225,10 @@ export async function POST(req: NextRequest) {
   }
 
   if (allEntries.length === 0) {
-    return err('Could not schedule any periods — ensure teachers are assigned to subjects.', 400);
+    return err('Could not schedule any periods — ensure teachers are assigned to curriculum subjects.', 400);
   }
 
-  // ── Create timetable with entries ─────────────────────────────────────────
+  // ── Create timetable ──────────────────────────────────────────────────────
   const label = `AI Generated — ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`;
 
   const timetable = await db.timetable.create({
@@ -197,8 +245,13 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  // Create entries separately to avoid Prisma type-narrowing issues with nested create
-  await db.timetableEntry.createMany({ data: allEntries.map(e => ({ ...e, timetableId: timetable.id, day: e.day as Parameters<typeof db.timetableEntry.create>[0]['data']['day'] })) });
+  await db.timetableEntry.createMany({
+    data: allEntries.map(e => ({
+      ...e,
+      timetableId: timetable.id,
+      day: e.day as Parameters<typeof db.timetableEntry.create>[0]['data']['day'],
+    })),
+  });
 
   const teachersScheduled = new Set(allEntries.map(e => e.teacherId)).size;
   const subjectsScheduled = new Set(allEntries.map(e => e.subjectId)).size;
@@ -206,6 +259,7 @@ export async function POST(req: NextRequest) {
   return ok({
     timetableId: timetable.id,
     label,
+    warnings,
     stats: {
       sectionsGenerated: sectionIds.length,
       totalEntries: allEntries.length,

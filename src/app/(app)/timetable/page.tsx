@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import {
   AlertCircle, CheckCircle2, Sparkles, LayoutGrid, Zap, RotateCcw,
   Brain, TrendingUp, User, Timer, Shield, RefreshCw, ChevronDown, BookOpen,
-  Settings2, Plus, Minus, Clock,
+  Settings2, Plus, Minus, Clock, GraduationCap, BookMarked, Save,
 } from 'lucide-react';
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -31,11 +31,19 @@ type Preflight = {
   periodSlotCount: number;
   periodsPerDay: number;
   workingDays: string[];
-  sections: { id: string; label: string; gradeId: string }[];
+  sections: { id: string; label: string; gradeId: string; gradeName: string; hasCurriculum: boolean }[];
   subjectCount: number;
   teacherCount: number;
   subjects: { id: string; name: string }[];
 };
+
+type CurriculumGrade = {
+  id: string;
+  name: string;
+  displayOrder: number;
+  subjects: { gradeSubjectId: string; subjectId: string; periodsPerWeek: number; isCompulsory: boolean }[];
+};
+type CurriculumSubject = { id: string; name: string; code: string | null; isElective: boolean; teachers: { id: string; name: string }[] };
 
 type GenResult = {
   timetableId: string;
@@ -152,7 +160,7 @@ function TimetableGrid({ grid, periodSlots, workingDays, breakAfterPeriod }: {
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function TimetablePage() {
-  const [activeTab, setActiveTab]       = useState<'timetable' | 'generator' | 'substitution' | 'setup'>('timetable');
+  const [activeTab, setActiveTab]       = useState<'timetable' | 'generator' | 'substitution' | 'curriculum' | 'setup'>('timetable');
   const [grades, setGrades]             = useState<Grade[]>([]);
   const [selectedSectionId, setSelectedSectionId] = useState('');
   const [selectedSectionLabel, setSelectedSectionLabel] = useState('');
@@ -400,11 +408,81 @@ export default function TimetablePage() {
       .finally(() => setSetupSaving(false));
   }
 
+  // ── Curriculum tab state ─────────────────────────────────────────────────
+  const [currGrades, setCurrGrades]         = useState<CurriculumGrade[]>([]);
+  const [currSubjects, setCurrSubjects]     = useState<CurriculumSubject[]>([]);
+  const [currLoading, setCurrLoading]       = useState(false);
+  const [currSaving, setCurrSaving]         = useState(false);
+  const [selectedGradeId, setSelectedGradeId] = useState('');
+  // local draft: gradeId → Set of selected subjectIds
+  const [currDraft, setCurrDraft] = useState<Record<string, Set<string>>>({});
+  // periods per week draft: gradeId-subjectId → number
+  const [ppwDraft, setPpwDraft] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (activeTab !== 'curriculum') return;
+    setCurrLoading(true);
+    fetch('/api/timetable/curriculum').then(r => r.json()).then(d => {
+      const grades: CurriculumGrade[] = d.data?.grades ?? d.grades ?? [];
+      const subjects: CurriculumSubject[] = d.data?.subjects ?? d.subjects ?? [];
+      setCurrGrades(grades);
+      setCurrSubjects(subjects);
+      // Initialise draft from DB
+      const draft: Record<string, Set<string>> = {};
+      const ppw: Record<string, number> = {};
+      for (const g of grades) {
+        draft[g.id] = new Set(g.subjects.map(s => s.subjectId));
+        for (const s of g.subjects) {
+          ppw[`${g.id}-${s.subjectId}`] = s.periodsPerWeek;
+        }
+      }
+      setCurrDraft(draft);
+      setPpwDraft(ppw);
+      if (grades.length > 0 && !selectedGradeId) setSelectedGradeId(grades[0].id);
+    }).catch(() => {})
+      .finally(() => setCurrLoading(false));
+  }, [activeTab]);
+
+  function toggleSubjectForGrade(gradeId: string, subjectId: string) {
+    setCurrDraft(prev => {
+      const next = { ...prev };
+      const set = new Set(next[gradeId] ?? []);
+      if (set.has(subjectId)) { set.delete(subjectId); } else { set.add(subjectId); }
+      next[gradeId] = set;
+      return next;
+    });
+  }
+
+  function handleSaveCurriculum(gradeId: string) {
+    setCurrSaving(true);
+    const subjectIds = [...(currDraft[gradeId] ?? [])];
+    const subjects = subjectIds.map(sid => ({
+      subjectId: sid,
+      periodsPerWeek: ppwDraft[`${gradeId}-${sid}`] ?? 5,
+      isCompulsory: true,
+    }));
+    fetch('/api/timetable/curriculum', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gradeId, subjects }),
+    }).then(r => r.json()).then(d => {
+      if (d.error) { toast.error(d.error); return; }
+      // Update local state
+      setCurrGrades(prev => prev.map(g => g.id === gradeId
+        ? { ...g, subjects: subjects.map(s => ({ gradeSubjectId: '', subjectId: s.subjectId, periodsPerWeek: s.periodsPerWeek, isCompulsory: true })) }
+        : g
+      ));
+      toast.success(`Curriculum saved for ${currGrades.find(g => g.id === gradeId)?.name}`);
+    }).catch(() => toast.error('Failed to save curriculum'))
+      .finally(() => setCurrSaving(false));
+  }
+
   const tabs = [
-    { id: 'timetable' as const,     label: 'Timetable',                  icon: LayoutGrid },
-    { id: 'generator' as const,     label: 'AI Generator',               icon: Sparkles },
-    { id: 'substitution' as const,  label: 'Substitution Intelligence',   icon: Zap },
-    { id: 'setup' as const,         label: 'Setup',                       icon: Settings2 },
+    { id: 'timetable' as const,    label: 'Timetable',                  icon: LayoutGrid },
+    { id: 'generator' as const,    label: 'AI Generator',               icon: Sparkles },
+    { id: 'substitution' as const, label: 'Substitution Intelligence',   icon: Zap },
+    { id: 'curriculum' as const,   label: 'Curriculum',                  icon: GraduationCap },
+    { id: 'setup' as const,        label: 'Setup',                       icon: Settings2 },
   ];
 
   const allSections = grades.flatMap(g => g.sections.map(s => ({ id: s.id, label: `${g.name}-${s.name}`, grade: g })));
@@ -603,9 +681,9 @@ export default function TimetablePage() {
                   {/* Section selector */}
                   <div className="mb-5">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Classes to Generate</p>
-                    <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                    <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
                       {preflight.sections.map(s => (
-                        <label key={s.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 rounded-lg px-1 py-0.5">
+                        <label key={s.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 rounded-lg px-1 py-1">
                           <input type="checkbox"
                             checked={selectedGenSections.has(s.id)}
                             onChange={e => {
@@ -615,11 +693,25 @@ export default function TimetablePage() {
                                 return next;
                               });
                             }}
-                            className="w-3.5 h-3.5 accent-navy rounded" />
-                          <span className="text-sm font-dm-sans text-gray-700">{s.label}</span>
+                            className="w-3.5 h-3.5 accent-navy rounded flex-shrink-0" />
+                          <span className="text-sm font-dm-sans text-gray-700 flex-1">{s.label}</span>
+                          {s.hasCurriculum ? (
+                            <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0">Curriculum ✓</span>
+                          ) : (
+                            <span title="No curriculum defined — will use all subjects as fallback" className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0 cursor-help">No Curriculum</span>
+                          )}
                         </label>
                       ))}
                     </div>
+                    {preflight.sections.some(s => selectedGenSections.has(s.id) && !s.hasCurriculum) && (
+                      <div className="mt-2 flex items-start gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                        <AlertCircle className="w-3 h-3 text-amber-600 mt-0.5 flex-shrink-0" />
+                        <p className="text-[10px] text-amber-700 font-dm-sans">
+                          Some selected classes have no curriculum — all school subjects will be used.{' '}
+                          <button onClick={() => setActiveTab('curriculum')} className="underline font-semibold">Set up curriculum →</button>
+                        </p>
+                      </div>
+                    )}
                     {selectedGenSections.size === 0 && (
                       <p className="text-xs text-amber-600 mt-1.5 font-dm-sans">Select at least one class</p>
                     )}
@@ -851,7 +943,132 @@ export default function TimetablePage() {
         </div>
       )}
 
-      {/* ── TAB 4: Setup ─────────────────────────────────────────────────── */}
+      {/* ── TAB 4: Curriculum ────────────────────────────────────────────── */}
+      {activeTab === 'curriculum' && (
+        <div className="space-y-5">
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
+            <GraduationCap className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+            <p className="text-sm text-blue-800 font-dm-sans">
+              Define which subjects are taught in each grade. The AI Generator will use this curriculum to build grade-appropriate timetables — Class IV gets Science, Class IX gets Physical Science &amp; Life Science, etc.
+            </p>
+          </div>
+
+          {currLoading && (
+            <div className="bg-white rounded-xl border border-gray-100 p-10 flex items-center justify-center gap-3">
+              <RefreshCw className="w-4 h-4 text-gray-300 animate-spin" />
+              <span className="text-sm text-gray-400">Loading curriculum data…</span>
+            </div>
+          )}
+
+          {!currLoading && (
+            <div className="grid grid-cols-4 gap-5">
+              {/* Left: Grade list */}
+              <div className="col-span-1">
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/60">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Grades</p>
+                  </div>
+                  <div className="divide-y divide-gray-50">
+                    {currGrades.length === 0 && (
+                      <p className="px-4 py-6 text-xs text-gray-400 text-center">No grades found</p>
+                    )}
+                    {currGrades.map(g => {
+                      const count = (currDraft[g.id] ?? new Set()).size;
+                      const isActive = selectedGradeId === g.id;
+                      return (
+                        <button key={g.id} onClick={() => setSelectedGradeId(g.id)}
+                          className={`w-full text-left px-4 py-3 flex items-center justify-between transition-colors ${isActive ? 'bg-navy text-white' : 'hover:bg-gray-50 text-gray-700'}`}>
+                          <span className={`text-sm font-dm-sans font-medium ${isActive ? 'text-white' : ''}`}>{g.name}</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white/20 text-white' : 'bg-iceLight text-navy'}`}>
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right: Subject checklist for selected grade */}
+              <div className="col-span-3">
+                {!selectedGradeId ? (
+                  <div className="bg-white rounded-xl border border-gray-100 p-10 text-center">
+                    <BookMarked className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                    <p className="text-sm text-gray-400">Select a grade to configure its curriculum</p>
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
+                    <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                      <div>
+                        <h3 className="text-sm font-sora font-semibold text-navy">
+                          {currGrades.find(g => g.id === selectedGradeId)?.name} — Subject Curriculum
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {(currDraft[selectedGradeId] ?? new Set()).size} subjects selected · set periods/week for each
+                        </p>
+                      </div>
+                      <button onClick={() => handleSaveCurriculum(selectedGradeId)}
+                        disabled={currSaving}
+                        className="flex items-center gap-2 bg-gold text-navy font-sora font-semibold rounded-lg px-4 py-2 hover:bg-gold/90 transition-colors disabled:opacity-50 text-sm">
+                        {currSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                        Save
+                      </button>
+                    </div>
+
+                    <div className="divide-y divide-gray-50">
+                      {currSubjects.length === 0 && (
+                        <div className="px-5 py-8 text-center">
+                          <p className="text-sm text-gray-400">No subjects found. Add subjects in the HR module first.</p>
+                        </div>
+                      )}
+                      {currSubjects.map(subject => {
+                        const selected = (currDraft[selectedGradeId] ?? new Set()).has(subject.id);
+                        const ppwKey = `${selectedGradeId}-${subject.id}`;
+                        const ppw = ppwDraft[ppwKey] ?? 5;
+                        const hasTeacher = subject.teachers.length > 0;
+                        return (
+                          <div key={subject.id}
+                            className={`flex items-center gap-4 px-5 py-3 transition-colors ${selected ? 'bg-iceLight/60' : 'hover:bg-gray-50/60'}`}>
+                            <input type="checkbox" checked={selected}
+                              onChange={() => toggleSubjectForGrade(selectedGradeId, subject.id)}
+                              className="w-4 h-4 accent-navy rounded flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-sm font-semibold font-dm-sans ${selected ? 'text-navy' : 'text-gray-600'}`}>{subject.name}</span>
+                                {subject.code && <span className="text-[10px] text-gray-400 font-mono">{subject.code}</span>}
+                                {subject.isElective && <span className="text-[9px] bg-purple/10 text-purple px-1.5 py-0.5 rounded-full font-semibold">Elective</span>}
+                              </div>
+                              {hasTeacher ? (
+                                <p className="text-[10px] text-gray-400 mt-0.5">
+                                  {subject.teachers.map(t => t.name).join(', ')}
+                                </p>
+                              ) : (
+                                <p className="text-[10px] text-amber-600 mt-0.5 flex items-center gap-1">
+                                  <AlertCircle className="w-2.5 h-2.5" /> No teacher assigned
+                                </p>
+                              )}
+                            </div>
+                            {selected && (
+                              <div className="flex items-center gap-1.5 flex-shrink-0">
+                                <label className="text-[10px] text-gray-500 whitespace-nowrap">periods/week</label>
+                                <input type="number" value={ppw} min={1} max={10}
+                                  onChange={e => setPpwDraft(prev => ({ ...prev, [ppwKey]: Number(e.target.value) }))}
+                                  className="w-12 border border-gray-200 rounded px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-navy/20" />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TAB 5: Setup ─────────────────────────────────────────────────── */}
       {activeTab === 'setup' && (
         <div className="grid grid-cols-5 gap-6">
           {/* Left: Configuration form */}
