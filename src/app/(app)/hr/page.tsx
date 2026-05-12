@@ -1664,94 +1664,95 @@ export default function HRPage() {
                     </div>
 
                     <div className="overflow-x-auto rounded-xl border border-gray-100">
-                      <table className="w-full min-w-[640px]">
+                      <table className="w-full min-w-[680px]">
                         <thead className="bg-gray-50 border-b border-gray-100">
                           <tr>
                             <th className="text-left text-xs uppercase tracking-wide text-gray-400 px-4 py-3 font-medium">Staff Member</th>
-                            <th className="text-left text-xs uppercase tracking-wide text-gray-400 px-4 py-3 font-medium">Dept / Designation</th>
-                            <th className="text-center text-xs uppercase tracking-wide text-gray-400 px-4 py-3 font-medium">Annual Quota</th>
-                            <th className="text-center text-xs uppercase tracking-wide text-gray-400 px-4 py-3 font-medium">Used</th>
-                            <th className="text-center text-xs uppercase tracking-wide text-gray-400 px-4 py-3 font-medium">Remaining</th>
-                            <th className="text-left text-xs uppercase tracking-wide text-gray-400 px-4 py-3 font-medium">Progress</th>
-                            <th className="text-center text-xs uppercase tracking-wide text-gray-400 px-4 py-3 font-medium">Status</th>
+                            <th className="text-left text-xs uppercase tracking-wide text-gray-400 px-4 py-3 font-medium">Designation</th>
+                            <th className="text-center text-xs uppercase tracking-wide text-gray-400 px-4 py-3 font-medium">Leave Types</th>
+                            <th className="text-center text-xs uppercase tracking-wide text-gray-400 px-4 py-3 font-medium">Used ↗</th>
+                            <th className="text-center text-xs uppercase tracking-wide text-gray-400 px-4 py-3 font-medium">Remaining ↗</th>
+                            <th className="text-left text-xs uppercase tracking-wide text-gray-400 px-4 py-3 font-medium">Overall Balance</th>
                           </tr>
                         </thead>
                         <tbody>
                           {filteredBalance.map((s, i) => {
-                            const quota = getQuota(s);
-                            const used = getUsed(s.id);
-                            const remaining = Math.max(0, quota - used);
-                            const pct = quota > 0 ? Math.round((remaining / quota) * 100) : 100;
-                            const statusLabel = remaining === 0 ? 'Exhausted' : remaining <= Math.round(quota * 0.2) ? 'Critical' : remaining <= Math.round(quota * 0.4) ? 'Low' : 'Healthy';
-                            const statusColor = remaining === 0 ? 'bg-coral/10 text-coral' : remaining <= Math.round(quota * 0.2) ? 'bg-coral/10 text-coral' : remaining <= Math.round(quota * 0.4) ? 'bg-amber/10 text-amber' : 'bg-green/10 text-green';
-                            const barColor = remaining === 0 ? '#D85A30' : remaining <= Math.round(quota * 0.2) ? '#D85A30' : remaining <= Math.round(quota * 0.4) ? '#BA7517' : '#3B6D11';
+                            const staffPolicies = leavePolicies.filter(p => policyAppliesToStaff(p, s._sourceType));
+                            const totalQuota = staffPolicies.reduce((sum, p) => sum + p.daysAllowed, 0);
+                            const usedPerPolicy = staffPolicies.map(p => ({
+                              p,
+                              used: leaveRequests
+                                .filter(l => l.staffId === s.id &&
+                                  (l.type === p.leaveType || l.type === p.label) &&
+                                  l.status !== 'Rejected' &&
+                                  new Date(l.from) >= sessionStart &&
+                                  new Date(l.from) <= sessionEnd)
+                                .reduce((sum, l) => sum + l.days, 0),
+                            }));
+                            const totalUsed = usedPerPolicy.reduce((sum, r) => sum + r.used, 0);
+                            const totalRemaining = Math.max(0, totalQuota - totalUsed);
+                            const pct = totalQuota > 0 ? Math.round((totalRemaining / totalQuota) * 100) : 100;
+                            const barColor = totalRemaining === 0 ? '#D85A30' : pct <= 25 ? '#D85A30' : pct <= 50 ? '#BA7517' : '#3B6D11';
+                            const remColor = totalRemaining === 0 ? 'text-coral' : pct <= 50 ? 'text-amber' : 'text-green';
                             return (
-                              <tr key={s.id} className={`border-b border-gray-50 hover:bg-iceLight/50 transition-colors ${i % 2 !== 0 ? 'bg-gray-50/30' : ''}`}>
+                              <tr key={s.id} className={`border-b border-gray-50 hover:bg-iceLight/40 transition-colors ${i % 2 !== 0 ? 'bg-gray-50/20' : ''}`}>
                                 <td className="px-4 py-3">
                                   <div className="flex items-center gap-2.5">
                                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-[11px] font-bold font-sora flex-shrink-0 ${s._sourceType === 'teacher' ? 'bg-purple' : 'bg-navy'}`}>
                                       {getInitials(s.name)}
                                     </div>
                                     <div>
-                                      <p className="font-semibold text-sm text-gray-800 leading-tight">{s.name}</p>
+                                      <p className="font-semibold text-sm text-gray-800">{s.name}</p>
                                       <p className="text-[10px] text-gray-400">{s._sourceType === 'teacher' ? 'Teaching' : 'Non-Teaching'}</p>
                                     </div>
                                   </div>
                                 </td>
-                                <td className="px-4 py-3">
-                                  <p className="text-xs text-gray-700 font-medium">{s.designation}</p>
-                                  <p className="text-[10px] text-gray-400">{s.department}</p>
+                                <td className="px-4 py-3 text-xs text-gray-600">{s.designation}</td>
+                                <td className="px-4 py-3 text-center">
+                                  <div className="flex justify-center gap-1 flex-wrap">
+                                    {staffPolicies.slice(0, 4).map(p => (
+                                      <span key={p.id} title={p.label} className="w-3 h-3 rounded-full inline-block border border-white/60" style={{ backgroundColor: p.color }} />
+                                    ))}
+                                    {staffPolicies.length > 4 && <span className="text-[10px] text-gray-400">+{staffPolicies.length - 4}</span>}
+                                  </div>
+                                  <p className="text-[10px] text-gray-400 mt-0.5">{staffPolicies.length} types</p>
                                 </td>
                                 <td className="px-4 py-3 text-center">
-                                  <span className="text-sm font-semibold text-gray-700">{quota}</span>
-                                  <span className="text-xs text-gray-400 ml-0.5">d</span>
-                                </td>
-                                <td className="px-4 py-3 text-center">
-                                  <button onClick={() => setBalanceModal({ staff: s, mode: 'used' })}
-                                    className={`text-sm font-bold underline decoration-dotted underline-offset-2 transition-colors ${used === 0 ? 'text-gray-300 cursor-default no-underline' : 'text-amber hover:text-amber/70 cursor-pointer'}`}
-                                    disabled={used === 0}>
-                                    {used}
+                                  <button
+                                    onClick={() => totalUsed > 0 ? setBalanceModal({ staff: s, mode: 'used' }) : undefined}
+                                    disabled={totalUsed === 0}
+                                    className={`text-base font-bold font-sora leading-none ${totalUsed === 0 ? 'text-gray-300 cursor-default' : 'text-amber underline decoration-dotted underline-offset-2 hover:text-amber/70 cursor-pointer'}`}>
+                                    {totalUsed}
                                   </button>
-                                  <span className="text-xs text-gray-400 ml-0.5">d</span>
+                                  <p className="text-[10px] text-gray-400 mt-0.5">days</p>
                                 </td>
                                 <td className="px-4 py-3 text-center">
-                                  <button onClick={() => setBalanceModal({ staff: s, mode: 'remaining' })}
-                                    className={`text-sm font-bold underline decoration-dotted underline-offset-2 transition-colors hover:opacity-70 cursor-pointer ${remaining === 0 ? 'text-coral' : remaining <= Math.round(quota * 0.4) ? 'text-amber' : 'text-green'}`}>
-                                    {remaining}
+                                  <button
+                                    onClick={() => setBalanceModal({ staff: s, mode: 'remaining' })}
+                                    className={`text-base font-bold font-sora leading-none underline decoration-dotted underline-offset-2 hover:opacity-70 cursor-pointer ${remColor}`}>
+                                    {totalRemaining}
                                   </button>
-                                  <span className="text-xs text-gray-400 ml-0.5">d</span>
+                                  <p className="text-[10px] text-gray-400 mt-0.5">days</p>
                                 </td>
                                 <td className="px-4 py-3">
                                   <div className="flex items-center gap-2">
                                     <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden min-w-[80px]">
                                       <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: barColor }} />
                                     </div>
-                                    <span className="text-[10px] text-gray-400 w-8 text-right">{pct}%</span>
+                                    <span className="text-[10px] text-gray-400 w-16 text-right">{totalUsed}/{totalQuota}d used</span>
                                   </div>
-                                </td>
-                                <td className="px-4 py-3 text-center">
-                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusColor}`}>{statusLabel}</span>
                                 </td>
                               </tr>
                             );
                           })}
                         </tbody>
-                        <tfoot className="border-t border-gray-100 bg-gray-50">
-                          <tr>
-                            <td colSpan={2} className="px-4 py-2.5 text-xs font-semibold text-gray-500">{filteredBalance.length} staff members</td>
-                            <td className="px-4 py-2.5 text-center text-xs font-bold text-gray-700">
-                              {filteredBalance.reduce((sum, s) => sum + getQuota(s), 0)}d
-                            </td>
-                            <td className="px-4 py-2.5 text-center text-xs font-bold text-amber">
-                              {filteredBalance.reduce((sum, s) => sum + getUsed(s.id), 0)}d
-                            </td>
-                            <td className="px-4 py-2.5 text-center text-xs font-bold text-green">
-                              {filteredBalance.reduce((sum, s) => sum + Math.max(0, getQuota(s) - getUsed(s.id)), 0)}d
-                            </td>
-                            <td colSpan={2} />
-                          </tr>
-                        </tfoot>
                       </table>
+                      {filteredBalance.length === 0 && (
+                        <div className="text-center py-10 text-sm text-gray-400">No staff found</div>
+                      )}
+                      {leavePolicies.length === 0 && (
+                        <div className="text-center py-8 text-xs text-gray-400">No leave policies configured — add them in Settings → HR → Leave Policies</div>
+                      )}
                     </div>
                   </div>
                 );
