@@ -21,7 +21,26 @@ type TimetableConfig = { periodsPerDay: number; workingDays: string[]; breakAfte
 type SubCandidate = { id: string; name: string; proficiency: string };
 type SubSuggestion = { periodNo: number; startTime: string; endTime: string; subject: { name: string }; section: string; timetableEntryId: string; candidates: SubCandidate[] };
 type AbsentTeacher  = { id: string; name: string };
-type GenerationState = 'idle' | 'running' | 'complete';
+type GenerationState = 'idle' | 'running' | 'complete' | 'error';
+
+type Preflight = {
+  ready: boolean;
+  missing: string[];
+  hasConfig: boolean;
+  periodSlotCount: number;
+  periodsPerDay: number;
+  workingDays: string[];
+  sections: { id: string; label: string; gradeId: string }[];
+  subjectCount: number;
+  teacherCount: number;
+  subjects: { id: string; name: string }[];
+};
+
+type GenResult = {
+  timetableId: string;
+  label: string;
+  stats: { sectionsGenerated: number; totalEntries: number; teachersScheduled: number; subjectsScheduled: number; conflictsFound: number };
+};
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -50,9 +69,9 @@ function subjectColorClass(subject: string, idx: number): string {
 const GEN_STEPS = [
   { icon: '⚙️', text: 'Loading teacher availability matrix...' },
   { icon: '🔄', text: 'Running constraint satisfaction algorithm...' },
-  { icon: '📊', text: 'Evaluating 1,247 combinations...' },
-  { icon: '✅', text: 'Zero conflicts detected' },
-  { icon: '🎯', text: 'Optimising for teacher fatigue...' },
+  { icon: '📊', text: 'Distributing subjects across periods...' },
+  { icon: '✅', text: 'Checking for scheduling conflicts...' },
+  { icon: '💾', text: 'Saving timetable to database...' },
 ] as const;
 
 // ── TimetableGrid ────────────────────────────────────────────────────────────
@@ -156,8 +175,12 @@ export default function TimetablePage() {
   // Generator tab
   const [genState, setGenState]         = useState<GenerationState>('idle');
   const [genStep, setGenStep]           = useState(0);
-  const [showOnlyChanges, setShowOnlyChanges] = useState(false);
   const [constraintsOpen, setConstraintsOpen] = useState(true);
+  const [preflight, setPreflight]       = useState<Preflight | null>(null);
+  const [preflightLoading, setPreflightLoading] = useState(false);
+  const [selectedGenSections, setSelectedGenSections] = useState<Set<string>>(new Set());
+  const [genResult, setGenResult]       = useState<GenResult | null>(null);
+  const [genError, setGenError]         = useState<string | null>(null);
 
   // ── Initial load: period slots + grades ──────────────────────────────────
   useEffect(() => {
@@ -227,7 +250,6 @@ export default function TimetablePage() {
   // ── Load absent teachers for substitution tab ────────────────────────────
   useEffect(() => {
     if (activeTab !== 'substitution') return;
-    const today = new Date().toISOString().split('T')[0];
     fetch(`/api/hr/leave?status=APPROVED`).then(r => r.json()).then(d => {
       const data: any[] = d.data ?? d ?? [];
       const todayDate = new Date(); todayDate.setHours(0, 0, 0, 0);
@@ -267,13 +289,58 @@ export default function TimetablePage() {
     }).catch(() => toast.error('Failed to assign substitute'));
   }
 
-  // ── Generator animation ──────────────────────────────────────────────────
+  // ── Preflight check when generator tab opens ─────────────────────────────
+  useEffect(() => {
+    if (activeTab !== 'generator') return;
+    setPreflightLoading(true);
+    fetch('/api/timetable/generate')
+      .then(r => r.json())
+      .then(d => {
+        const pf: Preflight = d.data ?? d;
+        setPreflight(pf);
+        // Default-select first 4 sections
+        setSelectedGenSections(new Set(pf.sections.slice(0, 4).map(s => s.id)));
+      })
+      .catch(() => setPreflight(null))
+      .finally(() => setPreflightLoading(false));
+  }, [activeTab]);
+
+  // ── Generator animation (runs while API call is in-flight) ───────────────
   useEffect(() => {
     if (genState !== 'running') return;
-    if (genStep >= GEN_STEPS.length) { setTimeout(() => setGenState('complete'), 400); return; }
-    const t = setTimeout(() => setGenStep(s => s + 1), 700);
+    if (genStep >= GEN_STEPS.length) return; // hold at last step until API responds
+    const t = setTimeout(() => setGenStep(s => s + 1), 900);
     return () => clearTimeout(t);
   }, [genState, genStep]);
+
+  function handleGenerate() {
+    if (!preflight?.ready || selectedGenSections.size === 0) return;
+    setGenState('running');
+    setGenStep(0);
+    setGenResult(null);
+    setGenError(null);
+
+    fetch('/api/timetable/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sectionIds: [...selectedGenSections] }),
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) { setGenError(d.error); setGenState('error'); return; }
+        setGenResult(d.data ?? d);
+        setGenState('complete');
+        // Reload timetable for the first section
+        const firstSection = [...selectedGenSections][0];
+        if (firstSection) {
+          setSelectedSectionId(firstSection);
+          const found = (preflight?.sections ?? []).find(s => s.id === firstSection);
+          setSelectedSectionLabel(found?.label ?? '');
+          loadTimetable(firstSection);
+        }
+      })
+      .catch(() => { setGenError('Network error — please try again.'); setGenState('error'); });
+  }
 
   const tabs = [
     { id: 'timetable' as const, label: 'Timetable', icon: LayoutGrid },
@@ -409,126 +476,232 @@ export default function TimetablePage() {
       {/* ── TAB 2: AI Generator ──────────────────────────────────────────── */}
       {activeTab === 'generator' && (
         <div className="space-y-5">
-          <div className="grid grid-cols-5 gap-5">
-            <div className="col-span-2 space-y-4">
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-                <div className="flex items-center gap-2 mb-1"><Sparkles className="w-5 h-5 text-gold" /><h2 className="text-base font-sora font-semibold text-navy">AI Timetable Generator</h2></div>
-                <p className="text-xs text-gray-500 font-dm-sans mb-5">Generate optimised, conflict-free timetables in seconds</p>
-                <div className="mb-5">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Classes to Include</p>
-                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                    {allSections.slice(0, 8).map((s, i) => (
-                      <label key={s.id} className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" defaultChecked={i < 4} className="w-3.5 h-3.5 accent-navy rounded" />
-                        <span className="text-sm font-dm-sans text-gray-700">{s.label}</span>
-                      </label>
+          {/* Pre-flight loading */}
+          {preflightLoading && (
+            <div className="bg-white rounded-xl border border-gray-100 p-8 flex items-center justify-center gap-3">
+              <RefreshCw className="w-4 h-4 text-gray-300 animate-spin" />
+              <span className="text-sm text-gray-400 font-dm-sans">Checking available data…</span>
+            </div>
+          )}
+
+          {/* Data insufficient — show what's missing */}
+          {!preflightLoading && preflight && !preflight.ready && (
+            <div className="bg-white rounded-xl border border-red-100 shadow-sm p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
+                  <AlertCircle className="w-5 h-5 text-red-500" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-sora font-semibold text-navy">Insufficient Data for AI Generation</h2>
+                  <p className="text-xs text-gray-500 font-dm-sans mt-0.5">The following must be set up before the AI can generate a timetable:</p>
+                </div>
+              </div>
+              <ul className="space-y-2 pl-1">
+                {preflight.missing.map(m => (
+                  <li key={m} className="flex items-start gap-2.5">
+                    <span className="w-4 h-4 rounded-full bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0 mt-0.5 text-[10px] font-bold">✕</span>
+                    <span className="text-sm font-dm-sans text-gray-700">{m}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-gray-400 font-dm-sans border-t border-gray-100 pt-3">
+                Complete the setup in <strong>Settings → School Configuration</strong> and <strong>HR → Teacher Subjects</strong>, then return here.
+              </p>
+            </div>
+          )}
+
+          {/* Ready — show generator UI */}
+          {!preflightLoading && preflight?.ready && (
+            <div className="grid grid-cols-5 gap-5">
+              {/* Left: Config panel */}
+              <div className="col-span-2 space-y-4">
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Sparkles className="w-5 h-5 text-gold" />
+                    <h2 className="text-base font-sora font-semibold text-navy">AI Timetable Generator</h2>
+                  </div>
+                  <p className="text-xs text-gray-500 font-dm-sans mb-5">Generate optimised, conflict-free timetables from your actual teacher & subject data</p>
+
+                  {/* Live data summary */}
+                  <div className="grid grid-cols-2 gap-2 mb-5">
+                    {[
+                      { label: 'Periods/Day', value: preflight.periodsPerDay },
+                      { label: 'Working Days', value: preflight.workingDays.length },
+                      { label: 'Subjects', value: preflight.subjectCount },
+                      { label: 'Teachers', value: preflight.teacherCount },
+                    ].map(item => (
+                      <div key={item.label} className="bg-iceLight rounded-lg px-3 py-2">
+                        <div className="text-xs text-gray-500 font-dm-sans">{item.label}</div>
+                        <div className="text-lg font-sora font-semibold text-navy">{item.value}</div>
+                      </div>
                     ))}
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3 mb-5">
-                  <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Periods / Day</label>
-                    <input type="number" defaultValue={ttConfig.periodsPerDay} min={6} max={10}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-navy/20 font-dm-sans" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Working Days</p>
-                    <div className="flex gap-1 flex-wrap">
-                      {ttConfig.workingDays.map((d) => (
-                        <span key={d} className="w-7 h-7 flex items-center justify-center text-[10px] font-bold rounded-full bg-navy text-white">{d[0]}</span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <div className="mb-5">
-                  <button onClick={() => setConstraintsOpen(o => !o)} className="flex items-center justify-between w-full text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                    Constraints <ChevronDown className={`w-3.5 h-3.5 transition-transform ${constraintsOpen ? 'rotate-180' : ''}`} />
-                  </button>
-                  {constraintsOpen && (
-                    <div className="space-y-2 pl-1">
-                      {['No subject more than once per day per class', 'Science practicals only Fri/Sat', 'Max 4 consecutive periods per teacher', 'Core subjects not in Periods 7–8'].map(c => (
-                        <label key={c} className="flex items-start gap-2 cursor-pointer">
-                          <input type="checkbox" defaultChecked className="mt-0.5 w-3.5 h-3.5 accent-navy rounded flex-shrink-0" />
-                          <span className="text-xs font-dm-sans text-gray-600 leading-snug">{c}</span>
+
+                  {/* Section selector */}
+                  <div className="mb-5">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Classes to Generate</p>
+                    <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                      {preflight.sections.map(s => (
+                        <label key={s.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 rounded-lg px-1 py-0.5">
+                          <input type="checkbox"
+                            checked={selectedGenSections.has(s.id)}
+                            onChange={e => {
+                              setSelectedGenSections(prev => {
+                                const next = new Set(prev);
+                                e.target.checked ? next.add(s.id) : next.delete(s.id);
+                                return next;
+                              });
+                            }}
+                            className="w-3.5 h-3.5 accent-navy rounded" />
+                          <span className="text-sm font-dm-sans text-gray-700">{s.label}</span>
                         </label>
                       ))}
                     </div>
-                  )}
-                </div>
-                <div className="bg-teal/10 border border-teal/20 rounded-lg px-3 py-2.5 mb-5 flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-teal flex-shrink-0" />
-                  <p className="text-xs font-dm-sans text-teal font-semibold">{teachers.length} teachers loaded from database</p>
-                </div>
-                <button onClick={() => { setGenState('running'); setGenStep(0); }} disabled={genState === 'running'}
-                  className="w-full flex items-center justify-center gap-2 bg-gold text-navy font-sora font-semibold rounded-xl px-4 py-3 hover:bg-gold/90 transition-colors disabled:opacity-60 text-sm">
-                  <Brain className="w-4 h-4" />
-                  {genState === 'running' ? 'Generating...' : '🤖 Generate Optimal Timetable'}
-                </button>
-              </div>
-            </div>
-
-            <div className="col-span-3 space-y-4">
-              {genState === 'running' && (
-                <div className="bg-white rounded-xl border border-navy/10 shadow-sm p-6">
-                  <div className="flex items-center gap-2 mb-4"><RefreshCw className="w-4 h-4 text-navy animate-spin" /><h3 className="text-sm font-sora font-semibold text-navy">Generating timetable...</h3></div>
-                  <div className="space-y-2.5">
-                    {GEN_STEPS.map((step, i) => {
-                      const isDone = i < genStep; const isActive = i === genStep;
-                      return (
-                        <div key={i} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${isActive ? 'bg-navy/5 border border-navy/10' : isDone ? 'opacity-60' : 'opacity-30'}`}>
-                          <span className="text-base leading-none">{step.icon}</span>
-                          <span className="flex-1 text-sm font-dm-sans text-gray-700">{step.text}</span>
-                          {isDone && <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />}
-                          {isActive && <span className="w-3 h-3 border-2 border-navy border-t-transparent rounded-full animate-spin flex-shrink-0" />}
-                        </div>
-                      );
-                    })}
+                    {selectedGenSections.size === 0 && (
+                      <p className="text-xs text-amber-600 mt-1.5 font-dm-sans">Select at least one class</p>
+                    )}
                   </div>
-                </div>
-              )}
-              {genState === 'idle' && (
-                <div className="bg-white rounded-xl border-2 border-dashed border-gray-200 p-10 flex flex-col items-center justify-center text-center min-h-[260px]">
-                  <Sparkles className="w-10 h-10 text-gray-300 mb-3" />
-                  <p className="text-sm font-sora font-semibold text-gray-400">Configure constraints and generate</p>
-                  <p className="text-xs text-gray-400 font-dm-sans mt-1">Your AI-optimised timetable will appear here</p>
-                </div>
-              )}
-              {genState === 'complete' && (
-                <div className="space-y-4">
-                  <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-                    <div className="flex items-start gap-6">
-                      <div className="flex-shrink-0 flex flex-col items-center justify-center w-28 h-28 rounded-full border-4 border-navy/10 bg-navy/5">
-                        <span className="text-3xl font-sora font-semibold text-navy">96</span>
-                        <span className="text-xs text-gray-400">/100</span>
-                      </div>
-                      <div className="flex-1 space-y-3">
-                        <h3 className="text-sm font-sora font-semibold text-navy mb-1">Quality Score — Excellent</h3>
+
+                  {/* Constraints */}
+                  <div className="mb-5">
+                    <button onClick={() => setConstraintsOpen(o => !o)} className="flex items-center justify-between w-full text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                      Constraints <ChevronDown className={`w-3.5 h-3.5 transition-transform ${constraintsOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {constraintsOpen && (
+                      <div className="space-y-2 pl-1">
                         {[
-                          { label: 'Conflict Score', score: 100, color: 'bg-green-500', text: 'text-green-700', note: 'Zero scheduling conflicts' },
-                          { label: 'Fatigue Score',  score: 91,  color: 'bg-teal',     text: 'text-teal',     note: 'All teachers within load limits' },
-                          { label: 'Pedagogy Score', score: 94,  color: 'bg-purple',   text: 'text-purple',   note: 'Core subjects optimally placed' },
+                          'No subject more than once per day per class',
+                          'Max 4 consecutive periods per teacher',
+                          'Teacher conflict prevention across sections',
+                        ].map(c => (
+                          <label key={c} className="flex items-start gap-2 cursor-pointer">
+                            <input type="checkbox" defaultChecked className="mt-0.5 w-3.5 h-3.5 accent-navy rounded flex-shrink-0" />
+                            <span className="text-xs font-dm-sans text-gray-600 leading-snug">{c}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={handleGenerate}
+                    disabled={genState === 'running' || selectedGenSections.size === 0}
+                    className="w-full flex items-center justify-center gap-2 bg-gold text-navy font-sora font-semibold rounded-xl px-4 py-3 hover:bg-gold/90 transition-colors disabled:opacity-50 text-sm">
+                    <Brain className="w-4 h-4" />
+                    {genState === 'running' ? 'Generating…' : '🤖 Generate Optimal Timetable'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Right: Output panel */}
+              <div className="col-span-3 space-y-4">
+                {genState === 'idle' && (
+                  <div className="bg-white rounded-xl border-2 border-dashed border-gray-200 p-10 flex flex-col items-center justify-center text-center min-h-[300px]">
+                    <Sparkles className="w-10 h-10 text-gray-300 mb-3" />
+                    <p className="text-sm font-sora font-semibold text-gray-400">Select classes and click Generate</p>
+                    <p className="text-xs text-gray-400 font-dm-sans mt-1">The AI will schedule {preflight.subjectCount} subjects across {preflight.periodsPerDay} periods using {preflight.teacherCount} teachers</p>
+                  </div>
+                )}
+
+                {genState === 'running' && (
+                  <div className="bg-white rounded-xl border border-navy/10 shadow-sm p-6">
+                    <div className="flex items-center gap-2 mb-4">
+                      <RefreshCw className="w-4 h-4 text-navy animate-spin" />
+                      <h3 className="text-sm font-sora font-semibold text-navy">Generating timetable for {selectedGenSections.size} class{selectedGenSections.size !== 1 ? 'es' : ''}…</h3>
+                    </div>
+                    <div className="space-y-2.5">
+                      {GEN_STEPS.map((step, i) => {
+                        const isDone = i < genStep; const isActive = i === genStep;
+                        return (
+                          <div key={i} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${isActive ? 'bg-navy/5 border border-navy/10' : isDone ? 'opacity-60' : 'opacity-30'}`}>
+                            <span className="text-base leading-none">{step.icon}</span>
+                            <span className="flex-1 text-sm font-dm-sans text-gray-700">{step.text}</span>
+                            {isDone && <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />}
+                            {isActive && <span className="w-3 h-3 border-2 border-navy border-t-transparent rounded-full animate-spin flex-shrink-0" />}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {genState === 'error' && genError && (
+                  <div className="bg-white rounded-xl border border-red-100 shadow-sm p-6">
+                    <div className="flex items-center gap-3 mb-3">
+                      <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                      <h3 className="text-sm font-sora font-semibold text-red-700">Generation Failed</h3>
+                    </div>
+                    <p className="text-sm font-dm-sans text-gray-600 mb-4">{genError}</p>
+                    <button onClick={() => { setGenState('idle'); setGenError(null); }}
+                      className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 font-semibold rounded-xl px-4 py-2 hover:border-navy/30 transition-colors text-sm">
+                      <RotateCcw className="w-4 h-4" /> Try Again
+                    </button>
+                  </div>
+                )}
+
+                {genState === 'complete' && genResult && (
+                  <div className="space-y-4">
+                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+                      <div className="flex items-center gap-2 mb-4">
+                        <CheckCircle2 className="w-5 h-5 text-green-500" />
+                        <h3 className="text-sm font-sora font-semibold text-navy">Timetable Generated Successfully</h3>
+                        <AIBadge label="AI" />
+                      </div>
+                      <p className="text-xs text-gray-400 font-dm-sans mb-4">{genResult.label}</p>
+
+                      {/* Real stats */}
+                      <div className="grid grid-cols-2 gap-3 mb-5">
+                        {[
+                          { label: 'Classes Scheduled',  value: genResult.stats.sectionsGenerated, color: 'text-navy' },
+                          { label: 'Total Periods',       value: genResult.stats.totalEntries,      color: 'text-navy' },
+                          { label: 'Teachers Assigned',   value: genResult.stats.teachersScheduled, color: 'text-teal' },
+                          { label: 'Conflicts Found',     value: genResult.stats.conflictsFound,    color: 'text-green-600' },
+                        ].map(s => (
+                          <div key={s.label} className="bg-gray-50 rounded-xl p-3">
+                            <div className={`text-2xl font-sora font-semibold ${s.color}`}>{s.value}</div>
+                            <div className="text-xs text-gray-500 font-dm-sans mt-0.5">{s.label}</div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Quality bars (real data derived) */}
+                      <div className="space-y-3">
+                        {[
+                          { label: 'Conflict Score', score: genResult.stats.conflictsFound === 0 ? 100 : Math.max(60, 100 - genResult.stats.conflictsFound * 5), color: 'bg-green-500', text: 'text-green-700', note: genResult.stats.conflictsFound === 0 ? 'Zero scheduling conflicts' : `${genResult.stats.conflictsFound} conflicts detected` },
+                          { label: 'Subject Coverage', score: Math.min(100, Math.round((genResult.stats.subjectsScheduled / preflight.subjectCount) * 100)), color: 'bg-teal', text: 'text-teal', note: `${genResult.stats.subjectsScheduled} of ${preflight.subjectCount} subjects scheduled` },
+                          { label: 'Teacher Utilisation', score: Math.min(100, Math.round((genResult.stats.teachersScheduled / preflight.teacherCount) * 100)), color: 'bg-purple', text: 'text-purple', note: `${genResult.stats.teachersScheduled} of ${preflight.teacherCount} teachers active` },
                         ].map(s => (
                           <div key={s.label}>
-                            <div className="flex items-center justify-between mb-1"><span className="text-xs text-gray-600">{s.label}</span><span className={`text-xs font-bold ${s.text}`}>{s.score}/100</span></div>
-                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full ${s.color} rounded-full`} style={{ width: `${s.score}%` }} /></div>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs text-gray-600">{s.label}</span>
+                              <span className={`text-xs font-bold ${s.text}`}>{s.score}/100</span>
+                            </div>
+                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                              <div className={`h-full ${s.color} rounded-full transition-all duration-700`} style={{ width: `${s.score}%` }} />
+                            </div>
                             <p className="text-[10px] text-gray-400 mt-0.5">{s.note}</p>
                           </div>
                         ))}
                       </div>
                     </div>
+
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => { setActiveTab('timetable'); toast.success('Timetable is now active — viewing generated schedule.'); }}
+                        className="flex items-center gap-2 bg-gold text-navy font-sora font-semibold rounded-xl px-5 py-2.5 hover:bg-gold/90 transition-colors text-sm">
+                        <CheckCircle2 className="w-4 h-4" /> View Timetable
+                      </button>
+                      <button
+                        onClick={() => { setGenState('idle'); setGenResult(null); }}
+                        className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 font-semibold rounded-xl px-4 py-2.5 hover:border-navy/30 transition-colors text-sm">
+                        <RotateCcw className="w-4 h-4" /> Regenerate
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex gap-3">
-                    <button onClick={() => { toast.success('New timetable applied! Takes effect from Monday.'); }} className="flex items-center gap-2 bg-gold text-navy font-sora font-semibold rounded-xl px-5 py-2.5 hover:bg-gold/90 transition-colors text-sm">
-                      <CheckCircle2 className="w-4 h-4" />Apply This Timetable
-                    </button>
-                    <button onClick={() => { setGenState('idle'); setGenStep(0); setTimeout(() => { setGenState('running'); setGenStep(0); }, 100); }} className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 font-semibold rounded-xl px-4 py-2.5 hover:border-navy/30 transition-colors text-sm">
-                      <RotateCcw className="w-4 h-4" />Regenerate
-                    </button>
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
