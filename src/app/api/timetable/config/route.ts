@@ -61,8 +61,16 @@ export async function POST(req: NextRequest) {
     if (config.breakAfterPeriod.includes(p)) current = addMinutes(current, config.breakDuration);
   }
 
-  // Delete old slots and recreate (config may have changed period count)
-  await db.periodSlot.deleteMany({ where: { configId: config.id } });
+  // Delete old slots — must clear TimetableEntry references first (FK constraint)
+  const oldSlots = await db.periodSlot.findMany({
+    where: { configId: config.id },
+    select: { id: true },
+  });
+  const oldSlotIds = oldSlots.map(s => s.id);
+  if (oldSlotIds.length > 0) {
+    await db.timetableEntry.deleteMany({ where: { periodSlotId: { in: oldSlotIds } } });
+    await db.periodSlot.deleteMany({ where: { configId: config.id } });
+  }
   await db.periodSlot.createMany({
     data: slotDefs.map(s => ({ configId: config.id, ...s })),
   });
