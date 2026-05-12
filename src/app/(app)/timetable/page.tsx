@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import {
   AlertCircle, CheckCircle2, Sparkles, LayoutGrid, Zap, RotateCcw,
   Brain, TrendingUp, User, Timer, Shield, RefreshCw, ChevronDown, BookOpen,
+  Settings2, Plus, Minus, Clock,
 } from 'lucide-react';
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -151,7 +152,7 @@ function TimetableGrid({ grid, periodSlots, workingDays, breakAfterPeriod }: {
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function TimetablePage() {
-  const [activeTab, setActiveTab]       = useState<'timetable' | 'generator' | 'substitution'>('timetable');
+  const [activeTab, setActiveTab]       = useState<'timetable' | 'generator' | 'substitution' | 'setup'>('timetable');
   const [grades, setGrades]             = useState<Grade[]>([]);
   const [selectedSectionId, setSelectedSectionId] = useState('');
   const [selectedSectionLabel, setSelectedSectionLabel] = useState('');
@@ -342,10 +343,68 @@ export default function TimetablePage() {
       .catch(() => { setGenError('Network error — please try again.'); setGenState('error'); });
   }
 
+  // ── Setup form state ─────────────────────────────────────────────────────
+  const ALL_DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'] as const;
+  const [setupForm, setSetupForm] = useState({
+    schoolStartTime: '08:00',
+    periodDuration: 40,
+    periodsPerDay: 8,
+    breakAfterPeriod: [4],
+    breakDuration: 30,
+    workingDays: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'],
+  });
+  const [setupSaving, setSetupSaving] = useState(false);
+  const [setupSlots, setSetupSlots] = useState<PeriodSlot[]>([]);
+  const [setupExisting, setSetupExisting] = useState(false);
+
+  useEffect(() => {
+    if (activeTab !== 'setup') return;
+    fetch('/api/timetable/config').then(r => r.json()).then(d => {
+      const cfg = d.data?.config ?? d.config;
+      if (cfg) {
+        setSetupExisting(true);
+        setSetupForm({
+          schoolStartTime: cfg.schoolStartTime,
+          periodDuration: cfg.periodDuration,
+          periodsPerDay: cfg.periodsPerDay,
+          breakAfterPeriod: cfg.breakAfterPeriod,
+          breakDuration: cfg.breakDuration,
+          workingDays: cfg.workingDays,
+        });
+        setSetupSlots(cfg.periodSlots ?? []);
+      }
+    }).catch(() => {});
+  }, [activeTab]);
+
+  function handleSaveSetup() {
+    setSetupSaving(true);
+    fetch('/api/timetable/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(setupForm),
+    }).then(r => r.json()).then(d => {
+      if (d.error) { toast.error(d.error); return; }
+      const slots = d.data?.periodSlots ?? d.periodSlots ?? [];
+      setSetupSlots(slots);
+      setSetupExisting(true);
+      toast.success(`Configuration saved — ${slots.length} period slots generated`);
+      // Reload period slots in main view
+      setPeriodSlots(slots.sort((a: PeriodSlot, b: PeriodSlot) => a.periodNo - b.periodNo));
+      setTtConfig({
+        periodsPerDay: setupForm.periodsPerDay,
+        workingDays: setupForm.workingDays,
+        breakAfterPeriod: setupForm.breakAfterPeriod,
+        breakDuration: setupForm.breakDuration,
+      });
+    }).catch(() => toast.error('Failed to save configuration'))
+      .finally(() => setSetupSaving(false));
+  }
+
   const tabs = [
-    { id: 'timetable' as const, label: 'Timetable', icon: LayoutGrid },
-    { id: 'generator' as const, label: 'AI Generator', icon: Sparkles },
-    { id: 'substitution' as const, label: 'Substitution Intelligence', icon: Zap },
+    { id: 'timetable' as const,     label: 'Timetable',                  icon: LayoutGrid },
+    { id: 'generator' as const,     label: 'AI Generator',               icon: Sparkles },
+    { id: 'substitution' as const,  label: 'Substitution Intelligence',   icon: Zap },
+    { id: 'setup' as const,         label: 'Setup',                       icon: Settings2 },
   ];
 
   const allSections = grades.flatMap(g => g.sections.map(s => ({ id: s.id, label: `${g.name}-${s.name}`, grade: g })));
@@ -504,9 +563,13 @@ export default function TimetablePage() {
                   </li>
                 ))}
               </ul>
-              <p className="text-xs text-gray-400 font-dm-sans border-t border-gray-100 pt-3">
-                Complete the setup in <strong>Settings → School Configuration</strong> and <strong>HR → Teacher Subjects</strong>, then return here.
-              </p>
+              <div className="border-t border-gray-100 pt-3 flex items-center gap-3">
+                <button onClick={() => setActiveTab('setup')}
+                  className="flex items-center gap-2 bg-navy text-white text-sm font-semibold rounded-lg px-4 py-2 hover:bg-navyMid transition-colors">
+                  <Settings2 className="w-4 h-4" /> Configure Now
+                </button>
+                <span className="text-xs text-gray-400 font-dm-sans">Opens the Setup tab where you can define school hours &amp; periods</span>
+              </div>
             </div>
           )}
 
@@ -785,6 +848,161 @@ export default function TimetablePage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ── TAB 4: Setup ─────────────────────────────────────────────────── */}
+      {activeTab === 'setup' && (
+        <div className="grid grid-cols-5 gap-6">
+          {/* Left: Configuration form */}
+          <div className="col-span-3 space-y-5">
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <div className="flex items-center gap-2 mb-1">
+                <Settings2 className="w-5 h-5 text-navy" />
+                <h2 className="text-base font-sora font-semibold text-navy">School Timetable Configuration</h2>
+              </div>
+              <p className="text-xs text-gray-500 font-dm-sans mb-6">
+                {setupExisting ? 'Editing existing configuration — saving will regenerate period slots.' : 'No configuration found. Fill in the details below to get started.'}
+              </p>
+
+              <div className="space-y-5">
+                {/* School start time & period duration */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
+                      <Clock className="w-3 h-3 inline mr-1" />School Start Time
+                    </label>
+                    <input type="time" value={setupForm.schoolStartTime}
+                      onChange={e => setSetupForm(f => ({ ...f, schoolStartTime: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-navy/20 font-dm-sans" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Period Duration (minutes)</label>
+                    <input type="number" value={setupForm.periodDuration} min={20} max={90}
+                      onChange={e => setSetupForm(f => ({ ...f, periodDuration: Number(e.target.value) }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-navy/20 font-dm-sans" />
+                  </div>
+                </div>
+
+                {/* Periods per day */}
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Periods Per Day</label>
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => setSetupForm(f => ({ ...f, periodsPerDay: Math.max(4, f.periodsPerDay - 1) }))}
+                      className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center hover:border-navy/30 text-gray-500">
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-2xl font-sora font-semibold text-navy w-8 text-center">{setupForm.periodsPerDay}</span>
+                    <button onClick={() => setSetupForm(f => ({ ...f, periodsPerDay: Math.min(12, f.periodsPerDay + 1) }))}
+                      className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center hover:border-navy/30 text-gray-500">
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-xs text-gray-400 font-dm-sans">(4–12 periods)</span>
+                  </div>
+                </div>
+
+                {/* Break configuration */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Break After Period</label>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {Array.from({ length: setupForm.periodsPerDay }, (_, i) => i + 1).map(p => (
+                        <button key={p}
+                          onClick={() => setSetupForm(f => ({
+                            ...f,
+                            breakAfterPeriod: f.breakAfterPeriod.includes(p)
+                              ? f.breakAfterPeriod.filter(x => x !== p)
+                              : [...f.breakAfterPeriod, p].sort((a, b) => a - b),
+                          }))}
+                          className={`w-8 h-8 rounded-lg text-xs font-bold border transition-colors ${setupForm.breakAfterPeriod.includes(p) ? 'bg-gold text-navy border-gold' : 'bg-white text-gray-500 border-gray-200 hover:border-navy/30'}`}>
+                          {p}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1">Click period numbers to toggle break after that period</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Break Duration (minutes)</label>
+                    <input type="number" value={setupForm.breakDuration} min={5} max={60}
+                      onChange={e => setSetupForm(f => ({ ...f, breakDuration: Number(e.target.value) }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-navy/20 font-dm-sans" />
+                  </div>
+                </div>
+
+                {/* Working days */}
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">Working Days</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {ALL_DAYS.map(day => {
+                      const active = setupForm.workingDays.includes(day);
+                      return (
+                        <button key={day}
+                          onClick={() => setSetupForm(f => ({
+                            ...f,
+                            workingDays: active ? f.workingDays.filter(d => d !== day) : [...f.workingDays, day],
+                          }))}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${active ? 'bg-navy text-white border-navy' : 'bg-white text-gray-500 border-gray-200 hover:border-navy/30'}`}>
+                          {day.slice(0, 3)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 pt-5 border-t border-gray-100">
+                <button onClick={handleSaveSetup} disabled={setupSaving || setupForm.workingDays.length === 0}
+                  className="flex items-center gap-2 bg-gold text-navy font-sora font-semibold rounded-xl px-6 py-3 hover:bg-gold/90 transition-colors disabled:opacity-50 text-sm">
+                  {setupSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                  {setupSaving ? 'Saving…' : setupExisting ? 'Update Configuration' : 'Save & Generate Period Slots'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Period slot preview */}
+          <div className="col-span-2 space-y-4">
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+              <h3 className="text-sm font-sora font-semibold text-navy mb-3">
+                {setupSlots.length > 0 ? `Period Slots (${setupSlots.length} generated)` : 'Period Slots'}
+              </h3>
+
+              {setupSlots.length === 0 ? (
+                <div className="text-center py-8">
+                  <Clock className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                  <p className="text-xs text-gray-400 font-dm-sans">Save configuration to generate period slots</p>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {setupSlots.map(slot => (
+                    <div key={slot.id} className="flex items-center gap-3 px-3 py-2 bg-iceLight rounded-lg">
+                      <span className="w-16 text-[10px] font-bold text-navy font-sora">P{slot.periodNo}</span>
+                      <span className="text-xs font-dm-sans text-gray-600">{slot.startTime} – {slot.endTime}</span>
+                      {setupForm.breakAfterPeriod.includes(slot.periodNo) && (
+                        <span className="ml-auto text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold">↓ BREAK</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {setupExisting && (
+              <div className="bg-teal/10 border border-teal/20 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <CheckCircle2 className="w-4 h-4 text-teal" />
+                  <span className="text-sm font-semibold text-teal">Configuration Active</span>
+                </div>
+                <p className="text-xs text-gray-500 font-dm-sans">
+                  {setupForm.periodsPerDay} periods/day · {setupForm.workingDays.length} working days · {setupForm.periodDuration} min/period
+                </p>
+                <button onClick={() => setActiveTab('generator')}
+                  className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-navy underline hover:no-underline">
+                  <Sparkles className="w-3 h-3" /> Go to AI Generator →
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </PageWrapper>
