@@ -572,9 +572,10 @@ function LeaveBalanceModal({ staff, mode, leaveRequests, policies, onClose }: {
     return { policy: p, used, remaining: Math.max(0, p.daysAllowed - used) };
   });
 
-  const totalQuota     = applicablePolicies.reduce((s, p) => s + p.daysAllowed, 0);
-  const totalUsed      = staffRequests.reduce((s, l) => s + l.days, 0);
-  const totalRemaining = Math.max(0, totalQuota - totalUsed);
+  const regularApplicable  = applicablePolicies.filter(p => p.daysAllowed <= 60);
+  const totalQuota         = regularApplicable.reduce((s, p) => s + p.daysAllowed, 0);
+  const totalUsed          = staffRequests.reduce((s, l) => s + l.days, 0);
+  const totalRemaining     = Math.max(0, totalQuota - totalUsed);
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -644,38 +645,62 @@ function LeaveBalanceModal({ staff, mode, leaveRequests, policies, onClose }: {
               </div>
             )
           ) : (
-            /* ── Remaining: per-policy breakdown ── */
-            <div className="space-y-3">
-              {remainingByPolicy.map(({ policy, used, remaining }) => {
+            /* ── Remaining: per-policy breakdown, regular vs statutory ── */
+            (() => {
+              const regular  = remainingByPolicy.filter(r => r.policy.daysAllowed <= 60);
+              const statutory = remainingByPolicy.filter(r => r.policy.daysAllowed > 60);
+              const renderRow = ({ policy, used, remaining }: { policy: LeavePolicy; used: number; remaining: number }) => {
                 const pct = policy.daysAllowed > 0 ? Math.round((remaining / policy.daysAllowed) * 100) : 0;
-                const statusColor = remaining === 0 ? 'text-coral' : remaining <= 2 ? 'text-amber' : 'text-green';
+                const remColor = remaining === 0 ? 'text-coral' : remaining <= 2 ? 'text-amber' : 'text-green';
                 return (
                   <div key={policy.id} className="bg-gray-50 rounded-xl p-3.5">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: policy.color }} />
                         <span className="text-sm font-semibold text-gray-800">{policy.label}</span>
-                        {policy.isPaid ? (
-                          <span className="text-[9px] font-bold bg-green/10 text-green border border-green/20 px-1.5 py-0.5 rounded-full">Paid</span>
-                        ) : (
-                          <span className="text-[9px] font-bold bg-gray-100 text-gray-500 border border-gray-200 px-1.5 py-0.5 rounded-full">Unpaid</span>
-                        )}
+                        {policy.isPaid
+                          ? <span className="text-[9px] font-bold bg-green/10 text-green border border-green/20 px-1.5 py-0.5 rounded-full">Paid</span>
+                          : <span className="text-[9px] font-bold bg-gray-100 text-gray-500 border border-gray-200 px-1.5 py-0.5 rounded-full">Unpaid</span>}
                       </div>
-                      <span className={`text-lg font-sora font-bold ${statusColor}`}>{remaining}<span className="text-xs font-normal text-gray-400 ml-0.5">/{policy.daysAllowed}</span></span>
+                      <span className={`text-lg font-sora font-bold ${remColor}`}>{remaining}<span className="text-xs font-normal text-gray-400 ml-0.5">/{policy.daysAllowed}d</span></span>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: policy.color, opacity: 0.7 }} />
+                        <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: policy.color, opacity: 0.7 }} />
                       </div>
-                      <span className="text-xs text-gray-400 w-20 text-right">{used} used · {remaining} left</span>
+                      <span className="text-xs text-gray-400 w-20 text-right">{used}d used · {remaining}d left</span>
                     </div>
                     {remaining === 0 && (
-                      <p className="text-[10px] text-coral mt-1.5 font-semibold">Quota exhausted — any new request will trigger the {policy.exceededPolicy.replace('_', ' ').toLowerCase()} policy.</p>
+                      <p className="text-[10px] text-coral mt-1.5 font-semibold">Quota exhausted — {policy.exceededPolicy.replace(/_/g, ' ').toLowerCase()} policy applies.</p>
                     )}
                   </div>
                 );
-              })}
-            </div>
+              };
+              return (
+                <div className="space-y-2">
+                  {regular.length > 0 && <>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Regular Leaves</p>
+                    {regular.map(renderRow)}
+                  </>}
+                  {statutory.length > 0 && <>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mt-3 mb-1">Statutory / On-Claim Leaves</p>
+                    {statutory.map(r => (
+                      <div key={r.policy.id} className="bg-blue-50 border border-blue-100 rounded-xl p-3.5 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: r.policy.color }} />
+                          <span className="text-sm font-semibold text-gray-800">{r.policy.label}</span>
+                          <span className="text-[9px] font-bold bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">Statutory</span>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-blue-600">{r.policy.daysAllowed}d entitlement</p>
+                          <p className="text-[10px] text-gray-400">Claimed as needed · not in running balance</p>
+                        </div>
+                      </div>
+                    ))}
+                  </>}
+                </div>
+              );
+            })()
           )}
         </div>
       </div>
@@ -1678,22 +1703,25 @@ export default function HRPage() {
                         <tbody>
                           {filteredBalance.map((s, i) => {
                             const staffPolicies = leavePolicies.filter(p => policyAppliesToStaff(p, s._sourceType));
-                            const totalQuota = staffPolicies.reduce((sum, p) => sum + p.daysAllowed, 0);
-                            const usedPerPolicy = staffPolicies.map(p => ({
-                              p,
-                              used: leaveRequests
+                            // Statutory/special leaves (>60d e.g. Maternity 180d) shown separately — not in running balance
+                            const regularPolicies = staffPolicies.filter(p => p.daysAllowed <= 60);
+                            const specialPolicies  = staffPolicies.filter(p => p.daysAllowed > 60);
+
+                            const getUsedForPolicy = (p: LeavePolicy) =>
+                              leaveRequests
                                 .filter(l => l.staffId === s.id &&
                                   (l.type === p.leaveType || l.type === p.label) &&
                                   l.status !== 'Rejected' &&
                                   new Date(l.from) >= sessionStart &&
                                   new Date(l.from) <= sessionEnd)
-                                .reduce((sum, l) => sum + l.days, 0),
-                            }));
-                            const totalUsed = usedPerPolicy.reduce((sum, r) => sum + r.used, 0);
-                            const totalRemaining = Math.max(0, totalQuota - totalUsed);
-                            const pct = totalQuota > 0 ? Math.round((totalRemaining / totalQuota) * 100) : 100;
-                            const barColor = totalRemaining === 0 ? '#D85A30' : pct <= 25 ? '#D85A30' : pct <= 50 ? '#BA7517' : '#3B6D11';
-                            const remColor = totalRemaining === 0 ? 'text-coral' : pct <= 50 ? 'text-amber' : 'text-green';
+                                .reduce((sum, l) => sum + l.days, 0);
+
+                            const regularQuota     = regularPolicies.reduce((sum, p) => sum + p.daysAllowed, 0);
+                            const regularUsed      = regularPolicies.reduce((sum, p) => sum + getUsedForPolicy(p), 0);
+                            const regularRemaining = Math.max(0, regularQuota - regularUsed);
+                            const pct = regularQuota > 0 ? Math.round((regularRemaining / regularQuota) * 100) : 100;
+                            const barColor = regularRemaining === 0 ? '#D85A30' : pct <= 25 ? '#D85A30' : pct <= 50 ? '#BA7517' : '#3B6D11';
+                            const remColor = regularRemaining === 0 ? 'text-coral' : pct <= 50 ? 'text-amber' : 'text-green';
                             return (
                               <tr key={s.id} className={`border-b border-gray-50 hover:bg-iceLight/40 transition-colors ${i % 2 !== 0 ? 'bg-gray-50/20' : ''}`}>
                                 <td className="px-4 py-3">
@@ -1719,10 +1747,10 @@ export default function HRPage() {
                                 </td>
                                 <td className="px-4 py-3 text-center">
                                   <button
-                                    onClick={() => totalUsed > 0 ? setBalanceModal({ staff: s, mode: 'used' }) : undefined}
-                                    disabled={totalUsed === 0}
-                                    className={`text-base font-bold font-sora leading-none ${totalUsed === 0 ? 'text-gray-300 cursor-default' : 'text-amber underline decoration-dotted underline-offset-2 hover:text-amber/70 cursor-pointer'}`}>
-                                    {totalUsed}
+                                    onClick={() => regularUsed > 0 ? setBalanceModal({ staff: s, mode: 'used' }) : undefined}
+                                    disabled={regularUsed === 0}
+                                    className={`text-base font-bold font-sora leading-none ${regularUsed === 0 ? 'text-gray-300 cursor-default' : 'text-amber underline decoration-dotted underline-offset-2 hover:text-amber/70 cursor-pointer'}`}>
+                                    {regularUsed}
                                   </button>
                                   <p className="text-[10px] text-gray-400 mt-0.5">days</p>
                                 </td>
@@ -1730,16 +1758,21 @@ export default function HRPage() {
                                   <button
                                     onClick={() => setBalanceModal({ staff: s, mode: 'remaining' })}
                                     className={`text-base font-bold font-sora leading-none underline decoration-dotted underline-offset-2 hover:opacity-70 cursor-pointer ${remColor}`}>
-                                    {totalRemaining}
+                                    {regularRemaining}
                                   </button>
                                   <p className="text-[10px] text-gray-400 mt-0.5">days</p>
+                                  {specialPolicies.length > 0 && (
+                                    <p className="text-[9px] text-gray-300 mt-0.5" title={specialPolicies.map(p => `${p.label}: ${p.daysAllowed}d`).join(', ')}>
+                                      +{specialPolicies.map(p => p.label.split(' ')[0]).join('/')} on claim
+                                    </p>
+                                  )}
                                 </td>
                                 <td className="px-4 py-3">
                                   <div className="flex items-center gap-2">
                                     <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden min-w-[80px]">
                                       <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: barColor }} />
                                     </div>
-                                    <span className="text-[10px] text-gray-400 w-16 text-right">{totalUsed}/{totalQuota}d used</span>
+                                    <span className="text-[10px] text-gray-400 w-16 text-right">{regularUsed}/{regularQuota}d used</span>
                                   </div>
                                 </td>
                               </tr>
