@@ -38,7 +38,6 @@ export async function GET(_req: NextRequest) {
   const uniqueSubjectIds = [...new Set(teacherSubjects.map(ts => ts.subjectId))];
   const uniqueTeacherIds = [...new Set(teacherSubjects.map(ts => ts.teacherId))];
 
-  // Which grades have curriculum configured
   const gradesWithCurriculum = new Set(gradeSubjects.map(gs => gs.gradeId));
 
   const missing: string[] = [];
@@ -109,7 +108,7 @@ export async function POST(req: NextRequest) {
     }),
     db.gradeSubject.findMany({
       where: { grade: { tenantId } },
-      select: { gradeId: true, subjectId: true, periodsPerWeek: true },
+      select: { gradeId: true, subjectId: true, periodsPerWeek: true, schedulingSlot: true },
     }),
   ]);
 
@@ -119,9 +118,9 @@ export async function POST(req: NextRequest) {
   if (!academicYear) return err('No academic year found. Create an academic year first.', 400);
 
   const workingDays = config.workingDays as string[];
-  const periodSlots  = config.periodSlots;
+  const periodSlots = config.periodSlots;
 
-  // ── Build subject → teachers map (all subjects) ───────────────────────────
+  // ── Build subject → teachers map ─────────────────────────────────────────
   type SubjectInfo = { subjectId: string; subjectName: string; teachers: { teacherId: string; name: string }[] };
   const subjectMap = new Map<string, SubjectInfo>();
   for (const ts of teacherSubjects) {
@@ -131,15 +130,20 @@ export async function POST(req: NextRequest) {
     subjectMap.get(ts.subjectId)!.teachers.push({ teacherId: ts.teacherId, name: ts.teacher.name });
   }
 
-  // ── Build grade → curriculum subjects map ─────────────────────────────────
-  const gradeCurriculumMap = new Map<string, string[]>(); // gradeId → [subjectId]
+  // ── Build grade → curriculum map (preserving periodsPerWeek + schedulingSlot) ──
+  type CurrEntry = { subjectId: string; periodsPerWeek: number; schedulingSlot: string };
+  const gradeCurriculumMap = new Map<string, CurrEntry[]>();
   for (const gs of gradeSubjects) {
     if (!gradeCurriculumMap.has(gs.gradeId)) gradeCurriculumMap.set(gs.gradeId, []);
-    gradeCurriculumMap.get(gs.gradeId)!.push(gs.subjectId);
+    gradeCurriculumMap.get(gs.gradeId)!.push({
+      subjectId: gs.subjectId,
+      periodsPerWeek: gs.periodsPerWeek,
+      schedulingSlot: gs.schedulingSlot,
+    });
   }
 
   // ── Section → grade lookup ────────────────────────────────────────────────
-  const sectionGradeMap = new Map<string, string>(); // sectionId → gradeId
+  const sectionGradeMap = new Map<string, string>();
   for (const s of sections) sectionGradeMap.set(s.id, s.grade.id);
 
   // ── Archive existing active timetable ────────────────────────────────────
@@ -149,60 +153,100 @@ export async function POST(req: NextRequest) {
   });
 
   // ── Generate entries per section ─────────────────────────────────────────
-  const usedSlots = new Set<string>(); // `${teacherId}-${day}-${periodSlotId}`
+  const WEEKEND_DAYS = new Set(['SATURDAY', 'SUNDAY']);
+  const lastSlotId = periodSlots[periodSlots.length - 1]?.id;
+
+  // Teacher conflict guard across all sections: teacherId-day-slotId
+  const usedSlots = new Set<string>();
+
   const allEntries: {
-    sectionId: string; subjectId: string; teacherId: string; periodSlotId: string; day: string; roomNumber: string;
+    sectionId: string; subjectId: string; teacherId: string;
+    periodSlotId: string; day: string; roomNumber: string;
   }[] = [];
 
   const warnings: string[] = [];
 
   for (const sectionId of sectionIds) {
     const gradeId = sectionGradeMap.get(sectionId);
-    const curriculumSubjectIds = gradeId ? (gradeCurriculumMap.get(gradeId) ?? []) : [];
+    const sectionLabel = sections.find(s => s.id === sectionId);
+    const gradeName = sectionLabel?.grade.name ?? sectionId;
 
-    // Use grade-specific subjects if curriculum is configured; else fall back to all subjects
-    let subjectsForSection: SubjectInfo[];
-    if (curriculumSubjectIds.length > 0) {
-      subjectsForSection = curriculumSubjectIds
-        .map(sid => subjectMap.get(sid))
-        .filter((s): s is SubjectInfo => s !== undefined);
-    } else {
-      subjectsForSection = [...subjectMap.values()];
-      const sectionLabel = sections.find(s => s.id === sectionId);
-      warnings.push(`${sectionLabel?.grade.name ?? sectionId}: No curriculum configured — used all subjects as fallback`);
+    let curriculum: CurrEntry[] = gradeId ? (gradeCurriculumMap.get(gradeId) ?? []) : [];
+
+    if (curriculum.length === 0) {
+      // Fallback: treat all teacher-assigned subjects as REGULAR with 5 ppw
+      curriculum = [...subjectMap.keys()].map(sid => ({
+        subjectId: sid, periodsPerWeek: 5, schedulingSlot: 'REGULAR',
+      }));
+      warnings.push(`${gradeName}: No curriculum configured — used all subjects as fallback (5 periods/week, Regular)`);
     }
 
-    if (subjectsForSection.length === 0) {
-      warnings.push(`Skipped section ${sectionId} — no subjects with teacher assignments in curriculum`);
+    // Drop subjects with no teacher assigned
+    curriculum = curriculum.filter(e => subjectMap.has(e.subjectId));
+
+    if (curriculum.length === 0) {
+      warnings.push(`Skipped ${gradeName} — no subjects with teacher assignments in curriculum`);
       continue;
     }
 
-    const N = subjectsForSection.length;
+    // Separate by scheduling slot
+    // AFTER_SCHOOL subjects are intentionally excluded from the main timetable grid
+    const regularPool  = curriculum.filter(e => ['REGULAR', 'DOUBLE_PERIOD'].includes(e.schedulingSlot));
+    const weekendPool  = curriculum.filter(e => e.schedulingSlot === 'WEEKEND');
+    const activityPool = curriculum.filter(e => e.schedulingSlot === 'ACTIVITY');
 
-    for (let d = 0; d < workingDays.length; d++) {
-      const day = workingDays[d];
+    // Weekly quota tracker — resets per section (each section is an independent week)
+    const weeklyCount = new Map<string, number>();
+
+    for (const day of workingDays) {
+      const isWeekend = WEEKEND_DAYS.has(day.toUpperCase());
       const usedSubjectsToday = new Set<string>();
 
       for (let p = 0; p < periodSlots.length; p++) {
         const slot = periodSlots[p];
+        const isLastPeriod = slot.id === lastSlotId;
 
-        // Rotate through subjects, no repeat per day
-        let chosenSubject: SubjectInfo | null = null;
-        const offset = (d * 2 + p) % N;
-        for (let k = 0; k < N; k++) {
-          const candidate = subjectsForSection[(offset + k) % N];
-          if (!usedSubjectsToday.has(candidate.subjectId)) {
-            chosenSubject = candidate;
-            break;
-          }
+        // ── Build the eligible pool for this exact day + period slot ─────────
+        let pool: CurrEntry[];
+
+        if (isWeekend) {
+          // Weekend days: only WEEKEND-slot subjects
+          pool = weekendPool;
+        } else if (isLastPeriod && activityPool.length > 0) {
+          // Last period of a weekday: prefer ACTIVITY subjects
+          const activityAvail = activityPool.filter(e =>
+            !usedSubjectsToday.has(e.subjectId) &&
+            (weeklyCount.get(e.subjectId) ?? 0) < e.periodsPerWeek
+          );
+          // If all activity quotas are filled, fall back to regular
+          pool = activityAvail.length > 0 ? activityAvail : regularPool;
+        } else {
+          // Normal weekday period: only REGULAR subjects
+          pool = regularPool;
         }
-        if (!chosenSubject) chosenSubject = subjectsForSection[p % N]; // allow repeat when P > N
 
-        usedSubjectsToday.add(chosenSubject.subjectId);
+        // Filter pool: respect weekly quota + no repeat today
+        const eligible = pool.filter(e =>
+          !usedSubjectsToday.has(e.subjectId) &&
+          (weeklyCount.get(e.subjectId) ?? 0) < e.periodsPerWeek
+        );
 
-        // Find available teacher for this subject at this slot
+        if (eligible.length === 0) continue;
+
+        // Greedy: pick the subject with the highest remaining weekly quota first
+        // This avoids subjects being starved at the end of the week
+        eligible.sort((a, b) => {
+          const remA = a.periodsPerWeek - (weeklyCount.get(a.subjectId) ?? 0);
+          const remB = b.periodsPerWeek - (weeklyCount.get(b.subjectId) ?? 0);
+          return remB - remA;
+        });
+
+        const chosen = eligible[0];
+        const subjectInfo = subjectMap.get(chosen.subjectId)!;
+
+        // Find an available teacher for this subject at this slot
         let assignedTeacherId: string | null = null;
-        for (const teacher of chosenSubject.teachers) {
+        for (const teacher of subjectInfo.teachers) {
           const key = `${teacher.teacherId}-${day}-${slot.id}`;
           if (!usedSlots.has(key)) {
             usedSlots.add(key);
@@ -210,16 +254,31 @@ export async function POST(req: NextRequest) {
             break;
           }
         }
-        if (!assignedTeacherId) continue;
+        if (!assignedTeacherId) continue; // all teachers for this subject busy at this slot
+
+        weeklyCount.set(chosen.subjectId, (weeklyCount.get(chosen.subjectId) ?? 0) + 1);
+        usedSubjectsToday.add(chosen.subjectId);
 
         allEntries.push({
           sectionId,
-          subjectId: chosenSubject.subjectId,
+          subjectId: chosen.subjectId,
           teacherId: assignedTeacherId,
           periodSlotId: slot.id,
           day,
           roomNumber: `R-${101 + p}`,
         });
+      }
+    }
+
+    // Warn about subjects that couldn't be fully scheduled
+    for (const e of curriculum) {
+      const scheduled = weeklyCount.get(e.subjectId) ?? 0;
+      if (scheduled < e.periodsPerWeek && e.schedulingSlot !== 'AFTER_SCHOOL') {
+        const name = subjectMap.get(e.subjectId)?.subjectName ?? e.subjectId;
+        warnings.push(
+          `${gradeName}: ${name} scheduled ${scheduled}/${e.periodsPerWeek} periods — ` +
+          (scheduled === 0 ? 'no teacher available or no matching day slots' : 'not enough slots to fill quota')
+        );
       }
     }
   }
