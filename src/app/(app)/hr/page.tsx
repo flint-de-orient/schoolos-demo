@@ -1091,6 +1091,30 @@ export default function HRPage() {
       .then(j => setLeavePolicies(j.policies ?? j.data?.policies ?? []))
       .catch(() => {});
   }, [activeTab]);
+
+  // ── HR Analytics state ───────────────────────────────────────────────────
+  type HRAnalytics = {
+    summary: { totalStaff: number; totalApprovedLeaveDays: number; pendingLeaveRequests: number; hasPayrollData: boolean };
+    payrollTrend: { month: string; year: number; netPay: number; gross: number; deductions: number; headcount: number }[];
+    leaveTypeBreakdown: { type: string; days: number }[];
+    leaveTrend: { month: string; days: number }[];
+    deptLeaveDays: { dept: string; days: number }[];
+    topEarners: { id: string; name: string; designation: string; net: number; basic: number; pct: number }[];
+    headcountByType: { type: string; count: number }[];
+    qualBreakdown: { label: string; value: number }[];
+  };
+  const [hrAnalytics, setHrAnalytics] = useState<HRAnalytics | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+
+  useEffect(() => {
+    if (activeTab !== 'analytics') return;
+    setAnalyticsLoading(true);
+    fetch('/api/hr/analytics')
+      .then(r => r.json())
+      .then(j => setHrAnalytics(j.data ?? j))
+      .catch(() => {})
+      .finally(() => setAnalyticsLoading(false));
+  }, [activeTab]);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [showAddStaff, setShowAddStaff] = useState(false);
   const [showApplyLeave, setShowApplyLeave] = useState(false);
@@ -1935,95 +1959,221 @@ export default function HRPage() {
           {/* ── Analytics ── */}
           {activeTab === 'analytics' && (
             <div className="space-y-5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                {/* Dept distribution */}
-                <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5">
-                  <h3 className="font-sora font-semibold text-navy text-sm mb-4">Staff by Department</h3>
-                  <div className="flex items-center gap-4">
-                    <ResponsiveContainer width={150} height={150}>
-                      <PieChart>
-                        <Pie data={deptData} cx="50%" cy="50%" innerRadius={40} outerRadius={65} dataKey="value">
-                          {deptData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-                        </Pie>
-                        <Tooltip contentStyle={{ fontFamily: 'DM Sans', fontSize: 11, borderRadius: 8 }} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="flex-1 space-y-1.5">
-                      {deptData.map((d, i) => (
-                        <div key={d.name} className="flex items-center gap-2 text-xs">
-                          <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: CHART_COLORS[i % CHART_COLORS.length] }} />
-                          <span className="text-gray-600 truncate">{d.name}</span>
-                          <span className="ml-auto font-bold text-gray-700">{d.value}</span>
+              {analyticsLoading ? (
+                <div className="grid grid-cols-2 gap-5">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="bg-gray-50 border border-gray-100 rounded-2xl p-5 h-52 animate-pulse" />
+                  ))}
+                </div>
+              ) : (
+                <>
+                  {/* ── KPI summary row ── */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[
+                      {
+                        label: 'Avg Tenure',
+                        value: staffList.length ? `${Math.round(staffList.reduce((s, x) => s + (new Date().getFullYear() - new Date(x.joiningDate).getFullYear()), 0) / staffList.length)} yrs` : '—',
+                        icon: Star, color: 'text-gold',
+                      },
+                      {
+                        label: 'Avg Basic Salary',
+                        value: staffList.length ? `₹${Math.round(staffList.reduce((s, x) => s + x.salary, 0) / staffList.length / 1000)}k` : '—',
+                        icon: DollarSign, color: 'text-green',
+                      },
+                      {
+                        label: 'Leave Days Used',
+                        value: hrAnalytics?.summary.totalApprovedLeaveDays ?? 0,
+                        icon: Calendar, color: 'text-amber',
+                      },
+                      {
+                        label: 'Departments',
+                        value: new Set(staffList.map(s => s.department)).size,
+                        icon: Building2, color: 'text-purple',
+                      },
+                    ].map(stat => {
+                      const Icon = stat.icon;
+                      return (
+                        <div key={stat.label} className="bg-gradient-to-br from-navy to-navyMid rounded-xl p-4 text-white">
+                          <Icon className={`w-4 h-4 mb-2 ${stat.color}`} />
+                          <div className="text-2xl font-sora font-bold">{stat.value}</div>
+                          <div className="text-xs text-ice/70 mt-0.5">{stat.label}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* ── Row 1: Dept distribution + Salary distribution ── */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5">
+                      <h3 className="font-sora font-semibold text-navy text-sm mb-4">Staff by Department</h3>
+                      <div className="flex items-center gap-4">
+                        <ResponsiveContainer width={150} height={150}>
+                          <PieChart>
+                            <Pie data={deptData} cx="50%" cy="50%" innerRadius={40} outerRadius={65} dataKey="value">
+                              {deptData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                            </Pie>
+                            <Tooltip contentStyle={{ fontFamily: 'DM Sans', fontSize: 11, borderRadius: 8 }} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                        <div className="flex-1 space-y-1.5">
+                          {deptData.map((d, i) => (
+                            <div key={d.name} className="flex items-center gap-2 text-xs">
+                              <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: CHART_COLORS[i % CHART_COLORS.length] }} />
+                              <span className="text-gray-600 truncate">{d.name}</span>
+                              <span className="ml-auto font-bold text-gray-700">{d.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5">
+                      <h3 className="font-sora font-semibold text-navy text-sm mb-4">Salary Distribution</h3>
+                      <ResponsiveContainer width="100%" height={150}>
+                        <BarChart data={salaryData} margin={{ top: 4, right: 4, left: -20 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                          <XAxis dataKey="range" tick={{ fontSize: 10, fontFamily: 'DM Sans' }} />
+                          <YAxis allowDecimals={false} tick={{ fontSize: 10, fontFamily: 'DM Sans' }} />
+                          <Tooltip contentStyle={{ fontFamily: 'DM Sans', fontSize: 11, borderRadius: 8 }} />
+                          <Bar dataKey="count" fill="#1E2761" radius={[4, 4, 0, 0]} name="Staff" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* ── Row 2: Monthly Payroll Trend + Leave Type Breakdown ── */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5">
+                      <h3 className="font-sora font-semibold text-navy text-sm mb-1">Monthly Payroll Disbursed</h3>
+                      <p className="text-[10px] text-gray-400 mb-3">Net pay released — last 6 months</p>
+                      {hrAnalytics?.summary.hasPayrollData ? (
+                        <ResponsiveContainer width="100%" height={150}>
+                          <BarChart data={hrAnalytics.payrollTrend} margin={{ top: 4, right: 4, left: -10 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                            <XAxis dataKey="month" tick={{ fontSize: 10, fontFamily: 'DM Sans' }} />
+                            <YAxis tick={{ fontSize: 10, fontFamily: 'DM Sans' }} tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} />
+                            <Tooltip
+                              formatter={(v: unknown) => [`₹${Number(v).toLocaleString('en-IN')}`, 'Net Pay']}
+                              contentStyle={{ fontFamily: 'DM Sans', fontSize: 11, borderRadius: 8 }}
+                            />
+                            <Bar dataKey="netPay" fill="#3B6D11" radius={[4, 4, 0, 0]} name="Net Pay" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="h-36 flex items-center justify-center text-xs text-gray-400">
+                          No payroll records yet — run payroll to see the trend.
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5">
+                      <h3 className="font-sora font-semibold text-navy text-sm mb-1">Leave by Type</h3>
+                      <p className="text-[10px] text-gray-400 mb-3">Approved leave days — current session</p>
+                      {(hrAnalytics?.leaveTypeBreakdown ?? []).length > 0 ? (
+                        <div className="space-y-2">
+                          {hrAnalytics!.leaveTypeBreakdown.slice(0, 6).map((l, i) => {
+                            const max = hrAnalytics!.leaveTypeBreakdown[0].days;
+                            const pct = max > 0 ? Math.round((l.days / max) * 100) : 0;
+                            return (
+                              <div key={l.type} className="flex items-center gap-2">
+                                <span className="text-[10px] text-gray-500 w-16 truncate">{l.type}</span>
+                                <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                  <div className="h-full rounded-full transition-all"
+                                    style={{ width: `${pct}%`, background: CHART_COLORS[i % CHART_COLORS.length] }} />
+                                </div>
+                                <span className="text-[10px] font-bold text-gray-700 w-10 text-right">{l.days}d</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="h-36 flex items-center justify-center text-xs text-gray-400">
+                          No approved leave requests this session.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ── Row 3: Leave Trend + Dept-wise Leave ── */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5">
+                      <h3 className="font-sora font-semibold text-navy text-sm mb-1">Monthly Leave Trend</h3>
+                      <p className="text-[10px] text-gray-400 mb-3">Approved leave days per month</p>
+                      <ResponsiveContainer width="100%" height={140}>
+                        <BarChart data={hrAnalytics?.leaveTrend ?? []} margin={{ top: 4, right: 4, left: -20 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                          <XAxis dataKey="month" tick={{ fontSize: 10, fontFamily: 'DM Sans' }} />
+                          <YAxis allowDecimals={false} tick={{ fontSize: 10, fontFamily: 'DM Sans' }} />
+                          <Tooltip contentStyle={{ fontFamily: 'DM Sans', fontSize: 11, borderRadius: 8 }} />
+                          <Bar dataKey="days" fill="#028090" radius={[4, 4, 0, 0]} name="Leave Days" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5">
+                      <h3 className="font-sora font-semibold text-navy text-sm mb-1">Leave by Department</h3>
+                      <p className="text-[10px] text-gray-400 mb-3">Total approved leave days this session</p>
+                      {(hrAnalytics?.deptLeaveDays ?? []).length > 0 ? (
+                        <div className="space-y-2">
+                          {hrAnalytics!.deptLeaveDays.map((d, i) => {
+                            const max = hrAnalytics!.deptLeaveDays[0].days;
+                            const pct = max > 0 ? Math.round((d.days / max) * 100) : 0;
+                            return (
+                              <div key={d.dept} className="flex items-center gap-2">
+                                <span className="text-[10px] text-gray-500 w-24 truncate">{d.dept}</span>
+                                <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                  <div className="h-full rounded-full transition-all"
+                                    style={{ width: `${pct}%`, background: CHART_COLORS[i % CHART_COLORS.length] }} />
+                                </div>
+                                <span className="text-[10px] font-bold text-gray-700 w-10 text-right">{d.days}d</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="h-36 flex items-center justify-center text-xs text-gray-400">
+                          No approved leave data yet.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ── Top Earners (real payroll net pay) ── */}
+                  <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-sora font-semibold text-navy text-sm">Top Earners</h3>
+                      <span className="text-[10px] text-gray-400">
+                        {hrAnalytics?.summary.hasPayrollData ? 'From actual payroll records' : 'Based on basic salary (no payroll run yet)'}
+                      </span>
+                    </div>
+                    <div className="space-y-2.5">
+                      {(hrAnalytics?.topEarners ?? []).length === 0 && (
+                        <p className="text-xs text-gray-400 text-center py-4">No staff records yet</p>
+                      )}
+                      {(hrAnalytics?.topEarners ?? []).map((s, i) => (
+                        <div key={s.id} className="flex items-center gap-3">
+                          <span className="text-xs font-bold text-gray-400 w-4">{i + 1}</span>
+                          <div className="w-7 h-7 rounded-lg bg-navy flex items-center justify-center flex-shrink-0">
+                            <span className="text-white text-[10px] font-bold font-sora">{getInitials(s.name)}</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex justify-between text-xs mb-1">
+                              <div className="min-w-0">
+                                <span className="font-semibold text-gray-800 truncate block">{s.name}</span>
+                                <span className="text-[10px] text-gray-400">{s.designation}</span>
+                              </div>
+                              <span className="font-bold text-navy ml-2 flex-shrink-0">₹{s.net.toLocaleString('en-IN')}</span>
+                            </div>
+                            <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                              <div className="h-full bg-gradient-to-r from-navy to-navyMid rounded-full" style={{ width: `${s.pct}%` }} />
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>
                   </div>
-                </div>
-
-                {/* Salary distribution */}
-                <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5">
-                  <h3 className="font-sora font-semibold text-navy text-sm mb-4">Salary Distribution</h3>
-                  <ResponsiveContainer width="100%" height={180}>
-                    <BarChart data={salaryData} margin={{ top: 4, right: 4, left: -20 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis dataKey="range" tick={{ fontSize: 10, fontFamily: 'DM Sans' }} />
-                      <YAxis tick={{ fontSize: 10, fontFamily: 'DM Sans' }} />
-                      <Tooltip contentStyle={{ fontFamily: 'DM Sans', fontSize: 11, borderRadius: 8 }} />
-                      <Bar dataKey="count" fill="#1E2761" radius={[4, 4, 0, 0]} name="Staff" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* KPI cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  { label: 'Avg Tenure', value: staffList.length ? `${Math.round(staffList.reduce((s, x) => s + (new Date().getFullYear() - new Date(x.joiningDate).getFullYear()), 0) / staffList.length)} yrs` : '— yrs', icon: Star, color: 'text-gold' },
-                  { label: 'Avg Salary', value: staffList.length ? `₹${Math.round(staffList.reduce((s, x) => s + x.salary, 0) / staffList.length / 1000)}k` : '₹—', icon: DollarSign, color: 'text-green' },
-                  { label: 'Qualified Teachers', value: staffList.filter(s => s.qualification.includes('B.Ed') || s.qualification.includes('M.Ed') || s.qualification.includes('PhD')).length, icon: Award, color: 'text-teal' },
-                  { label: 'Departments', value: new Set(staffList.map(s => s.department)).size, icon: Building2, color: 'text-purple' },
-                ].map(stat => {
-                  const Icon = stat.icon;
-                  return (
-                    <div key={stat.label} className="bg-gradient-to-br from-navy to-navyMid rounded-xl p-4 text-white">
-                      <Icon className={`w-4 h-4 mb-2 ${stat.color}`} />
-                      <div className="text-2xl font-sora font-bold">{stat.value}</div>
-                      <div className="text-xs text-ice/70 mt-0.5">{stat.label}</div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Top earners */}
-              <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5">
-                <h3 className="font-sora font-semibold text-navy text-sm mb-4">Top Earners</h3>
-                <div className="space-y-2.5">
-                  {staffList.length === 0 && <p className="text-xs text-gray-400 text-center py-4">No staff records yet</p>}
-                  {[...staffList].sort((a, b) => b.salary - a.salary).slice(0, 5).map((s, i) => {
-                    const net = s.salary + Math.round(s.salary * 0.2) - Math.round(s.salary * 0.12);
-                    const topSalary = staffList[0]?.salary ?? s.salary;
-                    const maxNet = topSalary + Math.round(topSalary * 0.2) - Math.round(topSalary * 0.12);
-                    const pct = maxNet > 0 ? Math.round((net / maxNet) * 100) : 0;
-                    return (
-                      <div key={s.id} className="flex items-center gap-3">
-                        <span className="text-xs font-bold text-gray-400 w-4">{i + 1}</span>
-                        <div className="w-7 h-7 rounded-lg bg-navy flex items-center justify-center flex-shrink-0">
-                          <span className="text-white text-[10px] font-bold font-sora">{getInitials(s.name)}</span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex justify-between text-xs mb-1">
-                            <span className="font-semibold text-gray-800 truncate">{s.name}</span>
-                            <span className="font-bold text-navy ml-2 flex-shrink-0">₹{net.toLocaleString('en-IN')}</span>
-                          </div>
-                          <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                            <div className="h-full bg-gradient-to-r from-navy to-navyMid rounded-full" style={{ width: `${pct}%` }} />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+                </>
+              )}
             </div>
           )}
 
