@@ -338,6 +338,27 @@ export default function TimetablePage() {
         if (d.error) { setGenError(d.error); setGenState('error'); return; }
         setGenResult(d.data ?? d);
         setGenState('complete');
+
+        // Reload period slots — the generate route replaced them in the DB
+        // (old slots deleted, new slots created based on curriculum load).
+        // Without this, the grid header still shows the old row count.
+        fetch('/api/timetable/period-slots')
+          .then(r => r.json())
+          .then(psData => {
+            const freshSlots: PeriodSlot[] = (psData.data?.periodSlots ?? psData.periodSlots ?? []);
+            setPeriodSlots(freshSlots.sort((a, b) => a.periodNo - b.periodNo));
+            const cfg = psData.data?.config ?? psData.config;
+            if (cfg) {
+              setTtConfig({
+                periodsPerDay: cfg.periodsPerDay,
+                workingDays: cfg.workingDays,
+                breakAfterPeriod: cfg.breakAfterPeriod,
+                breakDuration: cfg.breakDuration,
+              });
+            }
+          })
+          .catch(() => {});
+
         // Reload timetable for the first section
         const firstSection = [...selectedGenSections][0];
         if (firstSection) {
