@@ -1001,15 +1001,18 @@ function ApplyLeaveModal({ staff, leaveRequests, onClose, onApply }: {
 
 function mapTeacher(t: any): Staff {
   const subjectName = t.subjects?.[0]?.subject?.name ?? null;
-  const dept = subjectName
-    ? (subjectName.match(/maths|math|physics|chemistry|biology/i) ? 'Science & Maths'
-      : subjectName.match(/english|bengali|hindi|sanskrit/i) ? 'Languages'
-      : subjectName.match(/history|geography|civics|economics/i) ? 'Humanities'
-      : subjectName.match(/computer|it|technology/i) ? 'Technology'
-      : subjectName.match(/physical|sports/i) ? 'Sports'
-      : subjectName.match(/music|art|drawing/i) ? 'Arts'
-      : 'Science & Maths')
-    : (t.department ?? 'Academic');
+  // Prefer the department stored in DB; only infer from subject if DB has none
+  const dept = t.department
+    ? t.department
+    : subjectName
+      ? (subjectName.match(/maths|math|physics|chemistry|biology/i) ? 'Science & Maths'
+        : subjectName.match(/english|bengali|hindi|sanskrit/i) ? 'Languages'
+        : subjectName.match(/history|geography|civics|economics/i) ? 'Humanities'
+        : subjectName.match(/computer|it|technology/i) ? 'Technology'
+        : subjectName.match(/physical|sports/i) ? 'Sports'
+        : subjectName.match(/music|art|drawing/i) ? 'Arts'
+        : 'Academic')
+      : 'Academic';
   return {
     id: t.id, name: t.name, photo: null,
     designation: t.designation ?? 'Teacher',
