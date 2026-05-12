@@ -3,12 +3,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import PageWrapper from '@/components/layout/PageWrapper';
 import AIBadge from '@/components/shared/AIBadge';
-import CurriculumTab from '@/components/timetable/CurriculumTab';
+import ClassSubjectsTab from '@/components/timetable/ClassSubjectsTab';
 import { toast } from 'sonner';
 import {
   AlertCircle, CheckCircle2, Sparkles, LayoutGrid, Zap, RotateCcw,
   Brain, TrendingUp, User, Timer, Shield, RefreshCw, ChevronDown, BookOpen,
-  Settings2, Plus, Minus, Clock, GraduationCap,
+  Settings2, Clock, GraduationCap,
 } from 'lucide-react';
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -29,13 +29,11 @@ type Preflight = {
   ready: boolean;
   missing: string[];
   hasConfig: boolean;
-  periodSlotCount: number;
-  periodsPerDay: number;
+  estimatedPeriodsPerDay: number;
   workingDays: string[];
   sections: { id: string; label: string; gradeId: string; gradeName: string; hasCurriculum: boolean }[];
   subjectCount: number;
   teacherCount: number;
-  subjects: { id: string; name: string }[];
 };
 
 
@@ -154,7 +152,8 @@ function TimetableGrid({ grid, periodSlots, workingDays, breakAfterPeriod }: {
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function TimetablePage() {
-  const [activeTab, setActiveTab]       = useState<'timetable' | 'generator' | 'substitution' | 'curriculum' | 'setup'>('timetable');
+  const [activeTab, setActiveTab]       = useState<'timetable' | 'generator' | 'substitution' | 'classsubjects' | 'setup'>('timetable');
+  const [targetGradeId, setTargetGradeId] = useState<string | null>(null);
   const [grades, setGrades]             = useState<Grade[]>([]);
   const [selectedSectionId, setSelectedSectionId] = useState('');
   const [selectedSectionLabel, setSelectedSectionLabel] = useState('');
@@ -301,12 +300,18 @@ export default function TimetablePage() {
       .then(d => {
         const pf: Preflight = d.data ?? d;
         setPreflight(pf);
-        // Default-select first 4 sections
-        setSelectedGenSections(new Set(pf.sections.slice(0, 4).map(s => s.id)));
+        // Pre-select: if arriving from Class Subjects tab for a specific grade, select that grade's sections.
+        // Otherwise default to all sections that have curriculum configured.
+        if (targetGradeId) {
+          setSelectedGenSections(new Set(pf.sections.filter(s => s.gradeId === targetGradeId && s.hasCurriculum).map(s => s.id)));
+          setTargetGradeId(null);
+        } else {
+          setSelectedGenSections(new Set(pf.sections.filter(s => s.hasCurriculum).map(s => s.id)));
+        }
       })
       .catch(() => setPreflight(null))
       .finally(() => setPreflightLoading(false));
-  }, [activeTab]);
+  }, [activeTab, targetGradeId]);
 
   // ── Generator animation (runs while API call is in-flight) ───────────────
   useEffect(() => {
@@ -350,13 +355,11 @@ export default function TimetablePage() {
   const [setupForm, setSetupForm] = useState({
     schoolStartTime: '08:00',
     periodDuration: 40,
-    periodsPerDay: 8,
     breakAfterPeriod: [4],
     breakDuration: 30,
     workingDays: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'],
   });
   const [setupSaving, setSetupSaving] = useState(false);
-  const [setupSlots, setSetupSlots] = useState<PeriodSlot[]>([]);
   const [setupExisting, setSetupExisting] = useState(false);
 
   useEffect(() => {
@@ -368,12 +371,10 @@ export default function TimetablePage() {
         setSetupForm({
           schoolStartTime: cfg.schoolStartTime,
           periodDuration: cfg.periodDuration,
-          periodsPerDay: cfg.periodsPerDay,
           breakAfterPeriod: cfg.breakAfterPeriod,
           breakDuration: cfg.breakDuration,
           workingDays: cfg.workingDays,
         });
-        setSetupSlots(cfg.periodSlots ?? []);
       }
     }).catch(() => {});
   }, [activeTab]);
@@ -386,28 +387,30 @@ export default function TimetablePage() {
       body: JSON.stringify(setupForm),
     }).then(r => r.json()).then(d => {
       if (d.error) { toast.error(d.error); return; }
-      const slots = d.data?.periodSlots ?? d.periodSlots ?? [];
-      setSetupSlots(slots);
       setSetupExisting(true);
-      toast.success(`Configuration saved — ${slots.length} period slots generated`);
-      // Reload period slots in main view
-      setPeriodSlots(slots.sort((a: PeriodSlot, b: PeriodSlot) => a.periodNo - b.periodNo));
-      setTtConfig({
-        periodsPerDay: setupForm.periodsPerDay,
+      toast.success('Configuration saved — period slots will be generated when you run AI Generator');
+      setTtConfig(prev => ({
+        ...prev,
         workingDays: setupForm.workingDays,
         breakAfterPeriod: setupForm.breakAfterPeriod,
         breakDuration: setupForm.breakDuration,
-      });
+      }));
     }).catch(() => toast.error('Failed to save configuration'))
       .finally(() => setSetupSaving(false));
   }
 
+  function handleGoToGenerator(gradeId?: string) {
+    if (gradeId) setTargetGradeId(gradeId);
+    setPreflight(null); // force reload when switching to generator tab
+    setActiveTab('generator');
+  }
+
   const tabs = [
-    { id: 'timetable' as const,    label: 'Timetable',                  icon: LayoutGrid },
-    { id: 'generator' as const,    label: 'AI Generator',               icon: Sparkles },
-    { id: 'substitution' as const, label: 'Substitution Intelligence',   icon: Zap },
-    { id: 'curriculum' as const,   label: 'Curriculum',                  icon: GraduationCap },
-    { id: 'setup' as const,        label: 'Setup',                       icon: Settings2 },
+    { id: 'timetable' as const,      label: 'Timetable',                  icon: LayoutGrid },
+    { id: 'generator' as const,      label: 'AI Generator',               icon: Sparkles },
+    { id: 'substitution' as const,   label: 'Substitution Intelligence',   icon: Zap },
+    { id: 'classsubjects' as const,  label: 'Class Subjects',              icon: GraduationCap },
+    { id: 'setup' as const,          label: 'Setup',                       icon: Settings2 },
   ];
 
   const allSections = grades.flatMap(g => g.sections.map(s => ({ id: s.id, label: `${g.name}-${s.name}`, grade: g })));
@@ -566,12 +569,15 @@ export default function TimetablePage() {
                   </li>
                 ))}
               </ul>
-              <div className="border-t border-gray-100 pt-3 flex items-center gap-3">
+              <div className="border-t border-gray-100 pt-3 flex items-center gap-3 flex-wrap">
                 <button onClick={() => setActiveTab('setup')}
                   className="flex items-center gap-2 bg-navy text-white text-sm font-semibold rounded-lg px-4 py-2 hover:bg-navyMid transition-colors">
-                  <Settings2 className="w-4 h-4" /> Configure Now
+                  <Settings2 className="w-4 h-4" /> Configure School Hours
                 </button>
-                <span className="text-xs text-gray-400 font-dm-sans">Opens the Setup tab where you can define school hours &amp; periods</span>
+                <button onClick={() => setActiveTab('classsubjects')}
+                  className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 text-sm font-semibold rounded-lg px-4 py-2 hover:border-navy/30 transition-colors">
+                  <GraduationCap className="w-4 h-4" /> Set Up Class Subjects
+                </button>
               </div>
             </div>
           )}
@@ -591,7 +597,7 @@ export default function TimetablePage() {
                   {/* Live data summary */}
                   <div className="grid grid-cols-2 gap-2 mb-5">
                     {[
-                      { label: 'Periods/Day', value: preflight.periodsPerDay },
+                      { label: 'Est. Periods/Day', value: preflight.estimatedPeriodsPerDay || '—' },
                       { label: 'Working Days', value: preflight.workingDays.length },
                       { label: 'Subjects', value: preflight.subjectCount },
                       { label: 'Teachers', value: preflight.teacherCount },
@@ -608,10 +614,13 @@ export default function TimetablePage() {
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Classes to Generate</p>
                     <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
                       {preflight.sections.map(s => (
-                        <label key={s.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 rounded-lg px-1 py-1">
+                        <label key={s.id} className={`flex items-center gap-2 rounded-lg px-1 py-1 ${s.hasCurriculum ? 'cursor-pointer hover:bg-gray-50' : 'cursor-not-allowed opacity-50'}`}
+                          title={s.hasCurriculum ? undefined : 'Configure subjects in Class Subjects tab first'}>
                           <input type="checkbox"
+                            disabled={!s.hasCurriculum}
                             checked={selectedGenSections.has(s.id)}
                             onChange={e => {
+                              if (!s.hasCurriculum) return;
                               setSelectedGenSections(prev => {
                                 const next = new Set(prev);
                                 if (e.target.checked) { next.add(s.id); } else { next.delete(s.id); }
@@ -623,21 +632,21 @@ export default function TimetablePage() {
                           {s.hasCurriculum ? (
                             <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0">Curriculum ✓</span>
                           ) : (
-                            <span title="No curriculum defined — will use all subjects as fallback" className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0 cursor-help">No Curriculum</span>
+                            <span className="text-[9px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0">No Curriculum</span>
                           )}
                         </label>
                       ))}
                     </div>
-                    {preflight.sections.some(s => selectedGenSections.has(s.id) && !s.hasCurriculum) && (
+                    {preflight.sections.every(s => !s.hasCurriculum) && (
                       <div className="mt-2 flex items-start gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                         <AlertCircle className="w-3 h-3 text-amber-600 mt-0.5 flex-shrink-0" />
                         <p className="text-[10px] text-amber-700 font-dm-sans">
-                          Some selected classes have no curriculum — all school subjects will be used.{' '}
-                          <button onClick={() => setActiveTab('curriculum')} className="underline font-semibold">Set up curriculum →</button>
+                          No classes have subjects configured yet.{' '}
+                          <button onClick={() => setActiveTab('classsubjects')} className="underline font-semibold">Set up Class Subjects →</button>
                         </p>
                       </div>
                     )}
-                    {selectedGenSections.size === 0 && (
+                    {selectedGenSections.size === 0 && preflight.sections.some(s => s.hasCurriculum) && (
                       <p className="text-xs text-amber-600 mt-1.5 font-dm-sans">Select at least one class</p>
                     )}
                   </div>
@@ -679,7 +688,7 @@ export default function TimetablePage() {
                   <div className="bg-white rounded-xl border-2 border-dashed border-gray-200 p-10 flex flex-col items-center justify-center text-center min-h-[300px]">
                     <Sparkles className="w-10 h-10 text-gray-300 mb-3" />
                     <p className="text-sm font-sora font-semibold text-gray-400">Select classes and click Generate</p>
-                    <p className="text-xs text-gray-400 font-dm-sans mt-1">The AI will schedule {preflight.subjectCount} subjects across {preflight.periodsPerDay} periods using {preflight.teacherCount} teachers</p>
+                    <p className="text-xs text-gray-400 font-dm-sans mt-1">The AI will schedule {preflight.subjectCount} subjects across ~{preflight.estimatedPeriodsPerDay} periods/day using {preflight.teacherCount} teachers</p>
                   </div>
                 )}
 
@@ -868,23 +877,22 @@ export default function TimetablePage() {
         </div>
       )}
 
-      {/* ── TAB 4: Curriculum ────────────────────────────────────────────── */}
-      {activeTab === 'curriculum' && (
-        <CurriculumTab onGoToGenerator={() => setActiveTab('generator')} />
+      {/* ── TAB 4: Class Subjects ─────────────────────────────────────── */}
+      {activeTab === 'classsubjects' && (
+        <ClassSubjectsTab onGoToGenerator={handleGoToGenerator} />
       )}
 
       {/* ── TAB 5: Setup ─────────────────────────────────────────────────── */}
       {activeTab === 'setup' && (
-        <div className="grid grid-cols-5 gap-6">
-          {/* Left: Configuration form */}
-          <div className="col-span-3 space-y-5">
+        <div className="max-w-2xl space-y-5">
+          <div>
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
               <div className="flex items-center gap-2 mb-1">
                 <Settings2 className="w-5 h-5 text-navy" />
                 <h2 className="text-base font-sora font-semibold text-navy">School Timetable Configuration</h2>
               </div>
               <p className="text-xs text-gray-500 font-dm-sans mb-6">
-                {setupExisting ? 'Editing existing configuration — saving will regenerate period slots.' : 'No configuration found. Fill in the details below to get started.'}
+                {setupExisting ? 'Editing existing configuration. Period slots are auto-computed from your curriculum when you generate a timetable.' : 'No configuration found. Fill in the details below to get started.'}
               </p>
 
               <div className="space-y-5">
@@ -906,29 +914,12 @@ export default function TimetablePage() {
                   </div>
                 </div>
 
-                {/* Periods per day */}
-                <div>
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Periods Per Day</label>
-                  <div className="flex items-center gap-3">
-                    <button onClick={() => setSetupForm(f => ({ ...f, periodsPerDay: Math.max(4, f.periodsPerDay - 1) }))}
-                      className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center hover:border-navy/30 text-gray-500">
-                      <Minus className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="text-2xl font-sora font-semibold text-navy w-8 text-center">{setupForm.periodsPerDay}</span>
-                    <button onClick={() => setSetupForm(f => ({ ...f, periodsPerDay: Math.min(12, f.periodsPerDay + 1) }))}
-                      className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center hover:border-navy/30 text-gray-500">
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="text-xs text-gray-400 font-dm-sans">(4–12 periods)</span>
-                  </div>
-                </div>
-
                 {/* Break configuration */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Break After Period</label>
                     <div className="flex gap-1.5 flex-wrap">
-                      {Array.from({ length: setupForm.periodsPerDay }, (_, i) => i + 1).map(p => (
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map(p => (
                         <button key={p}
                           onClick={() => setSetupForm(f => ({
                             ...f,
@@ -976,55 +967,30 @@ export default function TimetablePage() {
                 <button onClick={handleSaveSetup} disabled={setupSaving || setupForm.workingDays.length === 0}
                   className="flex items-center gap-2 bg-gold text-navy font-sora font-semibold rounded-xl px-6 py-3 hover:bg-gold/90 transition-colors disabled:opacity-50 text-sm">
                   {setupSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                  {setupSaving ? 'Saving…' : setupExisting ? 'Update Configuration' : 'Save & Generate Period Slots'}
+                  {setupSaving ? 'Saving…' : setupExisting ? 'Update Configuration' : 'Save Configuration'}
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Right: Period slot preview */}
-          <div className="col-span-2 space-y-4">
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-              <h3 className="text-sm font-sora font-semibold text-navy mb-3">
-                {setupSlots.length > 0 ? `Period Slots (${setupSlots.length} generated)` : 'Period Slots'}
-              </h3>
-
-              {setupSlots.length === 0 ? (
-                <div className="text-center py-8">
-                  <Clock className="w-8 h-8 text-gray-200 mx-auto mb-2" />
-                  <p className="text-xs text-gray-400 font-dm-sans">Save configuration to generate period slots</p>
-                </div>
-              ) : (
-                <div className="space-y-1.5">
-                  {setupSlots.map(slot => (
-                    <div key={slot.id} className="flex items-center gap-3 px-3 py-2 bg-iceLight rounded-lg">
-                      <span className="w-16 text-[10px] font-bold text-navy font-sora">P{slot.periodNo}</span>
-                      <span className="text-xs font-dm-sans text-gray-600">{slot.startTime} – {slot.endTime}</span>
-                      {setupForm.breakAfterPeriod.includes(slot.periodNo) && (
-                        <span className="ml-auto text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold">↓ BREAK</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {setupExisting && (
-              <div className="bg-teal/10 border border-teal/20 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <CheckCircle2 className="w-4 h-4 text-teal" />
-                  <span className="text-sm font-semibold text-teal">Configuration Active</span>
-                </div>
-                <p className="text-xs text-gray-500 font-dm-sans">
-                  {setupForm.periodsPerDay} periods/day · {setupForm.workingDays.length} working days · {setupForm.periodDuration} min/period
-                </p>
-                <button onClick={() => setActiveTab('generator')}
-                  className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-navy underline hover:no-underline">
-                  <Sparkles className="w-3 h-3" /> Go to AI Generator →
-                </button>
+          {setupExisting && (
+            <div className="bg-teal/10 border border-teal/20 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <CheckCircle2 className="w-4 h-4 text-teal" />
+                <span className="text-sm font-semibold text-teal">Configuration Active</span>
               </div>
-            )}
-          </div>
+              <p className="text-xs text-gray-500 font-dm-sans">
+                {setupForm.workingDays.length} working days · {setupForm.periodDuration} min/period · {setupForm.breakDuration} min break after period {setupForm.breakAfterPeriod.join(', ')}
+              </p>
+              <p className="text-xs text-gray-400 font-dm-sans mt-1">
+                Periods per day are computed automatically from each grade&apos;s curriculum when you generate a timetable.
+              </p>
+              <button onClick={() => setActiveTab('generator')}
+                className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-navy underline hover:no-underline">
+                <Sparkles className="w-3 h-3" /> Go to AI Generator →
+              </button>
+            </div>
+          )}
         </div>
       )}
     </PageWrapper>
