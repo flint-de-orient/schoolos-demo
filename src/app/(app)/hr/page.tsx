@@ -529,22 +529,64 @@ function AddStaffModal({ onClose, onAdd }: { onClose: () => void; onAdd: (s: Sta
 
 // ─── Apply Leave Modal ────────────────────────────────────────────────────────
 
-function ApplyLeaveModal({ staff, onClose, onApply }: { staff: Staff[]; onClose: () => void; onApply: (l: LeaveRequest) => void }) {
-  const [form, setForm] = useState({ staffId: '', type: '', from: '', to: '', reason: '' });
+type LeavePolicy = {
+  id: string; leaveType: string; label: string; color: string;
+  daysAllowed: number; isPaid: boolean; requiresApproval: boolean;
+  exceededPolicy: string; cascadeToId: string | null; requiresDocument: boolean;
+  advanceMaxDays: number | null;
+  cascadeTo: { id: string; leaveType: string; label: string } | null;
+};
+
+function ApplyLeaveModal({ staff, leaveRequests, onClose, onApply }: {
+  staff: Staff[];
+  leaveRequests: LeaveRequest[];
+  onClose: () => void;
+  onApply: (l: LeaveRequest) => void;
+}) {
+  const [form, setForm] = useState({ staffId: '', policyId: '', from: '', to: '', reason: '', docNote: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [policies, setPolicies] = useState<LeavePolicy[]>([]);
+  const [loadingPolicies, setLoadingPolicies] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/hr/leave-policies')
+      .then(r => r.json())
+      .then(j => setPolicies(j.policies ?? j.data?.policies ?? []))
+      .catch(() => {})
+      .finally(() => setLoadingPolicies(false));
+  }, []);
+
+  const selectedPolicy = policies.find(p => p.id === form.policyId) ?? null;
 
   const days = form.from && form.to
     ? Math.max(1, Math.ceil((new Date(form.to).getTime() - new Date(form.from).getTime()) / 86400000) + 1)
     : 0;
 
+  // How many days of this policy type has the staff member already used this year
+  const usedDays = useMemo(() => {
+    if (!form.staffId || !selectedPolicy) return 0;
+    const year = new Date().getFullYear();
+    return leaveRequests
+      .filter(l => l.staffId === form.staffId && l.type === selectedPolicy.label && l.status !== 'Rejected')
+      .filter(l => new Date(l.from).getFullYear() === year)
+      .reduce((sum, l) => sum + l.days, 0);
+  }, [form.staffId, selectedPolicy, leaveRequests]);
+
+  const quota = selectedPolicy?.daysAllowed ?? 0;
+  const remaining = Math.max(0, quota - usedDays);
+  const exceededBy = days > 0 && days > remaining ? days - remaining : 0;
+  const isExceeded = exceededBy > 0;
+  const ep = isExceeded ? (selectedPolicy?.exceededPolicy ?? 'RESTRICT') : null;
+
   const validate = () => {
     const e: Record<string, string> = {};
     if (!form.staffId) e.staffId = 'Required';
-    if (!form.type) e.type = 'Required';
+    if (!form.policyId) e.policyId = 'Required';
     if (!form.from) e.from = 'Required';
     if (!form.to) e.to = 'Required';
     else if (form.from && new Date(form.to) < new Date(form.from)) e.to = 'Must be after start date';
     if (!form.reason.trim()) e.reason = 'Required';
+    if (ep === 'RESTRICT') e.policy = 'Leave quota exceeded — submission not allowed under current policy.';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -557,7 +599,7 @@ function ApplyLeaveModal({ staff, onClose, onApply }: { staff: Staff[]; onClose:
       staffId: form.staffId,
       name: s.name,
       designation: s.designation,
-      type: form.type,
+      type: selectedPolicy?.label ?? form.policyId,
       from: form.from,
       to: form.to,
       days,
@@ -570,12 +612,13 @@ function ApplyLeaveModal({ staff, onClose, onApply }: { staff: Staff[]; onClose:
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-fadeIn">
-        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-fadeIn max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100 sticky top-0 bg-white z-10">
           <div><h2 className="font-sora font-bold text-navy text-lg">Apply for Leave</h2><p className="text-xs text-gray-400 mt-0.5">Submit a leave request</p></div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500"><X className="w-4 h-4" /></button>
         </div>
         <div className="p-5 space-y-4">
+          {/* Staff */}
           <div>
             <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Staff Member *</label>
             <select value={form.staffId} onChange={e => setForm(f => ({ ...f, staffId: e.target.value }))}
@@ -585,18 +628,48 @@ function ApplyLeaveModal({ staff, onClose, onApply }: { staff: Staff[]; onClose:
             </select>
             {errors.staffId && <p className="text-xs text-coral mt-1">{errors.staffId}</p>}
           </div>
+
+          {/* Leave Type from Policies */}
           <div>
             <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Leave Type *</label>
-            <div className="grid grid-cols-2 gap-2">
-              {LEAVE_TYPES.map(t => (
-                <button key={t} onClick={() => setForm(f => ({ ...f, type: t }))}
-                  className={`py-2 text-xs font-semibold rounded-xl border transition-all ${form.type === t ? 'bg-navy text-white border-navy' : 'bg-white text-gray-600 border-gray-200 hover:border-navy/40'}`}>
-                  {t}
-                </button>
-              ))}
-            </div>
-            {errors.type && <p className="text-xs text-coral mt-1">{errors.type}</p>}
+            {loadingPolicies ? (
+              <div className="grid grid-cols-2 gap-2">{[1,2,3,4].map(i => <div key={i} className="h-9 bg-gray-100 rounded-xl animate-pulse" />)}</div>
+            ) : policies.length === 0 ? (
+              <p className="text-xs text-gray-400 py-2">No leave policies configured. Add them in Settings → HR → Leave Policies.</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {policies.map(p => (
+                  <button key={p.id} onClick={() => setForm(f => ({ ...f, policyId: p.id }))}
+                    className={`py-2 px-2 text-xs font-semibold rounded-xl border transition-all text-left flex items-center gap-1.5 ${form.policyId === p.id ? 'text-white border-transparent' : 'bg-white text-gray-600 border-gray-200 hover:border-navy/40'}`}
+                    style={form.policyId === p.id ? { backgroundColor: p.color, borderColor: p.color } : {}}>
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: form.policyId === p.id ? 'rgba(255,255,255,0.6)' : p.color }} />
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {errors.policyId && <p className="text-xs text-coral mt-1">{errors.policyId}</p>}
           </div>
+
+          {/* Quota info when policy + staff selected */}
+          {selectedPolicy && form.staffId && (
+            <div className="bg-iceLight border border-ice rounded-xl px-3 py-2.5 text-xs text-navy space-y-1">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Annual quota</span>
+                <span className="font-semibold">{quota} days</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Used this year</span>
+                <span className="font-semibold">{usedDays} days</span>
+              </div>
+              <div className="flex justify-between border-t border-ice pt-1">
+                <span className="text-gray-700 font-semibold">Remaining</span>
+                <span className={`font-bold ${remaining === 0 ? 'text-coral' : remaining <= 3 ? 'text-amber' : 'text-green'}`}>{remaining} days</span>
+              </div>
+            </div>
+          )}
+
+          {/* Dates */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold text-gray-700 mb-1.5 block">From *</label>
@@ -609,11 +682,82 @@ function ApplyLeaveModal({ staff, onClose, onApply }: { staff: Staff[]; onClose:
                 className={`w-full px-3 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 ${errors.to ? 'border-coral' : 'border-gray-200'}`} />
             </div>
           </div>
-          {days > 0 && (
+
+          {days > 0 && !isExceeded && (
             <div className="bg-iceLight border border-ice rounded-xl px-3 py-2 text-xs text-navy font-semibold">
               Duration: {days} day{days > 1 ? 's' : ''}
             </div>
           )}
+
+          {/* Exceeded Quota Policy Banner */}
+          {isExceeded && ep === 'RESTRICT' && (
+            <div className="bg-coral/10 border border-coral/30 rounded-xl p-3 space-y-1">
+              <p className="text-xs font-bold text-coral flex items-center gap-1.5">
+                <span className="w-4 h-4 rounded-full bg-coral text-white flex items-center justify-center text-[9px] font-black">✕</span>
+                Leave quota exceeded by {exceededBy} day{exceededBy > 1 ? 's' : ''}
+              </p>
+              <p className="text-xs text-coral/80">The <strong>{selectedPolicy?.label}</strong> policy restricts leave beyond the annual quota. This request cannot be submitted.</p>
+            </div>
+          )}
+
+          {isExceeded && ep === 'APPROVAL_REQUIRED' && (
+            <div className="bg-amber/10 border border-amber/30 rounded-xl p-3 space-y-2">
+              <p className="text-xs font-bold text-amber flex items-center gap-1.5">
+                <span>⚠</span> Quota exceeded by {exceededBy} day{exceededBy > 1 ? 's' : ''}
+              </p>
+              <p className="text-xs text-amber/90">This leave requires special approval. Your request will be escalated to the Principal for review.</p>
+              {selectedPolicy?.requiresDocument && (
+                <div className="mt-1">
+                  <label className="text-xs font-semibold text-gray-700 mb-1 block">Supporting Document Note <span className="text-coral">*</span></label>
+                  <input type="text" value={form.docNote} onChange={e => setForm(f => ({ ...f, docNote: e.target.value }))}
+                    placeholder="Describe document (e.g. Medical certificate, Court order...)"
+                    className="w-full px-3 py-2 text-xs border border-amber/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber/30 bg-white" />
+                  <p className="text-[10px] text-gray-400 mt-0.5">Physical document must be submitted to administration within 3 working days.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {isExceeded && ep === 'LWP' && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-1">
+              <p className="text-xs font-bold text-blue-700 flex items-center gap-1.5">
+                <span>ℹ</span> {exceededBy} day{exceededBy > 1 ? 's' : ''} will be Leave Without Pay
+              </p>
+              <p className="text-xs text-blue-600">
+                {remaining > 0 ? `${remaining} day${remaining > 1 ? 's' : ''} will be paid (from quota) · ` : ''}{exceededBy} day{exceededBy > 1 ? 's' : ''} will be unpaid (LWP) and deducted from salary.
+              </p>
+            </div>
+          )}
+
+          {isExceeded && ep === 'CASCADE' && selectedPolicy?.cascadeTo && (
+            <div className="bg-purple/10 border border-purple/20 rounded-xl p-3 space-y-1">
+              <p className="text-xs font-bold text-purple flex items-center gap-1.5">
+                <span>↷</span> Quota exceeded — will cascade to {selectedPolicy.cascadeTo.label}
+              </p>
+              <p className="text-xs text-purple/80">
+                {remaining > 0 ? `${remaining} day${remaining > 1 ? 's' : ''} from ${selectedPolicy.label} · ` : ''}{exceededBy} day{exceededBy > 1 ? 's' : ''} will be deducted from <strong>{selectedPolicy.cascadeTo.label}</strong> balance.
+              </p>
+            </div>
+          )}
+
+          {isExceeded && ep === 'ADVANCE' && (
+            <div className="bg-teal/10 border border-teal/20 rounded-xl p-3 space-y-1">
+              <p className="text-xs font-bold text-teal flex items-center gap-1.5">
+                <span>⏭</span> {exceededBy} day{exceededBy > 1 ? 's' : ''} borrowed from next year&apos;s quota
+              </p>
+              <p className="text-xs text-teal/80">
+                Next year&apos;s {selectedPolicy?.label} balance will be reduced by {exceededBy} day{exceededBy > 1 ? 's' : ''}.
+                {selectedPolicy?.advanceMaxDays ? ` Maximum advance allowed: ${selectedPolicy.advanceMaxDays} days.` : ''}
+              </p>
+              {selectedPolicy?.advanceMaxDays && exceededBy > selectedPolicy.advanceMaxDays && (
+                <p className="text-xs text-coral font-semibold">⚠ Advance request ({exceededBy} days) exceeds the maximum limit ({selectedPolicy.advanceMaxDays} days).</p>
+              )}
+            </div>
+          )}
+
+          {errors.policy && <p className="text-xs text-coral font-semibold">{errors.policy}</p>}
+
+          {/* Reason */}
           <div>
             <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Reason *</label>
             <textarea rows={3} value={form.reason} onChange={e => setForm(f => ({ ...f, reason: e.target.value }))} placeholder="Brief reason for leave..."
@@ -621,9 +765,9 @@ function ApplyLeaveModal({ staff, onClose, onApply }: { staff: Staff[]; onClose:
             {errors.reason && <p className="text-xs text-coral mt-1">{errors.reason}</p>}
           </div>
         </div>
-        <div className="flex gap-3 p-5 border-t border-gray-100">
+        <div className="flex gap-3 p-5 border-t border-gray-100 sticky bottom-0 bg-white">
           <button onClick={onClose} className="flex-1 py-2.5 text-sm font-semibold text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">Cancel</button>
-          <button onClick={handleApply} className="flex-1 py-2.5 text-sm font-semibold bg-navy text-white rounded-xl hover:bg-navyMid transition-colors">Submit Request</button>
+          <button onClick={handleApply} disabled={ep === 'RESTRICT'} className="flex-1 py-2.5 text-sm font-semibold bg-navy text-white rounded-xl hover:bg-navyMid transition-colors disabled:opacity-40 disabled:cursor-not-allowed">Submit Request</button>
         </div>
       </div>
     </div>
@@ -1813,7 +1957,7 @@ export default function HRPage() {
       {selectedStaff && <StaffDrawer staff={selectedStaff} onClose={() => setSelectedStaff(null)} onSalaryUpdate={(id, sal) => setStaffList(prev => prev.map(s => s.id === id ? { ...s, salary: sal } : s))} />}
       <TeacherProfileSheet teacherId={selectedTeacherId} onClose={() => setSelectedTeacherId(null)} />
       {showAddStaff && <AddStaffModal onClose={() => setShowAddStaff(false)} onAdd={s => setStaffList(prev => [s, ...prev])} />}
-      {showApplyLeave && <ApplyLeaveModal staff={staffList} onClose={() => setShowApplyLeave(false)} onApply={l => setLeaveRequests(prev => [l, ...prev])} />}
+      {showApplyLeave && <ApplyLeaveModal staff={staffList} leaveRequests={leaveRequests} onClose={() => setShowApplyLeave(false)} onApply={l => setLeaveRequests(prev => [l, ...prev])} />}
 
       {/* Log Availability Modal */}
       {showAvailModal && (

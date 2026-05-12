@@ -9,6 +9,7 @@ export async function GET(_req: NextRequest) {
   const policies = await db.leavePolicy.findMany({
     where: { tenantId: session.user.tenantId },
     orderBy: { leaveType: 'asc' },
+    include: { cascadeTo: { select: { id: true, leaveType: true, label: true } } },
   });
 
   return ok({ policies });
@@ -23,10 +24,11 @@ export async function POST(req: NextRequest) {
     leaveType, label, color, daysAllowed, isCarryOver, maxCarryOver,
     isPaid, isEncashable, requiresApproval, maxConsecutiveDays,
     minServiceDays, description, roleTypes,
+    exceededPolicy, cascadeToId, requiresDocument, advanceMaxDays,
   } = body;
 
   if (!leaveType?.trim()) return err('leaveType is required');
-  if (!daysAllowed || daysAllowed < 0) return err('daysAllowed must be >= 0');
+  if (daysAllowed === undefined || daysAllowed < 0) return err('daysAllowed must be >= 0');
 
   const existing = await db.leavePolicy.findUnique({
     where: { tenantId_leaveType: { tenantId: session.user.tenantId, leaveType: leaveType.trim().toUpperCase() } },
@@ -50,6 +52,10 @@ export async function POST(req: NextRequest) {
       minServiceDays: minServiceDays ? Number(minServiceDays) : null,
       description: description?.trim() || null,
       roleTypes: Array.isArray(roleTypes) ? roleTypes : ['ALL'],
+      exceededPolicy: exceededPolicy ?? 'RESTRICT',
+      cascadeToId: exceededPolicy === 'CASCADE' && cascadeToId ? cascadeToId : null,
+      requiresDocument: exceededPolicy === 'APPROVAL_REQUIRED' ? !!requiresDocument : false,
+      advanceMaxDays: exceededPolicy === 'ADVANCE' && advanceMaxDays ? Number(advanceMaxDays) : null,
     },
   });
 

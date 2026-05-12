@@ -733,6 +733,9 @@ type LeavePolicyRow = {
   isPaid: boolean; isEncashable: boolean; requiresApproval: boolean;
   maxConsecutiveDays: number | null; minServiceDays: number | null;
   description: string | null; roleTypes: string[];
+  exceededPolicy: string; cascadeToId: string | null; requiresDocument: boolean;
+  advanceMaxDays: number | null;
+  cascadeTo: { id: string; leaveType: string; label: string | null } | null;
 };
 
 type SalaryForm = {
@@ -1035,6 +1038,10 @@ function LeavePolicyTab() {
     isPaid: true, isEncashable: false, requiresApproval: true,
     maxConsecutiveDays: '', minServiceDays: '', description: '',
     roleTypes: ['ALL'] as string[],
+    exceededPolicy: 'RESTRICT' as string,
+    cascadeToId: '' as string,
+    requiresDocument: false,
+    advanceMaxDays: '' as string,
   });
 
   const load = async () => {
@@ -1047,11 +1054,9 @@ function LeavePolicyTab() {
 
   useEffect(() => { load(); }, []);
 
-  const openNew = () => {
-    setEditId(null);
-    setForm({ leaveType: '', label: '', color: LEAVE_COLORS[0], daysAllowed: 12, isCarryOver: false, maxCarryOver: '', isPaid: true, isEncashable: false, requiresApproval: true, maxConsecutiveDays: '', minServiceDays: '', description: '', roleTypes: ['ALL'] });
-    setShowForm(true);
-  };
+  const BLANK_FORM = { leaveType: '', label: '', color: LEAVE_COLORS[0], daysAllowed: 12, isCarryOver: false, maxCarryOver: '', isPaid: true, isEncashable: false, requiresApproval: true, maxConsecutiveDays: '', minServiceDays: '', description: '', roleTypes: ['ALL'] as string[], exceededPolicy: 'RESTRICT', cascadeToId: '', requiresDocument: false, advanceMaxDays: '' };
+
+  const openNew = () => { setEditId(null); setForm(BLANK_FORM); setShowForm(true); };
 
   const openEdit = (p: LeavePolicyRow) => {
     setEditId(p.id);
@@ -1062,6 +1067,10 @@ function LeavePolicyTab() {
       maxConsecutiveDays: p.maxConsecutiveDays ? String(p.maxConsecutiveDays) : '',
       minServiceDays: p.minServiceDays ? String(p.minServiceDays) : '',
       description: p.description ?? '', roleTypes: p.roleTypes ?? ['ALL'],
+      exceededPolicy: p.exceededPolicy ?? 'RESTRICT',
+      cascadeToId: p.cascadeToId ?? '',
+      requiresDocument: p.requiresDocument ?? false,
+      advanceMaxDays: p.advanceMaxDays ? String(p.advanceMaxDays) : '',
     });
     setShowForm(true);
   };
@@ -1078,6 +1087,9 @@ function LeavePolicyTab() {
         maxCarryOver: form.maxCarryOver ? Number(form.maxCarryOver) : null,
         maxConsecutiveDays: form.maxConsecutiveDays ? Number(form.maxConsecutiveDays) : null,
         minServiceDays: form.minServiceDays ? Number(form.minServiceDays) : null,
+        cascadeToId: form.exceededPolicy === 'CASCADE' ? (form.cascadeToId || null) : null,
+        requiresDocument: form.exceededPolicy === 'APPROVAL_REQUIRED' ? form.requiresDocument : false,
+        advanceMaxDays: form.exceededPolicy === 'ADVANCE' && form.advanceMaxDays ? Number(form.advanceMaxDays) : null,
       }),
     });
     setSaving(false);
@@ -1210,6 +1222,63 @@ function LeavePolicyTab() {
             <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="e.g. Requires medical certificate" className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-navy/20" />
           </div>
 
+          {/* ── Exceeded Quota Policy ── */}
+          <div className="border-t border-gray-200 pt-3">
+            <label className="text-[10px] font-bold text-coral uppercase tracking-wide block mb-2">When Quota is Exceeded</label>
+            <div className="space-y-2">
+              {([
+                { value: 'RESTRICT',          label: 'Restrict Completely',           desc: 'Block the application — staff cannot apply beyond quota' },
+                { value: 'APPROVAL_REQUIRED', label: 'Allow on Special / Court Order', desc: 'Principal must approve; optional supporting document upload' },
+                { value: 'LWP',               label: 'Leave Without Pay (LWP)',        desc: 'Auto-approved but excess days are unpaid' },
+                { value: 'CASCADE',           label: 'Cascade to Another Leave Type',  desc: 'Excess days deducted from a fallback leave type' },
+                { value: 'ADVANCE',           label: 'Advance from Next Year',         desc: 'Borrow against next year\'s entitlement (recommended for EL)' },
+              ] as const).map(opt => (
+                <label key={opt.value} className={`flex items-start gap-2.5 p-2.5 rounded-xl border-2 cursor-pointer transition-colors ${form.exceededPolicy === opt.value ? 'border-navy bg-navy/5' : 'border-gray-100 hover:border-gray-200'}`}>
+                  <input type="radio" name="exceededPolicy" value={opt.value} checked={form.exceededPolicy === opt.value} onChange={() => setForm(f => ({ ...f, exceededPolicy: opt.value }))} className="mt-0.5 accent-navy flex-shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-gray-800">{opt.label}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{opt.desc}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+
+            {/* APPROVAL_REQUIRED: document toggle */}
+            {form.exceededPolicy === 'APPROVAL_REQUIRED' && (
+              <div className="mt-2 ml-2">
+                <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-700">
+                  <input type="checkbox" checked={form.requiresDocument} onChange={e => setForm(f => ({ ...f, requiresDocument: e.target.checked }))} className="w-3.5 h-3.5 accent-navy" />
+                  <span>Require supporting document (court order / medical certificate)</span>
+                </label>
+              </div>
+            )}
+
+            {/* CASCADE: select target leave type */}
+            {form.exceededPolicy === 'CASCADE' && (
+              <div className="mt-2 ml-2">
+                <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide block mb-1">Cascade To</label>
+                <select value={form.cascadeToId} onChange={e => setForm(f => ({ ...f, cascadeToId: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-navy/20">
+                  <option value="">Select leave type…</option>
+                  {policies.filter(p => p.id !== editId).map(p => (
+                    <option key={p.id} value={p.id}>{p.label ?? p.leaveType} ({p.leaveType})</option>
+                  ))}
+                </select>
+                {!form.cascadeToId && <p className="text-[10px] text-coral mt-1">Select a fallback leave type</p>}
+              </div>
+            )}
+
+            {/* ADVANCE: max advance days + EL warning */}
+            {form.exceededPolicy === 'ADVANCE' && (
+              <div className="mt-2 ml-2 space-y-2">
+                <div>
+                  <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide block mb-1">Max Advance Days</label>
+                  <input type="number" min={1} value={form.advanceMaxDays} onChange={e => setForm(f => ({ ...f, advanceMaxDays: e.target.value }))} placeholder="e.g. 10" className="w-32 text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-navy/20" />
+                </div>
+                <p className="text-[10px] text-amber font-semibold">⚠ Recommended for Earned Leave (EL) only. Advance is recovered from final settlement if staff exits.</p>
+              </div>
+            )}
+          </div>
+
           <div className="flex gap-2">
             <button onClick={() => setShowForm(false)} className="flex-1 py-2 text-xs font-semibold text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">Cancel</button>
             <button onClick={handleSave} disabled={saving} className="flex-1 py-2 text-xs font-semibold bg-navy text-white rounded-xl hover:bg-navyMid disabled:opacity-50 flex items-center justify-center gap-1.5">
@@ -1249,6 +1318,18 @@ function LeavePolicyTab() {
                   {p.maxConsecutiveDays && <span>Max {p.maxConsecutiveDays} consecutive days</span>}
                   {p.requiresApproval && <span>Requires approval</span>}
                   {p.description && <span className="italic">{p.description}</span>}
+                  {(() => {
+                    const ep = p.exceededPolicy ?? 'RESTRICT';
+                    const meta: Record<string, { label: string; cls: string }> = {
+                      RESTRICT:          { label: '🚫 Restrict',               cls: 'bg-coral/10 text-coral border-coral/20' },
+                      APPROVAL_REQUIRED: { label: '📋 Approval Required',      cls: 'bg-amber/10 text-amber border-amber/20' },
+                      LWP:               { label: '💸 LWP',                    cls: 'bg-orange-50 text-orange-600 border-orange-200' },
+                      CASCADE:           { label: `↪ Cascade → ${p.cascadeTo?.label ?? p.cascadeToId ?? '?'}`, cls: 'bg-purple/10 text-purple border-purple/20' },
+                      ADVANCE:           { label: `⏩ Advance${p.advanceMaxDays ? ` (max ${p.advanceMaxDays}d)` : ''}`, cls: 'bg-teal/10 text-teal border-teal/20' },
+                    };
+                    const m = meta[ep];
+                    return m ? <span className={`text-[9px] border px-1.5 py-0.5 rounded-full font-semibold ${m.cls}`}>{m.label}</span> : null;
+                  })()}
                 </div>
               </div>
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5">

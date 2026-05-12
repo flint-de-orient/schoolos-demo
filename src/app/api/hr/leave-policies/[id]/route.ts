@@ -17,6 +17,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     label, color, daysAllowed, isCarryOver, maxCarryOver,
     isPaid, isEncashable, requiresApproval, maxConsecutiveDays,
     minServiceDays, description, roleTypes,
+    exceededPolicy, cascadeToId, requiresDocument, advanceMaxDays,
   } = body;
 
   const updated = await db.leavePolicy.update({
@@ -34,6 +35,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ...(minServiceDays !== undefined && { minServiceDays: minServiceDays ? Number(minServiceDays) : null }),
       ...(description !== undefined && { description }),
       ...(roleTypes !== undefined && { roleTypes }),
+      ...(exceededPolicy !== undefined && { exceededPolicy }),
+      ...(exceededPolicy !== undefined && {
+        cascadeToId: exceededPolicy === 'CASCADE' && cascadeToId ? cascadeToId : null,
+        requiresDocument: exceededPolicy === 'APPROVAL_REQUIRED' ? !!requiresDocument : false,
+        advanceMaxDays: exceededPolicy === 'ADVANCE' && advanceMaxDays ? Number(advanceMaxDays) : null,
+      }),
     },
   });
 

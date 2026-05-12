@@ -2111,20 +2111,24 @@ model ScholarshipApplication {
 // ─────────────────────────────────────────────
 
 model LeaveRequest {
-  id          String      @id @default(cuid())
-  tenantId    String
-  teacherId   String?
-  staffId     String?
-  leaveType   String
-  fromDate    DateTime    @db.Date
-  toDate      DateTime    @db.Date
-  days        Float
-  reason      String?
-  status      LeaveStatus @default(PENDING)
-  approvedById String?
-  approvedAt  DateTime?
-  remarks     String?
-  createdAt   DateTime    @default(now())
+  id               String      @id @default(cuid())
+  tenantId         String
+  teacherId        String?
+  staffId          String?
+  leaveType        String
+  fromDate         DateTime    @db.Date
+  toDate           DateTime    @db.Date
+  days             Float
+  reason           String?
+  status           LeaveStatus @default(PENDING)
+  approvedById     String?
+  approvedAt       DateTime?
+  remarks          String?
+  exceededDays     Float       @default(0)
+  appliedPolicy    String?
+  lwpDays          Float       @default(0)
+  supportingDocUrl String?
+  createdAt        DateTime    @default(now())
 
   teacher Teacher? @relation(fields: [teacherId], references: [id])
   staff   Staff?   @relation(fields: [staffId], references: [id])
@@ -2149,6 +2153,13 @@ model LeavePolicy {
   minServiceDays     Int?
   description        String?
   roleTypes          String[]
+  exceededPolicy     String  @default("RESTRICT")
+  cascadeToId        String?
+  requiresDocument   Boolean @default(false)
+  advanceMaxDays     Float?
+
+  cascadeTo   LeavePolicy?  @relation("LeaveCascade", fields: [cascadeToId], references: [id])
+  cascadeFrom LeavePolicy[] @relation("LeaveCascade")
 
   @@unique([tenantId, leaveType])
 }
