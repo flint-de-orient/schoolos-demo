@@ -1136,6 +1136,7 @@ export default function HRPage() {
   const [savingAvail, setSavingAvail] = useState(false);
   const [rebalancing, setRebalancing] = useState(false);
   const [rebalanced, setRebalanced] = useState(false);
+  const [rebalanceResult, setRebalanceResult] = useState<{ adjusted: number; periodsReassigned: number; message: string } | null>(null);
   const [workloadView, setWorkloadView] = useState<'week' | 'month' | 'year'>('week');
 
   // ── Derived ──
@@ -2202,9 +2203,27 @@ export default function HRPage() {
                       ))}
                     </div>
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         setRebalancing(true);
-                        setTimeout(() => { setRebalancing(false); setRebalanced(true); toast.success('AI rebalanced class assignments', { description: '3 teachers adjusted · Timetable updated' }); }, 2200);
+                        setRebalanced(false);
+                        setRebalanceResult(null);
+                        try {
+                          const res = await fetch('/api/hr/workload/rebalance', { method: 'POST' });
+                          const json = await res.json();
+                          const data = json.data ?? json;
+                          setRebalanceResult({ adjusted: data.adjusted ?? 0, periodsReassigned: data.periodsReassigned ?? 0, message: data.message ?? '' });
+                          setRebalanced(true);
+                          if ((data.adjusted ?? 0) > 0) {
+                            toast.success('AI rebalanced class assignments', { description: `${data.periodsReassigned} period${data.periodsReassigned !== 1 ? 's' : ''} reassigned across ${data.adjusted} teacher${data.adjusted !== 1 ? 's' : ''}` });
+                            await loadAvailability();
+                          } else {
+                            toast.info('No rebalancing needed', { description: data.message });
+                          }
+                        } catch {
+                          toast.error('Rebalance failed — please try again');
+                        } finally {
+                          setRebalancing(false);
+                        }
                       }}
                       disabled={rebalancing}
                       className="flex items-center gap-1.5 bg-navy text-white text-xs font-semibold px-3 py-2 rounded-xl hover:bg-navyMid disabled:opacity-60 transition-all">
@@ -2214,12 +2233,14 @@ export default function HRPage() {
                   </div>
                 </div>
 
-                {rebalanced && (
-                  <div className="bg-green/5 border border-green/20 rounded-xl p-3 mb-3 flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-green flex-shrink-0 mt-0.5" />
+                {rebalanced && rebalanceResult && (
+                  <div className={`border rounded-xl p-3 mb-3 flex items-start gap-2 ${rebalanceResult.adjusted > 0 ? 'bg-green/5 border-green/20' : 'bg-blue-50 border-blue-200'}`}>
+                    <CheckCircle2 className={`w-4 h-4 flex-shrink-0 mt-0.5 ${rebalanceResult.adjusted > 0 ? 'text-green' : 'text-blue-500'}`} />
                     <div>
-                      <p className="text-xs font-semibold text-green">AI Rebalanced Successfully</p>
-                      <p className="text-[10px] text-gray-600 mt-0.5">Workload redistributed across {workloadData.length} teachers. Timetable regenerated and notifications sent.</p>
+                      <p className={`text-xs font-semibold ${rebalanceResult.adjusted > 0 ? 'text-green' : 'text-blue-700'}`}>
+                        {rebalanceResult.adjusted > 0 ? 'AI Rebalanced Successfully' : 'Workload Already Balanced'}
+                      </p>
+                      <p className="text-[10px] text-gray-600 mt-0.5">{rebalanceResult.message}</p>
                     </div>
                   </div>
                 )}
