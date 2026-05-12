@@ -548,7 +548,7 @@ export default function TimetablePage() {
                             onChange={e => {
                               setSelectedGenSections(prev => {
                                 const next = new Set(prev);
-                                e.target.checked ? next.add(s.id) : next.delete(s.id);
+                                if (e.target.checked) { next.add(s.id); } else { next.delete(s.id); }
                                 return next;
                               });
                             }}
