@@ -547,6 +547,7 @@ function ApplyLeaveModal({ staff, leaveRequests, onClose, onApply }: {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [policies, setPolicies] = useState<LeavePolicy[]>([]);
   const [loadingPolicies, setLoadingPolicies] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     fetch('/api/hr/leave-policies')
@@ -562,12 +563,14 @@ function ApplyLeaveModal({ staff, leaveRequests, onClose, onApply }: {
     ? Math.max(1, Math.ceil((new Date(form.to).getTime() - new Date(form.from).getTime()) / 86400000) + 1)
     : 0;
 
-  // How many days of this policy type has the staff member already used this year
+  // Match by both leaveType code and label to handle seeded + new records
   const usedDays = useMemo(() => {
     if (!form.staffId || !selectedPolicy) return 0;
     const year = new Date().getFullYear();
+    const code = selectedPolicy.leaveType;
+    const label = selectedPolicy.label;
     return leaveRequests
-      .filter(l => l.staffId === form.staffId && l.type === selectedPolicy.label && l.status !== 'Rejected')
+      .filter(l => l.staffId === form.staffId && (l.type === code || l.type === label) && l.status !== 'Rejected')
       .filter(l => new Date(l.from).getFullYear() === year)
       .reduce((sum, l) => sum + l.days, 0);
   }, [form.staffId, selectedPolicy, leaveRequests]);
@@ -577,6 +580,10 @@ function ApplyLeaveModal({ staff, leaveRequests, onClose, onApply }: {
   const exceededBy = days > 0 && days > remaining ? days - remaining : 0;
   const isExceeded = exceededBy > 0;
   const ep = isExceeded ? (selectedPolicy?.exceededPolicy ?? 'RESTRICT') : null;
+
+  // Identify if the selected staff member is a teacher (id prefixed 'T' or via _sourceType)
+  const selectedStaffMember = staff.find(x => x.id === form.staffId);
+  const isTeacher = selectedStaffMember?._sourceType === 'teacher';
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -591,23 +598,48 @@ function ApplyLeaveModal({ staff, leaveRequests, onClose, onApply }: {
     return Object.keys(e).length === 0;
   };
 
-  const handleApply = () => {
-    if (!validate()) return;
-    const s = staff.find(x => x.id === form.staffId)!;
-    onApply({
-      id: `LV${Date.now()}`,
-      staffId: form.staffId,
-      name: s.name,
-      designation: s.designation,
-      type: selectedPolicy?.label ?? form.policyId,
-      from: form.from,
-      to: form.to,
-      days,
-      reason: form.reason.trim(),
-      status: 'Pending',
-    });
-    toast.success(`Leave request submitted for ${s.name}`);
-    onClose();
+  const handleApply = async () => {
+    if (!validate() || !selectedStaffMember) return;
+    setSubmitting(true);
+    try {
+      const body: Record<string, unknown> = {
+        leaveType: selectedPolicy!.leaveType,
+        fromDate: form.from,
+        toDate: form.to,
+        reason: form.reason.trim(),
+        ...(isTeacher ? { teacherId: form.staffId } : { staffId: form.staffId }),
+        // exceeded policy fields
+        appliedPolicy: isExceeded ? ep : null,
+        exceededDays: exceededBy,
+        lwpDays: ep === 'LWP' ? exceededBy : 0,
+        supportingDocUrl: ep === 'APPROVAL_REQUIRED' && form.docNote ? form.docNote : null,
+      };
+      const res = await fetch('/api/hr/leave', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+      const created = json.id ? json : json.data;
+      onApply({
+        id: created?.id ?? `LV${Date.now()}`,
+        staffId: form.staffId,
+        name: selectedStaffMember.name,
+        designation: selectedStaffMember.designation,
+        type: selectedPolicy!.leaveType,
+        from: form.from,
+        to: form.to,
+        days,
+        reason: form.reason.trim(),
+        status: 'Pending',
+      });
+      toast.success(`Leave request submitted for ${selectedStaffMember.name}`);
+      onClose();
+    } catch {
+      toast.error('Failed to submit leave request');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -766,8 +798,11 @@ function ApplyLeaveModal({ staff, leaveRequests, onClose, onApply }: {
           </div>
         </div>
         <div className="flex gap-3 p-5 border-t border-gray-100 sticky bottom-0 bg-white">
-          <button onClick={onClose} className="flex-1 py-2.5 text-sm font-semibold text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">Cancel</button>
-          <button onClick={handleApply} disabled={ep === 'RESTRICT'} className="flex-1 py-2.5 text-sm font-semibold bg-navy text-white rounded-xl hover:bg-navyMid transition-colors disabled:opacity-40 disabled:cursor-not-allowed">Submit Request</button>
+          <button onClick={onClose} disabled={submitting} className="flex-1 py-2.5 text-sm font-semibold text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40">Cancel</button>
+          <button onClick={handleApply} disabled={ep === 'RESTRICT' || submitting} className="flex-1 py-2.5 text-sm font-semibold bg-navy text-white rounded-xl hover:bg-navyMid transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            {submitting ? 'Submitting...' : 'Submit Request'}
+          </button>
         </div>
       </div>
     </div>

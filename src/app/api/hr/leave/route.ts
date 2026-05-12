@@ -30,7 +30,10 @@ export async function POST(req: NextRequest) {
   if (error) return error;
 
   const body = await req.json();
-  const { teacherId, staffId, leaveType, fromDate, toDate, reason } = body;
+  const {
+    teacherId, staffId, leaveType, fromDate, toDate, reason,
+    appliedPolicy, exceededDays, lwpDays, supportingDocUrl,
+  } = body;
 
   if (!leaveType || !fromDate || !toDate) {
     return err('leaveType, fromDate and toDate are required');
@@ -51,6 +54,10 @@ export async function POST(req: NextRequest) {
       days,
       reason,
       status: 'PENDING',
+      appliedPolicy: appliedPolicy ?? null,
+      exceededDays: exceededDays ? Number(exceededDays) : 0,
+      lwpDays: lwpDays ? Number(lwpDays) : 0,
+      supportingDocUrl: supportingDocUrl ?? null,
     },
   });
 
