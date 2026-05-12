@@ -543,6 +543,9 @@ function LeaveBalanceModal({ staff, mode, leaveRequests, policies, onClose }: {
 
   const sessionLabel = `April ${ayStart} – March ${ayStart + 1}`;
 
+  // Only policies applicable to this staff member's role
+  const applicablePolicies = policies.filter(p => policyAppliesToStaff(p, staff._sourceType));
+
   // All requests for this staff member in current session
   const staffRequests = leaveRequests.filter(l =>
     l.staffId === staff.id &&
@@ -558,18 +561,18 @@ function LeaveBalanceModal({ staff, mode, leaveRequests, policies, onClose }: {
       .reduce((sum, l) => sum + l.days, 0);
 
   // Group used requests by policy
-  const usedByPolicy = policies.map(p => ({
+  const usedByPolicy = applicablePolicies.map(p => ({
     policy: p,
     requests: staffRequests.filter(l => l.type === p.leaveType || l.type === p.label),
   })).filter(g => g.requests.length > 0);
 
-  // Remaining breakdown
-  const remainingByPolicy = policies.map(p => {
+  // Remaining breakdown (only applicable policies)
+  const remainingByPolicy = applicablePolicies.map(p => {
     const used = usedByType(p);
     return { policy: p, used, remaining: Math.max(0, p.daysAllowed - used) };
   });
 
-  const totalQuota     = policies.reduce((s, p) => s + p.daysAllowed, 0);
+  const totalQuota     = applicablePolicies.reduce((s, p) => s + p.daysAllowed, 0);
   const totalUsed      = staffRequests.reduce((s, l) => s + l.days, 0);
   const totalRemaining = Math.max(0, totalQuota - totalUsed);
 
@@ -686,9 +689,16 @@ type LeavePolicy = {
   id: string; leaveType: string; label: string; color: string;
   daysAllowed: number; isPaid: boolean; requiresApproval: boolean;
   exceededPolicy: string; cascadeToId: string | null; requiresDocument: boolean;
-  advanceMaxDays: number | null;
+  advanceMaxDays: number | null; roleTypes: string[];
   cascadeTo: { id: string; leaveType: string; label: string } | null;
 };
+
+function policyAppliesToStaff(p: LeavePolicy, sourceType: 'teacher' | 'staff' | undefined): boolean {
+  if (!p.roleTypes || p.roleTypes.length === 0 || p.roleTypes.includes('ALL')) return true;
+  if (sourceType === 'teacher') return p.roleTypes.some(r => r === 'TEACHING' || r === 'ALL');
+  if (sourceType === 'staff')   return p.roleTypes.some(r => r === 'NON_TEACHING' || r === 'ALL');
+  return true;
+}
 
 function ApplyLeaveModal({ staff, leaveRequests, onClose, onApply }: {
   staff: Staff[];
@@ -710,6 +720,8 @@ function ApplyLeaveModal({ staff, leaveRequests, onClose, onApply }: {
       .finally(() => setLoadingPolicies(false));
   }, []);
 
+  const selectedStaffMember = staff.find(x => x.id === form.staffId);
+  const applicablePolicies = policies.filter(p => policyAppliesToStaff(p, selectedStaffMember?._sourceType));
   const selectedPolicy = policies.find(p => p.id === form.policyId) ?? null;
 
   const days = form.from && form.to
@@ -734,8 +746,6 @@ function ApplyLeaveModal({ staff, leaveRequests, onClose, onApply }: {
   const isExceeded = exceededBy > 0;
   const ep = isExceeded ? (selectedPolicy?.exceededPolicy ?? 'RESTRICT') : null;
 
-  // Identify if the selected staff member is a teacher (id prefixed 'T' or via _sourceType)
-  const selectedStaffMember = staff.find(x => x.id === form.staffId);
   const isTeacher = selectedStaffMember?._sourceType === 'teacher';
 
   const validate = () => {
@@ -819,11 +829,11 @@ function ApplyLeaveModal({ staff, leaveRequests, onClose, onApply }: {
             <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Leave Type *</label>
             {loadingPolicies ? (
               <div className="grid grid-cols-2 gap-2">{[1,2,3,4].map(i => <div key={i} className="h-9 bg-gray-100 rounded-xl animate-pulse" />)}</div>
-            ) : policies.length === 0 ? (
-              <p className="text-xs text-gray-400 py-2">No leave policies configured. Add them in Settings → HR → Leave Policies.</p>
+            ) : applicablePolicies.length === 0 ? (
+              <p className="text-xs text-gray-400 py-2">No leave policies configured for this staff type. Add them in Settings → HR → Leave Policies.</p>
             ) : (
               <div className="grid grid-cols-2 gap-2">
-                {policies.map(p => (
+                {applicablePolicies.map(p => (
                   <button key={p.id} onClick={() => setForm(f => ({ ...f, policyId: p.id }))}
                     className={`py-2 px-2 text-xs font-semibold rounded-xl border transition-all text-left flex items-center gap-1.5 ${form.policyId === p.id ? 'text-white border-transparent' : 'bg-white text-gray-600 border-gray-200 hover:border-navy/40'}`}
                     style={form.policyId === p.id ? { backgroundColor: p.color, borderColor: p.color } : {}}>
@@ -1630,7 +1640,10 @@ export default function HRPage() {
                       new Date(l.from) >= sessionStart && new Date(l.from) <= sessionEnd)
                     .reduce((sum, l) => sum + l.days, 0);
 
-                const totalQuota = leavePolicies.reduce((s, p) => s + p.daysAllowed, 0);
+                const getQuota = (s: Staff) =>
+                  leavePolicies
+                    .filter(p => policyAppliesToStaff(p, s._sourceType))
+                    .reduce((sum, p) => sum + p.daysAllowed, 0);
 
                 return (
                   <div>
@@ -1640,7 +1653,7 @@ export default function HRPage() {
                         <p className="text-sm font-semibold text-navy">Leave Balance — All Staff</p>
                         <p className="text-xs text-gray-400 mt-0.5">
                           Session: April {ayStart} – March {ayStart + 1}
-                          {leavePolicies.length > 0 && ` · ${leavePolicies.length} policy types · ${totalQuota} days total quota per staff`}
+                          {leavePolicies.length > 0 && ` · ${leavePolicies.length} policy types configured`}
                         </p>
                       </div>
                       <div className="relative">
@@ -1665,12 +1678,13 @@ export default function HRPage() {
                         </thead>
                         <tbody>
                           {filteredBalance.map((s, i) => {
+                            const quota = getQuota(s);
                             const used = getUsed(s.id);
-                            const remaining = Math.max(0, totalQuota - used);
-                            const pct = totalQuota > 0 ? Math.round((remaining / totalQuota) * 100) : 100;
-                            const statusLabel = remaining === 0 ? 'Exhausted' : remaining <= Math.round(totalQuota * 0.2) ? 'Critical' : remaining <= Math.round(totalQuota * 0.4) ? 'Low' : 'Healthy';
-                            const statusColor = remaining === 0 ? 'bg-coral/10 text-coral' : remaining <= Math.round(totalQuota * 0.2) ? 'bg-coral/10 text-coral' : remaining <= Math.round(totalQuota * 0.4) ? 'bg-amber/10 text-amber' : 'bg-green/10 text-green';
-                            const barColor = remaining === 0 ? '#D85A30' : remaining <= Math.round(totalQuota * 0.2) ? '#D85A30' : remaining <= Math.round(totalQuota * 0.4) ? '#BA7517' : '#3B6D11';
+                            const remaining = Math.max(0, quota - used);
+                            const pct = quota > 0 ? Math.round((remaining / quota) * 100) : 100;
+                            const statusLabel = remaining === 0 ? 'Exhausted' : remaining <= Math.round(quota * 0.2) ? 'Critical' : remaining <= Math.round(quota * 0.4) ? 'Low' : 'Healthy';
+                            const statusColor = remaining === 0 ? 'bg-coral/10 text-coral' : remaining <= Math.round(quota * 0.2) ? 'bg-coral/10 text-coral' : remaining <= Math.round(quota * 0.4) ? 'bg-amber/10 text-amber' : 'bg-green/10 text-green';
+                            const barColor = remaining === 0 ? '#D85A30' : remaining <= Math.round(quota * 0.2) ? '#D85A30' : remaining <= Math.round(quota * 0.4) ? '#BA7517' : '#3B6D11';
                             return (
                               <tr key={s.id} className={`border-b border-gray-50 hover:bg-iceLight/50 transition-colors ${i % 2 !== 0 ? 'bg-gray-50/30' : ''}`}>
                                 <td className="px-4 py-3">
@@ -1689,7 +1703,7 @@ export default function HRPage() {
                                   <p className="text-[10px] text-gray-400">{s.department}</p>
                                 </td>
                                 <td className="px-4 py-3 text-center">
-                                  <span className="text-sm font-semibold text-gray-700">{totalQuota}</span>
+                                  <span className="text-sm font-semibold text-gray-700">{quota}</span>
                                   <span className="text-xs text-gray-400 ml-0.5">d</span>
                                 </td>
                                 <td className="px-4 py-3 text-center">
@@ -1702,7 +1716,7 @@ export default function HRPage() {
                                 </td>
                                 <td className="px-4 py-3 text-center">
                                   <button onClick={() => setBalanceModal({ staff: s, mode: 'remaining' })}
-                                    className={`text-sm font-bold underline decoration-dotted underline-offset-2 transition-colors hover:opacity-70 cursor-pointer ${remaining === 0 ? 'text-coral' : remaining <= Math.round(totalQuota * 0.4) ? 'text-amber' : 'text-green'}`}>
+                                    className={`text-sm font-bold underline decoration-dotted underline-offset-2 transition-colors hover:opacity-70 cursor-pointer ${remaining === 0 ? 'text-coral' : remaining <= Math.round(quota * 0.4) ? 'text-amber' : 'text-green'}`}>
                                     {remaining}
                                   </button>
                                   <span className="text-xs text-gray-400 ml-0.5">d</span>
@@ -1725,12 +1739,14 @@ export default function HRPage() {
                         <tfoot className="border-t border-gray-100 bg-gray-50">
                           <tr>
                             <td colSpan={2} className="px-4 py-2.5 text-xs font-semibold text-gray-500">{filteredBalance.length} staff members</td>
-                            <td className="px-4 py-2.5 text-center text-xs font-bold text-gray-700">{filteredBalance.length * totalQuota}d</td>
+                            <td className="px-4 py-2.5 text-center text-xs font-bold text-gray-700">
+                              {filteredBalance.reduce((sum, s) => sum + getQuota(s), 0)}d
+                            </td>
                             <td className="px-4 py-2.5 text-center text-xs font-bold text-amber">
                               {filteredBalance.reduce((sum, s) => sum + getUsed(s.id), 0)}d
                             </td>
                             <td className="px-4 py-2.5 text-center text-xs font-bold text-green">
-                              {filteredBalance.reduce((sum, s) => sum + Math.max(0, totalQuota - getUsed(s.id)), 0)}d
+                              {filteredBalance.reduce((sum, s) => sum + Math.max(0, getQuota(s) - getUsed(s.id)), 0)}d
                             </td>
                             <td colSpan={2} />
                           </tr>
