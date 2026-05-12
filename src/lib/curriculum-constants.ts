@@ -1,6 +1,6 @@
 export const SUBJECT_CATEGORIES = [
   { value: 'CORE',            label: 'Core Academic',        icon: '📚', color: 'blue',   description: 'Mathematics, Science, History, Geography' },
-  { value: 'LANGUAGE',        label: 'Language',             icon: '🗣️', color: 'green',  description: 'English, Bengali, Hindi, Sanskrit, French…' },
+  { value: 'LANGUAGE',        label: 'Language',             icon: '🗣️', color: 'green',  description: 'English, Hindi, Regional language, Foreign language…' },
   { value: 'ELECTIVE',        label: 'Elective',             icon: '🎓', color: 'purple', description: 'Commerce, Economics, Psychology, Accountancy…' },
   { value: 'PRACTICAL',       label: 'Practical / Lab',      icon: '🔬', color: 'teal',   description: 'Physics Lab, Chemistry Lab, Computer Lab…' },
   { value: 'SPORTS',          label: 'Sports & Games',       icon: '⚽', color: 'orange', description: 'Cricket, Football, Badminton, Chess, Athletics…' },
@@ -8,6 +8,7 @@ export const SUBJECT_CATEGORIES = [
   { value: 'TECHNOLOGY',      label: 'Technology',           icon: '🤖', color: 'indigo', description: 'Robotics, Coding, AI, Electronics, 3D Printing…' },
   { value: 'VALUE_EDUCATION', label: 'Value Education',      icon: '🌿', color: 'amber',  description: 'Moral Science, Environmental Studies, Yoga, Meditation…' },
   { value: 'REMEDIAL',        label: 'Remedial Support',     icon: '🆘', color: 'red',    description: 'Remedial classes for below-average performers' },
+  { value: 'ENRICHMENT',      label: 'Enrichment',           icon: '🏆', color: 'yellow', description: 'Olympiad, NEET/JEE/IELTS coaching, Scholarship prep, beyond-curriculum programs' },
 ] as const;
 
 export const LANGUAGE_LEVELS = [

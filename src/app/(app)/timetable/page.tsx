@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import PageWrapper from '@/components/layout/PageWrapper';
 import AIBadge from '@/components/shared/AIBadge';
 import ClassSubjectsTab from '@/components/timetable/ClassSubjectsTab';
+import GradeGroupsSetup from '@/components/timetable/GradeGroupsSetup';
 import { toast } from 'sonner';
 import {
   AlertCircle, CheckCircle2, Sparkles, LayoutGrid, Zap, RotateCcw,
@@ -18,22 +19,28 @@ type Section    = { id: string; name: string };
 type Grade      = { id: string; name: string; displayOrder: number; sections: Section[] };
 type GridCell   = { subject: string; colorHex: string; teacher: string; room: string | null; teacherId: string };
 type Grid       = Record<string, Record<number, GridCell>>; // day → periodNo → cell
-type TimetableConfig = { periodsPerDay: number; workingDays: string[]; breakAfterPeriod: number[]; breakDuration: number };
+type TimetableConfig = { workingDays: string[]; schoolStartTime: string };
+type GradeGroupMeta  = { mainBreakAfterPeriod: number; shortBreakEnabled: boolean; shortBreakAfterPeriod: number | null; fillerType: string };
 
 type SubCandidate = { id: string; name: string; proficiency: string };
 type SubSuggestion = { periodNo: number; startTime: string; endTime: string; subject: { name: string }; section: string; timetableEntryId: string; candidates: SubCandidate[] };
 type AbsentTeacher  = { id: string; name: string };
 type GenerationState = 'idle' | 'running' | 'complete' | 'error';
 
+type PreflightSection = {
+  id: string; label: string; gradeId: string; gradeName: string;
+  hasCurriculum: boolean; hasGroup: boolean; groupName: string | null; groupPeriodsPerDay: number | null;
+};
+
 type Preflight = {
   ready: boolean;
   missing: string[];
   hasConfig: boolean;
-  estimatedPeriodsPerDay: number;
   workingDays: string[];
-  sections: { id: string; label: string; gradeId: string; gradeName: string; hasCurriculum: boolean }[];
+  sections: PreflightSection[];
   subjectCount: number;
   teacherCount: number;
+  groupCount: number;
 };
 
 
@@ -77,11 +84,13 @@ const GEN_STEPS = [
 
 // ── TimetableGrid ────────────────────────────────────────────────────────────
 
-function TimetableGrid({ grid, periodSlots, workingDays, breakAfterPeriod }: {
+function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, shortBreakAfterPeriod, fillerType }: {
   grid: Grid;
   periodSlots: PeriodSlot[];
   workingDays: string[];
-  breakAfterPeriod: number[];
+  mainBreakAfterPeriod?: number;
+  shortBreakAfterPeriod?: number | null;
+  fillerType?: string;
 }) {
   const days = DAYS_ORDER.filter(d => workingDays.includes(d));
   const subjectIndexMap: Record<string, number> = {};
@@ -101,7 +110,10 @@ function TimetableGrid({ grid, periodSlots, workingDays, breakAfterPeriod }: {
           </thead>
           <tbody>
             {periodSlots.map((slot, pIdx) => {
-              const showBreak = breakAfterPeriod.includes(slot.periodNo);
+              const showMainBreak  = mainBreakAfterPeriod === slot.periodNo;
+              const showShortBreak = shortBreakAfterPeriod === slot.periodNo;
+              const showBreak = showMainBreak || showShortBreak;
+              const fillerLabel = fillerType === 'STUDY_PERIOD' ? 'Study Period' : fillerType === 'REVISION' ? 'Revision' : null;
               return (
                 <>
                   <tr key={slot.id} className={`border-b border-gray-100 ${pIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
@@ -111,7 +123,17 @@ function TimetableGrid({ grid, periodSlots, workingDays, breakAfterPeriod }: {
                     </td>
                     {days.map(day => {
                       const cell = grid[day]?.[slot.periodNo];
-                      if (!cell) return <td key={day} className="px-3 py-2 text-center text-xs text-gray-300">—</td>;
+                      if (!cell) return (
+                        <td key={day} className="px-2 py-2">
+                          {fillerLabel ? (
+                            <div className="rounded-lg border border-gray-100 bg-gray-50 px-2 py-1.5 text-center">
+                              <div className="text-[10px] text-gray-400 font-dm-sans">{fillerLabel}</div>
+                            </div>
+                          ) : (
+                            <div className="text-center text-xs text-gray-200">—</div>
+                          )}
+                        </td>
+                      );
                       if (!(cell.subject in subjectIndexMap)) {
                         subjectIndexMap[cell.subject] = subjectCounter++;
                       }
@@ -128,13 +150,17 @@ function TimetableGrid({ grid, periodSlots, workingDays, breakAfterPeriod }: {
                     })}
                   </tr>
                   {showBreak && (
-                    <tr key={`break-${slot.periodNo}`} className="bg-gray-50">
+                    <tr key={`break-${slot.periodNo}`} className={showShortBreak ? 'bg-amber-50/30' : 'bg-gray-50'}>
                       <td className="px-5 py-1.5 border-r border-gray-100">
-                        <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Break</div>
+                        <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                          {showShortBreak ? 'Short Break' : 'Break'}
+                        </div>
                       </td>
                       {days.map(d => (
                         <td key={d} className="px-2 py-1.5">
-                          <div className="bg-gray-100 text-gray-400 text-[10px] font-semibold rounded-lg px-2 py-1 text-center">BREAK</div>
+                          <div className={`text-[10px] font-semibold rounded-lg px-2 py-1 text-center ${showShortBreak ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400'}`}>
+                            {showShortBreak ? 'SHORT BREAK' : 'BREAK'}
+                          </div>
                         </td>
                       ))}
                     </tr>
@@ -158,7 +184,8 @@ export default function TimetablePage() {
   const [selectedSectionId, setSelectedSectionId] = useState('');
   const [selectedSectionLabel, setSelectedSectionLabel] = useState('');
   const [periodSlots, setPeriodSlots]   = useState<PeriodSlot[]>([]);
-  const [ttConfig, setTtConfig]         = useState<TimetableConfig>({ periodsPerDay: 8, workingDays: ['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'], breakAfterPeriod: [4], breakDuration: 30 });
+  const [ttConfig, setTtConfig]         = useState<TimetableConfig>({ workingDays: ['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'], schoolStartTime: '08:00' });
+  const [groupMeta, setGroupMeta]       = useState<GradeGroupMeta | null>(null);
   const [grid, setGrid]                 = useState<Grid>({});
   const [timetableLabel, setTimetableLabel] = useState('');
   const [ttLoading, setTtLoading]       = useState(false);
@@ -184,21 +211,18 @@ export default function TimetablePage() {
   const [genResult, setGenResult]       = useState<GenResult | null>(null);
   const [genError, setGenError]         = useState<string | null>(null);
 
-  // ── Initial load: period slots + grades ──────────────────────────────────
+  // ── Initial load: config + grades ────────────────────────────────────────
   useEffect(() => {
     Promise.all([
-      fetch('/api/timetable/period-slots').then(r => r.json()),
+      fetch('/api/timetable/config').then(r => r.json()),
       fetch('/api/grades').then(r => r.json()),
-    ]).then(([psData, gradeData]) => {
-      const config = psData.data?.config ?? psData.config;
-      const slots  = psData.data?.periodSlots ?? psData.periodSlots ?? [];
-      if (config) setTtConfig({ periodsPerDay: config.periodsPerDay, workingDays: config.workingDays, breakAfterPeriod: config.breakAfterPeriod, breakDuration: config.breakDuration });
-      setPeriodSlots(slots.sort((a: PeriodSlot, b: PeriodSlot) => a.periodNo - b.periodNo));
+    ]).then(([cfgData, gradeData]) => {
+      const config = cfgData.data?.config ?? cfgData.config;
+      if (config) setTtConfig({ workingDays: config.workingDays, schoolStartTime: config.schoolStartTime });
 
       const gradeList: Grade[] = gradeData.data ?? gradeData ?? [];
       setGrades(gradeList);
 
-      // Default to first available section
       const firstSection = gradeList.flatMap(g => g.sections)[0];
       if (firstSection) {
         const parentGrade = gradeList.find(g => g.sections.some(s => s.id === firstSection.id));
@@ -215,7 +239,22 @@ export default function TimetablePage() {
     const url = teacherId
       ? `/api/timetable?teacherId=${teacherId}`
       : `/api/timetable?sectionId=${sectionId}`;
-    fetch(url).then(r => r.json()).then(res => {
+
+    const slotUrl = sectionId ? `/api/timetable/period-slots?sectionId=${sectionId}` : null;
+
+    Promise.all([
+      fetch(url).then(r => r.json()),
+      slotUrl ? fetch(slotUrl).then(r => r.json()) : Promise.resolve(null),
+    ]).then(([res, psRes]) => {
+      // Update period slots for this section's group
+      if (psRes) {
+        const freshSlots: PeriodSlot[] = psRes.data?.periodSlots ?? psRes.periodSlots ?? [];
+        setPeriodSlots(freshSlots.sort((a: PeriodSlot, b: PeriodSlot) => a.periodNo - b.periodNo));
+        const g = psRes.data?.group ?? psRes.group;
+        if (g) setGroupMeta({ mainBreakAfterPeriod: g.mainBreakAfterPeriod, shortBreakEnabled: g.shortBreakEnabled, shortBreakAfterPeriod: g.shortBreakAfterPeriod, fillerType: g.fillerType });
+        else setGroupMeta(null);
+      }
+
       const tt = res.data?.timetable ?? res.timetable;
       const subs = res.data?.substitutions ?? res.substitutions ?? [];
       setSubstitutions(subs);
@@ -339,27 +378,8 @@ export default function TimetablePage() {
         setGenResult(d.data ?? d);
         setGenState('complete');
 
-        // Reload period slots — the generate route replaced them in the DB
-        // (old slots deleted, new slots created based on curriculum load).
-        // Without this, the grid header still shows the old row count.
-        fetch('/api/timetable/period-slots')
-          .then(r => r.json())
-          .then(psData => {
-            const freshSlots: PeriodSlot[] = (psData.data?.periodSlots ?? psData.periodSlots ?? []);
-            setPeriodSlots(freshSlots.sort((a, b) => a.periodNo - b.periodNo));
-            const cfg = psData.data?.config ?? psData.config;
-            if (cfg) {
-              setTtConfig({
-                periodsPerDay: cfg.periodsPerDay,
-                workingDays: cfg.workingDays,
-                breakAfterPeriod: cfg.breakAfterPeriod,
-                breakDuration: cfg.breakDuration,
-              });
-            }
-          })
-          .catch(() => {});
-
-        // Reload timetable for the first section
+        // Reload timetable for the first section — loadTimetable now also
+        // fetches fresh period slots per section's grade group
         const firstSection = [...selectedGenSections][0];
         if (firstSection) {
           setSelectedSectionId(firstSection);
@@ -375,9 +395,6 @@ export default function TimetablePage() {
   const ALL_DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'] as const;
   const [setupForm, setSetupForm] = useState({
     schoolStartTime: '08:00',
-    periodDuration: 40,
-    breakAfterPeriod: [4],
-    breakDuration: 30,
     workingDays: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'],
   });
   const [setupSaving, setSetupSaving] = useState(false);
@@ -389,13 +406,7 @@ export default function TimetablePage() {
       const cfg = d.data?.config ?? d.config;
       if (cfg) {
         setSetupExisting(true);
-        setSetupForm({
-          schoolStartTime: cfg.schoolStartTime,
-          periodDuration: cfg.periodDuration,
-          breakAfterPeriod: cfg.breakAfterPeriod,
-          breakDuration: cfg.breakDuration,
-          workingDays: cfg.workingDays,
-        });
+        setSetupForm({ schoolStartTime: cfg.schoolStartTime, workingDays: cfg.workingDays });
       }
     }).catch(() => {});
   }, [activeTab]);
@@ -409,13 +420,8 @@ export default function TimetablePage() {
     }).then(r => r.json()).then(d => {
       if (d.error) { toast.error(d.error); return; }
       setSetupExisting(true);
-      toast.success('Configuration saved — period slots will be generated when you run AI Generator');
-      setTtConfig(prev => ({
-        ...prev,
-        workingDays: setupForm.workingDays,
-        breakAfterPeriod: setupForm.breakAfterPeriod,
-        breakDuration: setupForm.breakDuration,
-      }));
+      toast.success('School timing saved');
+      setTtConfig({ schoolStartTime: setupForm.schoolStartTime, workingDays: setupForm.workingDays });
     }).catch(() => toast.error('Failed to save configuration'))
       .finally(() => setSetupSaving(false));
   }
@@ -522,7 +528,14 @@ export default function TimetablePage() {
               <p className="text-xs text-gray-300 mt-1">Use the AI Generator tab to create one.</p>
             </div>
           ) : (
-            <TimetableGrid grid={grid} periodSlots={periodSlots} workingDays={ttConfig.workingDays} breakAfterPeriod={ttConfig.breakAfterPeriod} />
+            <TimetableGrid
+              grid={grid}
+              periodSlots={periodSlots}
+              workingDays={ttConfig.workingDays}
+              mainBreakAfterPeriod={groupMeta?.mainBreakAfterPeriod}
+              shortBreakAfterPeriod={groupMeta?.shortBreakEnabled ? groupMeta.shortBreakAfterPeriod : null}
+              fillerType={groupMeta?.fillerType}
+            />
           )}
 
           {/* Health Score */}
@@ -618,7 +631,7 @@ export default function TimetablePage() {
                   {/* Live data summary */}
                   <div className="grid grid-cols-2 gap-2 mb-5">
                     {[
-                      { label: 'Est. Periods/Day', value: preflight.estimatedPeriodsPerDay || '—' },
+                      { label: 'Grade Groups', value: preflight.groupCount },
                       { label: 'Working Days', value: preflight.workingDays.length },
                       { label: 'Subjects', value: preflight.subjectCount },
                       { label: 'Teachers', value: preflight.teacherCount },
@@ -633,41 +646,58 @@ export default function TimetablePage() {
                   {/* Section selector */}
                   <div className="mb-5">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Classes to Generate</p>
-                    <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
-                      {preflight.sections.map(s => (
-                        <label key={s.id} className={`flex items-center gap-2 rounded-lg px-1 py-1 ${s.hasCurriculum ? 'cursor-pointer hover:bg-gray-50' : 'cursor-not-allowed opacity-50'}`}
-                          title={s.hasCurriculum ? undefined : 'Configure subjects in Class Subjects tab first'}>
-                          <input type="checkbox"
-                            disabled={!s.hasCurriculum}
-                            checked={selectedGenSections.has(s.id)}
-                            onChange={e => {
-                              if (!s.hasCurriculum) return;
-                              setSelectedGenSections(prev => {
-                                const next = new Set(prev);
-                                if (e.target.checked) { next.add(s.id); } else { next.delete(s.id); }
-                                return next;
-                              });
-                            }}
-                            className="w-3.5 h-3.5 accent-navy rounded flex-shrink-0" />
-                          <span className="text-sm font-dm-sans text-gray-700 flex-1">{s.label}</span>
-                          {s.hasCurriculum ? (
-                            <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0">Curriculum ✓</span>
-                          ) : (
-                            <span className="text-[9px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0">No Curriculum</span>
-                          )}
-                        </label>
-                      ))}
+                    <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
+                      {preflight.sections.map(s => {
+                        const canSelect = s.hasCurriculum && s.hasGroup;
+                        const reason = !s.hasCurriculum ? 'No subjects configured' : !s.hasGroup ? 'No grade group assigned' : null;
+                        return (
+                          <label key={s.id}
+                            className={`flex items-center gap-2 rounded-lg px-1 py-1 ${canSelect ? 'cursor-pointer hover:bg-gray-50' : 'cursor-not-allowed opacity-50'}`}
+                            title={reason ?? undefined}>
+                            <input type="checkbox"
+                              disabled={!canSelect}
+                              checked={selectedGenSections.has(s.id)}
+                              onChange={e => {
+                                if (!canSelect) return;
+                                setSelectedGenSections(prev => {
+                                  const next = new Set(prev);
+                                  if (e.target.checked) { next.add(s.id); } else { next.delete(s.id); }
+                                  return next;
+                                });
+                              }}
+                              className="w-3.5 h-3.5 accent-navy rounded flex-shrink-0" />
+                            <span className="text-sm font-dm-sans text-gray-700 flex-1">{s.label}</span>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {s.hasCurriculum
+                                ? <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-semibold">Subjects ✓</span>
+                                : <span className="text-[9px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded-full font-semibold">No Subjects</span>}
+                              {s.hasGroup
+                                ? <span className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-semibold">{s.groupName}</span>
+                                : <span className="text-[9px] bg-red-100 text-red-500 px-1.5 py-0.5 rounded-full font-semibold">No Group</span>}
+                            </div>
+                          </label>
+                        );
+                      })}
                     </div>
                     {preflight.sections.every(s => !s.hasCurriculum) && (
                       <div className="mt-2 flex items-start gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                         <AlertCircle className="w-3 h-3 text-amber-600 mt-0.5 flex-shrink-0" />
                         <p className="text-[10px] text-amber-700 font-dm-sans">
-                          No classes have subjects configured yet.{' '}
+                          No classes have subjects configured.{' '}
                           <button onClick={() => setActiveTab('classsubjects')} className="underline font-semibold">Set up Class Subjects →</button>
                         </p>
                       </div>
                     )}
-                    {selectedGenSections.size === 0 && preflight.sections.some(s => s.hasCurriculum) && (
+                    {preflight.sections.some(s => s.hasCurriculum && !s.hasGroup) && (
+                      <div className="mt-2 flex items-start gap-1.5 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                        <AlertCircle className="w-3 h-3 text-red-500 mt-0.5 flex-shrink-0" />
+                        <p className="text-[10px] text-red-700 font-dm-sans">
+                          Some classes have no grade group.{' '}
+                          <button onClick={() => setActiveTab('setup')} className="underline font-semibold">Set up Grade Groups →</button>
+                        </p>
+                      </div>
+                    )}
+                    {selectedGenSections.size === 0 && preflight.sections.some(s => s.hasCurriculum && s.hasGroup) && (
                       <p className="text-xs text-amber-600 mt-1.5 font-dm-sans">Select at least one class</p>
                     )}
                   </div>
@@ -709,7 +739,7 @@ export default function TimetablePage() {
                   <div className="bg-white rounded-xl border-2 border-dashed border-gray-200 p-10 flex flex-col items-center justify-center text-center min-h-[300px]">
                     <Sparkles className="w-10 h-10 text-gray-300 mb-3" />
                     <p className="text-sm font-sora font-semibold text-gray-400">Select classes and click Generate</p>
-                    <p className="text-xs text-gray-400 font-dm-sans mt-1">The AI will schedule {preflight.subjectCount} subjects across ~{preflight.estimatedPeriodsPerDay} periods/day using {preflight.teacherCount} teachers</p>
+                    <p className="text-xs text-gray-400 font-dm-sans mt-1">The AI will schedule {preflight.subjectCount} subjects across {preflight.groupCount} grade group{preflight.groupCount !== 1 ? 's' : ''} using {preflight.teacherCount} teachers</p>
                   </div>
                 )}
 
@@ -905,106 +935,65 @@ export default function TimetablePage() {
 
       {/* ── TAB 5: Setup ─────────────────────────────────────────────────── */}
       {activeTab === 'setup' && (
-        <div className="max-w-2xl space-y-5">
-          <div>
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-              <div className="flex items-center gap-2 mb-1">
-                <Settings2 className="w-5 h-5 text-navy" />
-                <h2 className="text-base font-sora font-semibold text-navy">School Timetable Configuration</h2>
+        <div className="space-y-6 max-w-3xl">
+          {/* School timing — global */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+            <div className="flex items-center gap-2 mb-1">
+              <Clock className="w-5 h-5 text-navy" />
+              <h2 className="text-base font-sora font-semibold text-navy">School Timing</h2>
+              <span className="text-xs text-gray-400 font-dm-sans ml-1">— applies to all classes</span>
+            </div>
+            <p className="text-xs text-gray-400 font-dm-sans mb-5">Period duration, breaks, and periods per day are configured per grade group below.</p>
+
+            <div className="grid grid-cols-2 gap-5">
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">School Start Time</label>
+                <input type="time" value={setupForm.schoolStartTime}
+                  onChange={e => setSetupForm(f => ({ ...f, schoolStartTime: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-navy/20 font-dm-sans" />
               </div>
-              <p className="text-xs text-gray-500 font-dm-sans mb-6">
-                {setupExisting ? 'Editing existing configuration. Period slots are auto-computed from your curriculum when you generate a timetable.' : 'No configuration found. Fill in the details below to get started.'}
-              </p>
-
-              <div className="space-y-5">
-                {/* School start time & period duration */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
-                      <Clock className="w-3 h-3 inline mr-1" />School Start Time
-                    </label>
-                    <input type="time" value={setupForm.schoolStartTime}
-                      onChange={e => setSetupForm(f => ({ ...f, schoolStartTime: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-navy/20 font-dm-sans" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Period Duration (minutes)</label>
-                    <input type="number" value={setupForm.periodDuration} min={20} max={90}
-                      onChange={e => setSetupForm(f => ({ ...f, periodDuration: Number(e.target.value) }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-navy/20 font-dm-sans" />
-                  </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">Working Days</label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {ALL_DAYS.map(day => {
+                    const active = setupForm.workingDays.includes(day);
+                    return (
+                      <button key={day}
+                        onClick={() => setSetupForm(f => ({
+                          ...f,
+                          workingDays: active ? f.workingDays.filter(d => d !== day) : [...f.workingDays, day],
+                        }))}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-colors ${active ? 'bg-navy text-white border-navy' : 'bg-white text-gray-500 border-gray-200 hover:border-navy/30'}`}>
+                        {day.slice(0, 3)}
+                      </button>
+                    );
+                  })}
                 </div>
-
-                {/* Break configuration */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Break After Period</label>
-                    <div className="flex gap-1.5 flex-wrap">
-                      {Array.from({ length: 12 }, (_, i) => i + 1).map(p => (
-                        <button key={p}
-                          onClick={() => setSetupForm(f => ({
-                            ...f,
-                            breakAfterPeriod: f.breakAfterPeriod.includes(p)
-                              ? f.breakAfterPeriod.filter(x => x !== p)
-                              : [...f.breakAfterPeriod, p].sort((a, b) => a - b),
-                          }))}
-                          className={`w-8 h-8 rounded-lg text-xs font-bold border transition-colors ${setupForm.breakAfterPeriod.includes(p) ? 'bg-gold text-navy border-gold' : 'bg-white text-gray-500 border-gray-200 hover:border-navy/30'}`}>
-                          {p}
-                        </button>
-                      ))}
-                    </div>
-                    <p className="text-[10px] text-gray-400 mt-1">Click period numbers to toggle break after that period</p>
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Break Duration (minutes)</label>
-                    <input type="number" value={setupForm.breakDuration} min={5} max={60}
-                      onChange={e => setSetupForm(f => ({ ...f, breakDuration: Number(e.target.value) }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-navy/20 font-dm-sans" />
-                  </div>
-                </div>
-
-                {/* Working days */}
-                <div>
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">Working Days</label>
-                  <div className="flex gap-2 flex-wrap">
-                    {ALL_DAYS.map(day => {
-                      const active = setupForm.workingDays.includes(day);
-                      return (
-                        <button key={day}
-                          onClick={() => setSetupForm(f => ({
-                            ...f,
-                            workingDays: active ? f.workingDays.filter(d => d !== day) : [...f.workingDays, day],
-                          }))}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${active ? 'bg-navy text-white border-navy' : 'bg-white text-gray-500 border-gray-200 hover:border-navy/30'}`}>
-                          {day.slice(0, 3)}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-6 pt-5 border-t border-gray-100">
-                <button onClick={handleSaveSetup} disabled={setupSaving || setupForm.workingDays.length === 0}
-                  className="flex items-center gap-2 bg-gold text-navy font-sora font-semibold rounded-xl px-6 py-3 hover:bg-gold/90 transition-colors disabled:opacity-50 text-sm">
-                  {setupSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                  {setupSaving ? 'Saving…' : setupExisting ? 'Update Configuration' : 'Save Configuration'}
-                </button>
               </div>
             </div>
+
+            <div className="mt-5 pt-4 border-t border-gray-100">
+              <button onClick={handleSaveSetup} disabled={setupSaving || setupForm.workingDays.length === 0}
+                className="flex items-center gap-2 bg-gold text-navy font-sora font-semibold rounded-xl px-5 py-2.5 hover:bg-gold/90 transition-colors disabled:opacity-50 text-sm">
+                {setupSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                {setupSaving ? 'Saving…' : setupExisting ? 'Update School Timing' : 'Save School Timing'}
+              </button>
+            </div>
+          </div>
+
+          {/* Grade groups */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+            <GradeGroupsSetup />
           </div>
 
           {setupExisting && (
             <div className="bg-teal/10 border border-teal/20 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-1">
                 <CheckCircle2 className="w-4 h-4 text-teal" />
-                <span className="text-sm font-semibold text-teal">Configuration Active</span>
+                <span className="text-sm font-semibold text-teal">Setup Complete</span>
               </div>
               <p className="text-xs text-gray-500 font-dm-sans">
-                {setupForm.workingDays.length} working days · {setupForm.periodDuration} min/period · {setupForm.breakDuration} min break after period {setupForm.breakAfterPeriod.join(', ')}
-              </p>
-              <p className="text-xs text-gray-400 font-dm-sans mt-1">
-                Periods per day are computed automatically from each grade&apos;s curriculum when you generate a timetable.
+                School starts at {setupForm.schoolStartTime} · {setupForm.workingDays.length} working days · periods and breaks configured per grade group
               </p>
               <button onClick={() => setActiveTab('generator')}
                 className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-navy underline hover:no-underline">

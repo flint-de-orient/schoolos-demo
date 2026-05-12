@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
         include: {
           subject: { select: { id: true, name: true, colorHex: true } },
           teacher: { select: { id: true, name: true } },
-          section: { include: { grade: { select: { name: true } } } },
+          section: { include: { grade: { select: { name: true, gradeGroupId: true, gradeGroup: { select: { id: true, name: true, fillerType: true, mainBreakAfterPeriod: true, shortBreakEnabled: true, shortBreakAfterPeriod: true } } } } } },
           periodSlot: true,
         },
         orderBy: [{ day: 'asc' }, { periodSlot: { periodNo: 'asc' } }],

@@ -59,13 +59,16 @@ const DEFICIT_MIN: Record<string, number> = {
   TECHNOLOGY: 1,
   VALUE_EDUCATION: 1,
   REMEDIAL: 1,
+  ENRICHMENT: 0, // can be cut to zero — always lowest priority
 };
 
 /**
  * Category trim priority (index 0 = trimmed first).
+ * ENRICHMENT (Olympiad/competitive coaching) is always trimmed first.
  * Optional subjects are handled separately before this list.
  */
 const TRIM_CAT_ORDER = [
+  'ENRICHMENT',     // Olympiad, NEET/JEE coaching — trimmed first
   'SPORTS',
   'ARTS',
   'TECHNOLOGY',
@@ -74,7 +77,7 @@ const TRIM_CAT_ORDER = [
   'ELECTIVE',
   'PRACTICAL',
   'CORE',
-  'LANGUAGE',
+  'LANGUAGE',       // trimmed last — always protected
 ];
 
 // ── Main function ─────────────────────────────────────────────────────────────

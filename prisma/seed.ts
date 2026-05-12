@@ -125,18 +125,18 @@ async function main() {
   await prisma.timetableConfig.upsert({
     where: { tenantId: sundarban.id }, update: {},
     create: {
-      tenantId: sundarban.id, periodsPerDay: 8,
+      tenantId: sundarban.id,
       workingDays: [DayOfWeek.MONDAY,DayOfWeek.TUESDAY,DayOfWeek.WEDNESDAY,DayOfWeek.THURSDAY,DayOfWeek.FRIDAY,DayOfWeek.SATURDAY],
-      periodDuration: 40, breakAfterPeriod: [4], breakDuration: 30, schoolStartTime: '08:00',
+      schoolStartTime: '08:00',
     },
   });
 
   await prisma.timetableConfig.upsert({
     where: { tenantId: muraliganj.id }, update: {},
     create: {
-      tenantId: muraliganj.id, periodsPerDay: 8,
+      tenantId: muraliganj.id,
       workingDays: [DayOfWeek.MONDAY,DayOfWeek.TUESDAY,DayOfWeek.WEDNESDAY,DayOfWeek.THURSDAY,DayOfWeek.FRIDAY,DayOfWeek.SATURDAY],
-      periodDuration: 40, breakAfterPeriod: [4], breakDuration: 30, schoolStartTime: '10:30',
+      schoolStartTime: '10:30',
     },
   });
 

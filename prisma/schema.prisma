@@ -294,6 +294,13 @@ enum PTMBookingStatus {
   NO_SHOW
 }
 
+enum FillerType {
+  STUDY_PERIOD
+  REVISION
+  REPEAT_COMPULSORY
+  LEAVE_EMPTY
+}
+
 // ─────────────────────────────────────────────
 // SECTION 1 — CORE: TENANT + USER
 // ─────────────────────────────────────────────
@@ -328,6 +335,7 @@ model Tenant {
   users                 User[]
   academicYears         AcademicYear[]
   grades                Grade[]
+  gradeGroups           GradeGroup[]
   sections              Section[]
   subjects              Subject[]
   teachers              Teacher[]
@@ -478,10 +486,12 @@ model Grade {
   board          Board
   isExamClass    Boolean  @default(false)
   isActive       Boolean  @default(true)
+  gradeGroupId   String?
   createdAt      DateTime @default(now())
 
   tenant            Tenant             @relation(fields: [tenantId], references: [id])
   academicYear      AcademicYear       @relation(fields: [academicYearId], references: [id])
+  gradeGroup        GradeGroup?        @relation(fields: [gradeGroupId], references: [id])
   sections          Section[]
   gradeSubjects     GradeSubject[]
   syllabi           Syllabus[]
@@ -920,14 +930,33 @@ model StudentAchievement {
 // SECTION 5 — TIMETABLE ENGINE
 // ─────────────────────────────────────────────
 
+model GradeGroup {
+  id                    String     @id @default(cuid())
+  tenantId              String
+  name                  String
+  displayOrder          Int        @default(0)
+  periodsPerDay         Int        @default(8)
+  periodDuration        Int        @default(40)
+  shortBreakEnabled     Boolean    @default(false)
+  shortBreakAfterPeriod Int?
+  shortBreakDuration    Int        @default(10)
+  mainBreakAfterPeriod  Int        @default(4)
+  mainBreakDuration     Int        @default(30)
+  fillerType            FillerType @default(STUDY_PERIOD)
+  grades                Grade[]
+  periodSlots           PeriodSlot[]
+  tenant                Tenant     @relation(fields: [tenantId], references: [id])
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
 model TimetableConfig {
   id                    String      @id @default(cuid())
-  tenantId              String
-  periodsPerDay         Int         @default(8)
+  tenantId              String      @unique
   workingDays           DayOfWeek[]
-  periodDuration        Int         @default(40)
-  breakAfterPeriod      Int[]
-  breakDuration         Int         @default(20)
   schoolStartTime       String      @default("08:00")
   maxConsecutivePeriods Int         @default(2)
   createdAt             DateTime    @default(now())
@@ -935,23 +964,24 @@ model TimetableConfig {
 
   tenant      Tenant       @relation(fields: [tenantId], references: [id])
   periodSlots PeriodSlot[]
-
-  @@unique([tenantId])
 }
 
 model PeriodSlot {
-  id        String  @id @default(cuid())
-  configId  String
-  periodNo  Int
-  startTime String
-  endTime   String
-  isBreak   Boolean @default(false)
-  label     String?
+  id           String  @id @default(cuid())
+  configId     String
+  gradeGroupId String?
+  periodNo     Int
+  startTime    String
+  endTime      String
+  isBreak      Boolean @default(false)
+  label        String?
 
   config           TimetableConfig  @relation(fields: [configId], references: [id])
+  gradeGroup       GradeGroup?      @relation(fields: [gradeGroupId], references: [id])
   timetableEntries TimetableEntry[]
 
-  @@unique([configId, periodNo])
+  @@unique([gradeGroupId, periodNo])
+  @@index([configId])
 }
 
 model Timetable {

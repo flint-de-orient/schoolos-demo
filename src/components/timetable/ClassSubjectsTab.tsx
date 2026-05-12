@@ -39,18 +39,21 @@ const CAT_COLORS: Record<string, string> = {
   TECHNOLOGY: 'bg-indigo-50 border-indigo-200 text-indigo-800',
   VALUE_EDUCATION: 'bg-amber-50 border-amber-200 text-amber-800',
   REMEDIAL: 'bg-red-50 border-red-200 text-red-800',
+  ENRICHMENT: 'bg-yellow-50 border-yellow-200 text-yellow-900',
 };
 
 const CAT_HEADER: Record<string, string> = {
   CORE: 'bg-blue-600', LANGUAGE: 'bg-green-600', ELECTIVE: 'bg-purple-600',
   PRACTICAL: 'bg-teal-600', SPORTS: 'bg-orange-500', ARTS: 'bg-pink-600',
   TECHNOLOGY: 'bg-indigo-600', VALUE_EDUCATION: 'bg-amber-600', REMEDIAL: 'bg-red-600',
+  ENRICHMENT: 'bg-yellow-500',
 };
 
 // Default periods/week per category (AI Suggest)
 const DEFAULT_PPW: Record<string, number> = {
   LANGUAGE: 6, CORE: 5, ELECTIVE: 3, PRACTICAL: 2,
   SPORTS: 2, ARTS: 2, TECHNOLOGY: 2, VALUE_EDUCATION: 1, REMEDIAL: 2,
+  ENRICHMENT: 1,
 };
 
 // Default scheduling slot per category
@@ -58,6 +61,7 @@ const DEFAULT_SLOT: Record<string, string> = {
   LANGUAGE: 'REGULAR', CORE: 'REGULAR', ELECTIVE: 'REGULAR', PRACTICAL: 'REGULAR',
   SPORTS: 'ACTIVITY', ARTS: 'ACTIVITY', TECHNOLOGY: 'ACTIVITY',
   VALUE_EDUCATION: 'ACTIVITY', REMEDIAL: 'REGULAR',
+  ENRICHMENT: 'ACTIVITY',
 };
 
 // ── Draft types ───────────────────────────────────────────────────────────────
