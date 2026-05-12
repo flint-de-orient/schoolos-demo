@@ -527,6 +527,159 @@ function AddStaffModal({ onClose, onAdd }: { onClose: () => void; onAdd: (s: Sta
   );
 }
 
+// ─── Leave Balance Modal ──────────────────────────────────────────────────────
+
+function LeaveBalanceModal({ staff, mode, leaveRequests, policies, onClose }: {
+  staff: Staff;
+  mode: 'used' | 'remaining';
+  leaveRequests: LeaveRequest[];
+  policies: LeavePolicy[];
+  onClose: () => void;
+}) {
+  const now = new Date();
+  const ayStart = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+  const sessionStart = new Date(ayStart, 3, 1);
+  const sessionEnd   = new Date(ayStart + 1, 2, 31);
+
+  const sessionLabel = `April ${ayStart} – March ${ayStart + 1}`;
+
+  // All requests for this staff member in current session
+  const staffRequests = leaveRequests.filter(l =>
+    l.staffId === staff.id &&
+    l.status !== 'Rejected' &&
+    new Date(l.from) >= sessionStart &&
+    new Date(l.from) <= sessionEnd
+  );
+
+  // Per-policy used days
+  const usedByType = (p: LeavePolicy) =>
+    staffRequests
+      .filter(l => l.type === p.leaveType || l.type === p.label)
+      .reduce((sum, l) => sum + l.days, 0);
+
+  // Group used requests by policy
+  const usedByPolicy = policies.map(p => ({
+    policy: p,
+    requests: staffRequests.filter(l => l.type === p.leaveType || l.type === p.label),
+  })).filter(g => g.requests.length > 0);
+
+  // Remaining breakdown
+  const remainingByPolicy = policies.map(p => {
+    const used = usedByType(p);
+    return { policy: p, used, remaining: Math.max(0, p.daysAllowed - used) };
+  });
+
+  const totalQuota     = policies.reduce((s, p) => s + p.daysAllowed, 0);
+  const totalUsed      = staffRequests.reduce((s, l) => s + l.days, 0);
+  const totalRemaining = Math.max(0, totalQuota - totalUsed);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-fadeIn max-h-[85vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b border-gray-100 flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-navy flex items-center justify-center flex-shrink-0">
+              <span className="text-white text-xs font-bold font-sora">{getInitials(staff.name)}</span>
+            </div>
+            <div>
+              <h2 className="font-sora font-bold text-navy text-base">{staff.name}</h2>
+              <p className="text-xs text-gray-400">{staff.designation} · {sessionLabel}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500"><X className="w-4 h-4" /></button>
+        </div>
+
+        {/* Summary bar */}
+        <div className="grid grid-cols-3 divide-x divide-gray-100 border-b border-gray-100 flex-shrink-0">
+          {[
+            { label: 'Annual Quota', value: totalQuota, color: 'text-navy' },
+            { label: 'Days Used',    value: totalUsed,  color: 'text-amber' },
+            { label: 'Remaining',    value: totalRemaining, color: totalRemaining <= 3 ? 'text-coral' : totalRemaining <= 8 ? 'text-amber' : 'text-green' },
+          ].map(s => (
+            <div key={s.label} className="py-3 px-4 text-center">
+              <div className={`text-xl font-sora font-bold ${s.color}`}>{s.value}</div>
+              <div className="text-[10px] text-gray-400 mt-0.5">{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="overflow-y-auto flex-1 p-5">
+          {mode === 'used' ? (
+            /* ── Used: show requests grouped by type ── */
+            usedByPolicy.length === 0 ? (
+              <div className="text-center py-10 text-sm text-gray-400">No leave availed this session</div>
+            ) : (
+              <div className="space-y-4">
+                {usedByPolicy.map(({ policy, requests }) => (
+                  <div key={policy.id}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: policy.color }} />
+                      <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">{policy.label}</span>
+                      <span className="ml-auto text-xs font-semibold text-amber bg-amber/10 px-2 py-0.5 rounded-full">
+                        {requests.reduce((s, l) => s + l.days, 0)} / {policy.daysAllowed} days
+                      </span>
+                    </div>
+                    <div className="rounded-xl border border-gray-100 overflow-hidden">
+                      {requests.map((l, i) => (
+                        <div key={l.id} className={`flex items-center gap-3 px-4 py-2.5 text-xs ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}`}>
+                          <div className="flex-1 min-w-0">
+                            <span className="font-semibold text-gray-700">{l.from}</span>
+                            <span className="text-gray-400 mx-1.5">→</span>
+                            <span className="font-semibold text-gray-700">{l.to}</span>
+                            {l.reason && <span className="text-gray-400 ml-2 truncate">· {l.reason}</span>}
+                          </div>
+                          <span className="font-bold text-navy whitespace-nowrap">{l.days}d</span>
+                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${
+                            l.status === 'Approved' ? 'bg-green/10 text-green border-green/20' : 'bg-amber/10 text-amber border-amber/20'
+                          }`}>{l.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          ) : (
+            /* ── Remaining: per-policy breakdown ── */
+            <div className="space-y-3">
+              {remainingByPolicy.map(({ policy, used, remaining }) => {
+                const pct = policy.daysAllowed > 0 ? Math.round((remaining / policy.daysAllowed) * 100) : 0;
+                const statusColor = remaining === 0 ? 'text-coral' : remaining <= 2 ? 'text-amber' : 'text-green';
+                return (
+                  <div key={policy.id} className="bg-gray-50 rounded-xl p-3.5">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: policy.color }} />
+                        <span className="text-sm font-semibold text-gray-800">{policy.label}</span>
+                        {policy.isPaid ? (
+                          <span className="text-[9px] font-bold bg-green/10 text-green border border-green/20 px-1.5 py-0.5 rounded-full">Paid</span>
+                        ) : (
+                          <span className="text-[9px] font-bold bg-gray-100 text-gray-500 border border-gray-200 px-1.5 py-0.5 rounded-full">Unpaid</span>
+                        )}
+                      </div>
+                      <span className={`text-lg font-sora font-bold ${statusColor}`}>{remaining}<span className="text-xs font-normal text-gray-400 ml-0.5">/{policy.daysAllowed}</span></span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: policy.color, opacity: 0.7 }} />
+                      </div>
+                      <span className="text-xs text-gray-400 w-20 text-right">{used} used · {remaining} left</span>
+                    </div>
+                    {remaining === 0 && (
+                      <p className="text-[10px] text-coral mt-1.5 font-semibold">Quota exhausted — any new request will trigger the {policy.exceededPolicy.replace('_', ' ').toLowerCase()} policy.</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Apply Leave Modal ────────────────────────────────────────────────────────
 
 type LeavePolicy = {
@@ -895,6 +1048,14 @@ export default function HRPage() {
   useEffect(() => {
     Promise.all([loadStaff(), loadLeave()]).finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'leave') return;
+    fetch('/api/hr/leave-policies')
+      .then(r => r.json())
+      .then(j => setLeavePolicies(j.policies ?? j.data?.policies ?? []))
+      .catch(() => {});
+  }, [activeTab]);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [showAddStaff, setShowAddStaff] = useState(false);
   const [showApplyLeave, setShowApplyLeave] = useState(false);
@@ -910,6 +1071,10 @@ export default function HRPage() {
   // Leave state
   const [leaveSearch, setLeaveSearch] = useState('');
   const [leaveFilter, setLeaveFilter] = useState<'All' | 'Pending' | 'Approved' | 'Rejected'>('All');
+  const [leaveSubTab, setLeaveSubTab] = useState<'requests' | 'balance'>('requests');
+  const [leavePolicies, setLeavePolicies] = useState<LeavePolicy[]>([]);
+  const [balanceModal, setBalanceModal] = useState<{ staff: Staff; mode: 'used' | 'remaining' } | null>(null);
+  const [lbSearch, setLbSearch] = useState('');
 
   // Payroll state
   const [payrollMonth, setPayrollMonth] = useState('April 2026');
@@ -962,6 +1127,11 @@ export default function HRPage() {
   const filteredPayroll = useMemo(() => staffList.filter(s =>
     s.name.toLowerCase().includes(payrollSearch.toLowerCase())
   ), [staffList, payrollSearch]);
+
+  const filteredBalance = useMemo(() => staffList.filter(s =>
+    s.name.toLowerCase().includes(lbSearch.toLowerCase()) ||
+    s.designation.toLowerCase().includes(lbSearch.toLowerCase())
+  ), [staffList, lbSearch]);
 
   // ── Actions ──
   const handleLeaveAction = async (id: string, action: 'Approved' | 'Rejected') => {
@@ -1172,6 +1342,12 @@ export default function HRPage() {
                 <Plus className="w-3.5 h-3.5" /> Apply Leave
               </button>
             )}
+            {activeTab === 'leave' && leaveSubTab === 'balance' && (
+              <button onClick={() => setLbSearch('')}
+                className="flex items-center gap-1.5 border border-gray-200 text-gray-600 text-xs font-semibold px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors">
+                <Download className="w-3.5 h-3.5" /> Export
+              </button>
+            )}
             {activeTab === 'directory' && (
               <button onClick={() => setShowAddStaff(true)}
                 className="flex items-center gap-1.5 bg-gold text-navy text-xs font-semibold px-3 py-2 rounded-xl hover:bg-gold/90 transition-colors">
@@ -1330,8 +1506,8 @@ export default function HRPage() {
           {/* ── Leave Management ── */}
           {activeTab === 'leave' && (
             <div>
-              {/* Leave balance quick view */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+              {/* Stats */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                 {[
                   { label: 'Pending Requests', value: leaveRequests.filter(l => l.status === 'Pending').length, color: 'text-amber', bg: 'bg-amber/10' },
                   { label: 'Approved This Month', value: leaveRequests.filter(l => l.status === 'Approved').length, color: 'text-green', bg: 'bg-green/10' },
@@ -1345,141 +1521,225 @@ export default function HRPage() {
                 ))}
               </div>
 
-              {/* Toolbar */}
-              <div className="flex flex-col sm:flex-row gap-3 mb-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input type="text" placeholder="Search by name or leave type..."
-                    value={leaveSearch} onChange={e => setLeaveSearch(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20" />
-                </div>
-                <div className="flex gap-1">
-                  {(['All','Pending','Approved','Rejected'] as const).map(f => (
-                    <button key={f} onClick={() => setLeaveFilter(f)}
-                      className={`px-3 py-2 text-xs font-semibold rounded-xl border transition-colors ${leaveFilter === f ? 'bg-navy text-white border-navy' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}>
-                      {f}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Leave cards */}
-              <div className="space-y-3">
-                {filteredLeave.length === 0 ? (
-                  <div className="text-center py-12 bg-gray-50 rounded-2xl text-sm text-gray-400">No leave requests found</div>
-                ) : filteredLeave.map(l => (
-                  <div key={l.id} className={`bg-white border rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-4 transition-all ${
-                    l.status === 'Pending' ? 'border-amber/30 bg-amber/3' :
-                    l.status === 'Approved' ? 'border-green/20' : 'border-gray-100'
-                  }`}>
-                    {/* Staff avatar + info */}
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className="w-10 h-10 rounded-xl gradient-navy flex items-center justify-center flex-shrink-0">
-                        <span className="text-white text-xs font-bold font-sora">{getInitials(l.name)}</span>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-sm text-gray-800">{l.name}</p>
-                        <p className="text-xs text-gray-500">{l.designation}</p>
-                      </div>
-                    </div>
-
-                    {/* Leave details */}
-                    <div className="flex flex-wrap gap-3 flex-shrink-0 text-xs">
-                      <div className="bg-gray-50 rounded-xl px-3 py-2">
-                        <div className="text-gray-400 text-[10px] mb-0.5">Type</div>
-                        <div className="font-semibold text-gray-700">{l.type}</div>
-                      </div>
-                      <div className="bg-gray-50 rounded-xl px-3 py-2">
-                        <div className="text-gray-400 text-[10px] mb-0.5">Duration</div>
-                        <div className="font-semibold text-gray-700">{l.from} → {l.to}</div>
-                      </div>
-                      <div className="bg-gray-50 rounded-xl px-3 py-2">
-                        <div className="text-gray-400 text-[10px] mb-0.5">Days</div>
-                        <div className="font-bold text-navy">{l.days}</div>
-                      </div>
-                      <div className="bg-gray-50 rounded-xl px-3 py-2 max-w-[160px]">
-                        <div className="text-gray-400 text-[10px] mb-0.5">Reason</div>
-                        <div className="font-medium text-gray-600 truncate">{l.reason}</div>
-                      </div>
-                    </div>
-
-                    {/* Status + actions */}
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
-                        l.status === 'Approved' ? 'bg-green/10 text-green border-green/20' :
-                        l.status === 'Rejected' ? 'bg-coral/10 text-coral border-coral/20' :
-                        'bg-amber/10 text-amber border-amber/20'
-                      }`}>
-                        {l.status === 'Approved' ? <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3" />{l.status}</span> :
-                         l.status === 'Rejected' ? <span className="flex items-center gap-1"><XCircle className="w-3 h-3" />{l.status}</span> :
-                         <span className="flex items-center gap-1"><AlertCircle className="w-3 h-3" />{l.status}</span>}
-                      </span>
-                      {l.status === 'Pending' && (
-                        <>
-                          <button onClick={() => handleLeaveAction(l.id, 'Approved')}
-                            className="w-8 h-8 bg-green/10 text-green rounded-xl flex items-center justify-center hover:bg-green/20 transition-colors border border-green/20" title="Approve">
-                            <Check className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => handleLeaveAction(l.id, 'Rejected')}
-                            className="w-8 h-8 bg-coral/10 text-coral rounded-xl flex items-center justify-center hover:bg-coral/20 transition-colors border border-coral/20" title="Reject">
-                            <X className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
+              {/* Sub-tab toggle */}
+              <div className="flex bg-gray-100 rounded-xl p-1 mb-4 w-fit">
+                {([
+                  { id: 'requests', label: 'Leave Requests' },
+                  { id: 'balance',  label: 'Leave Balance' },
+                ] as const).map(st => (
+                  <button key={st.id} onClick={() => setLeaveSubTab(st.id)}
+                    className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${leaveSubTab === st.id ? 'bg-white shadow-sm text-navy' : 'text-gray-500 hover:text-gray-700'}`}>
+                    {st.label}
+                  </button>
                 ))}
               </div>
 
-              {/* Leave balance table */}
-              <div className="mt-6">
-                <h3 className="font-sora font-semibold text-navy mb-3 text-sm">Leave Balance — All Staff</h3>
-                <div className="overflow-x-auto rounded-xl border border-gray-100">
-                  <table className="w-full min-w-[500px]">
-                    <thead className="bg-gray-50 border-b border-gray-100">
-                      <tr>
-                        {['Staff Member','Designation','Annual Entitlement','Used','Remaining','Status'].map(h => (
-                          <th key={h} className="text-left text-xs uppercase tracking-wide text-gray-400 px-4 py-3 font-medium">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {staffList.map((s, i) => {
-                        const used = 20 - s.leaveBalance;
-                        const pct = Math.round((s.leaveBalance / 20) * 100);
-                        return (
-                          <tr key={s.id} className={`border-b border-gray-50 hover:bg-gray-50/80 ${i % 2 !== 0 ? 'bg-gray-50/30' : ''}`}>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-2">
-                                <div className="w-7 h-7 rounded-lg bg-navy flex items-center justify-center flex-shrink-0">
-                                  <span className="text-white text-[10px] font-bold font-sora">{getInitials(s.name)}</span>
-                                </div>
-                                <span className="font-semibold text-sm text-gray-800">{s.name}</span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-xs text-gray-500">{s.designation}</td>
-                            <td className="px-4 py-3 text-sm text-gray-700 font-medium">20 days</td>
-                            <td className="px-4 py-3 text-sm font-semibold text-amber">{used}</td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-2">
-                                <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                  <div className={`h-full rounded-full ${pct > 50 ? 'bg-green' : pct > 25 ? 'bg-amber' : 'bg-coral'}`} style={{ width: `${pct}%` }} />
-                                </div>
-                                <span className={`text-sm font-bold ${s.leaveBalance <= 5 ? 'text-coral' : s.leaveBalance <= 10 ? 'text-amber' : 'text-green'}`}>{s.leaveBalance}</span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${s.leaveBalance <= 5 ? 'bg-coral/10 text-coral' : s.leaveBalance <= 10 ? 'bg-amber/10 text-amber' : 'bg-green/10 text-green'}`}>
-                                {s.leaveBalance <= 5 ? 'Critical' : s.leaveBalance <= 10 ? 'Low' : 'Healthy'}
-                              </span>
-                            </td>
+              {/* ── Requests sub-tab ── */}
+              {leaveSubTab === 'requests' && (
+                <>
+                  <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input type="text" placeholder="Search by name or leave type..."
+                        value={leaveSearch} onChange={e => setLeaveSearch(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20" />
+                    </div>
+                    <div className="flex gap-1">
+                      {(['All','Pending','Approved','Rejected'] as const).map(f => (
+                        <button key={f} onClick={() => setLeaveFilter(f)}
+                          className={`px-3 py-2 text-xs font-semibold rounded-xl border transition-colors ${leaveFilter === f ? 'bg-navy text-white border-navy' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}>
+                          {f}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    {filteredLeave.length === 0 ? (
+                      <div className="text-center py-12 bg-gray-50 rounded-2xl text-sm text-gray-400">No leave requests found</div>
+                    ) : filteredLeave.map(l => (
+                      <div key={l.id} className={`bg-white border rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-4 transition-all ${
+                        l.status === 'Pending' ? 'border-amber/30 bg-amber/3' :
+                        l.status === 'Approved' ? 'border-green/20' : 'border-gray-100'
+                      }`}>
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="w-10 h-10 rounded-xl gradient-navy flex items-center justify-center flex-shrink-0">
+                            <span className="text-white text-xs font-bold font-sora">{getInitials(l.name)}</span>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-sm text-gray-800">{l.name}</p>
+                            <p className="text-xs text-gray-500">{l.designation}</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-3 flex-shrink-0 text-xs">
+                          <div className="bg-gray-50 rounded-xl px-3 py-2">
+                            <div className="text-gray-400 text-[10px] mb-0.5">Type</div>
+                            <div className="font-semibold text-gray-700">{l.type}</div>
+                          </div>
+                          <div className="bg-gray-50 rounded-xl px-3 py-2">
+                            <div className="text-gray-400 text-[10px] mb-0.5">Duration</div>
+                            <div className="font-semibold text-gray-700">{l.from} → {l.to}</div>
+                          </div>
+                          <div className="bg-gray-50 rounded-xl px-3 py-2">
+                            <div className="text-gray-400 text-[10px] mb-0.5">Days</div>
+                            <div className="font-bold text-navy">{l.days}</div>
+                          </div>
+                          <div className="bg-gray-50 rounded-xl px-3 py-2 max-w-[160px]">
+                            <div className="text-gray-400 text-[10px] mb-0.5">Reason</div>
+                            <div className="font-medium text-gray-600 truncate">{l.reason}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                            l.status === 'Approved' ? 'bg-green/10 text-green border-green/20' :
+                            l.status === 'Rejected' ? 'bg-coral/10 text-coral border-coral/20' :
+                            'bg-amber/10 text-amber border-amber/20'
+                          }`}>
+                            {l.status === 'Approved' ? <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3" />{l.status}</span> :
+                             l.status === 'Rejected' ? <span className="flex items-center gap-1"><XCircle className="w-3 h-3" />{l.status}</span> :
+                             <span className="flex items-center gap-1"><AlertCircle className="w-3 h-3" />{l.status}</span>}
+                          </span>
+                          {l.status === 'Pending' && (
+                            <>
+                              <button onClick={() => handleLeaveAction(l.id, 'Approved')}
+                                className="w-8 h-8 bg-green/10 text-green rounded-xl flex items-center justify-center hover:bg-green/20 transition-colors border border-green/20" title="Approve">
+                                <Check className="w-4 h-4" />
+                              </button>
+                              <button onClick={() => handleLeaveAction(l.id, 'Rejected')}
+                                className="w-8 h-8 bg-coral/10 text-coral rounded-xl flex items-center justify-center hover:bg-coral/20 transition-colors border border-coral/20" title="Reject">
+                                <X className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* ── Leave Balance sub-tab ── */}
+              {leaveSubTab === 'balance' && (() => {
+                const now = new Date();
+                const ayStart = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+                const sessionStart = new Date(ayStart, 3, 1);
+                const sessionEnd   = new Date(ayStart + 1, 2, 31);
+
+                const getUsed = (staffId: string) =>
+                  leaveRequests
+                    .filter(l => l.staffId === staffId && l.status !== 'Rejected' &&
+                      new Date(l.from) >= sessionStart && new Date(l.from) <= sessionEnd)
+                    .reduce((sum, l) => sum + l.days, 0);
+
+                const totalQuota = leavePolicies.reduce((s, p) => s + p.daysAllowed, 0);
+
+                return (
+                  <div>
+                    {/* Summary header */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <p className="text-sm font-semibold text-navy">Leave Balance — All Staff</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          Session: April {ayStart} – March {ayStart + 1}
+                          {leavePolicies.length > 0 && ` · ${leavePolicies.length} policy types · ${totalQuota} days total quota per staff`}
+                        </p>
+                      </div>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                        <input type="text" placeholder="Search staff..." value={lbSearch} onChange={e => setLbSearch(e.target.value)}
+                          className="pl-8 pr-3 py-2 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 w-44" />
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-xl border border-gray-100">
+                      <table className="w-full min-w-[640px]">
+                        <thead className="bg-gray-50 border-b border-gray-100">
+                          <tr>
+                            <th className="text-left text-xs uppercase tracking-wide text-gray-400 px-4 py-3 font-medium">Staff Member</th>
+                            <th className="text-left text-xs uppercase tracking-wide text-gray-400 px-4 py-3 font-medium">Dept / Designation</th>
+                            <th className="text-center text-xs uppercase tracking-wide text-gray-400 px-4 py-3 font-medium">Annual Quota</th>
+                            <th className="text-center text-xs uppercase tracking-wide text-gray-400 px-4 py-3 font-medium">Used</th>
+                            <th className="text-center text-xs uppercase tracking-wide text-gray-400 px-4 py-3 font-medium">Remaining</th>
+                            <th className="text-left text-xs uppercase tracking-wide text-gray-400 px-4 py-3 font-medium">Progress</th>
+                            <th className="text-center text-xs uppercase tracking-wide text-gray-400 px-4 py-3 font-medium">Status</th>
                           </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                        </thead>
+                        <tbody>
+                          {filteredBalance.map((s, i) => {
+                            const used = getUsed(s.id);
+                            const remaining = Math.max(0, totalQuota - used);
+                            const pct = totalQuota > 0 ? Math.round((remaining / totalQuota) * 100) : 100;
+                            const statusLabel = remaining === 0 ? 'Exhausted' : remaining <= Math.round(totalQuota * 0.2) ? 'Critical' : remaining <= Math.round(totalQuota * 0.4) ? 'Low' : 'Healthy';
+                            const statusColor = remaining === 0 ? 'bg-coral/10 text-coral' : remaining <= Math.round(totalQuota * 0.2) ? 'bg-coral/10 text-coral' : remaining <= Math.round(totalQuota * 0.4) ? 'bg-amber/10 text-amber' : 'bg-green/10 text-green';
+                            const barColor = remaining === 0 ? '#D85A30' : remaining <= Math.round(totalQuota * 0.2) ? '#D85A30' : remaining <= Math.round(totalQuota * 0.4) ? '#BA7517' : '#3B6D11';
+                            return (
+                              <tr key={s.id} className={`border-b border-gray-50 hover:bg-iceLight/50 transition-colors ${i % 2 !== 0 ? 'bg-gray-50/30' : ''}`}>
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-2.5">
+                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-[11px] font-bold font-sora flex-shrink-0 ${s._sourceType === 'teacher' ? 'bg-purple' : 'bg-navy'}`}>
+                                      {getInitials(s.name)}
+                                    </div>
+                                    <div>
+                                      <p className="font-semibold text-sm text-gray-800 leading-tight">{s.name}</p>
+                                      <p className="text-[10px] text-gray-400">{s._sourceType === 'teacher' ? 'Teaching' : 'Non-Teaching'}</p>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <p className="text-xs text-gray-700 font-medium">{s.designation}</p>
+                                  <p className="text-[10px] text-gray-400">{s.department}</p>
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  <span className="text-sm font-semibold text-gray-700">{totalQuota}</span>
+                                  <span className="text-xs text-gray-400 ml-0.5">d</span>
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  <button onClick={() => setBalanceModal({ staff: s, mode: 'used' })}
+                                    className={`text-sm font-bold underline decoration-dotted underline-offset-2 transition-colors ${used === 0 ? 'text-gray-300 cursor-default no-underline' : 'text-amber hover:text-amber/70 cursor-pointer'}`}
+                                    disabled={used === 0}>
+                                    {used}
+                                  </button>
+                                  <span className="text-xs text-gray-400 ml-0.5">d</span>
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  <button onClick={() => setBalanceModal({ staff: s, mode: 'remaining' })}
+                                    className={`text-sm font-bold underline decoration-dotted underline-offset-2 transition-colors hover:opacity-70 cursor-pointer ${remaining === 0 ? 'text-coral' : remaining <= Math.round(totalQuota * 0.4) ? 'text-amber' : 'text-green'}`}>
+                                    {remaining}
+                                  </button>
+                                  <span className="text-xs text-gray-400 ml-0.5">d</span>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden min-w-[80px]">
+                                      <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: barColor }} />
+                                    </div>
+                                    <span className="text-[10px] text-gray-400 w-8 text-right">{pct}%</span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusColor}`}>{statusLabel}</span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                        <tfoot className="border-t border-gray-100 bg-gray-50">
+                          <tr>
+                            <td colSpan={2} className="px-4 py-2.5 text-xs font-semibold text-gray-500">{filteredBalance.length} staff members</td>
+                            <td className="px-4 py-2.5 text-center text-xs font-bold text-gray-700">{filteredBalance.length * totalQuota}d</td>
+                            <td className="px-4 py-2.5 text-center text-xs font-bold text-amber">
+                              {filteredBalance.reduce((sum, s) => sum + getUsed(s.id), 0)}d
+                            </td>
+                            <td className="px-4 py-2.5 text-center text-xs font-bold text-green">
+                              {filteredBalance.reduce((sum, s) => sum + Math.max(0, totalQuota - getUsed(s.id)), 0)}d
+                            </td>
+                            <td colSpan={2} />
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -1993,6 +2253,7 @@ export default function HRPage() {
       <TeacherProfileSheet teacherId={selectedTeacherId} onClose={() => setSelectedTeacherId(null)} />
       {showAddStaff && <AddStaffModal onClose={() => setShowAddStaff(false)} onAdd={s => setStaffList(prev => [s, ...prev])} />}
       {showApplyLeave && <ApplyLeaveModal staff={staffList} leaveRequests={leaveRequests} onClose={() => setShowApplyLeave(false)} onApply={l => setLeaveRequests(prev => [l, ...prev])} />}
+      {balanceModal && <LeaveBalanceModal staff={balanceModal.staff} mode={balanceModal.mode} leaveRequests={leaveRequests} policies={leavePolicies} onClose={() => setBalanceModal(null)} />}
 
       {/* Log Availability Modal */}
       {showAvailModal && (
