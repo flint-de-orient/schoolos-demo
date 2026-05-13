@@ -14,7 +14,11 @@ export async function GET(_req: NextRequest) {
     db.grade.findMany({
       where: { tenantId },
       orderBy: { displayOrder: 'asc' },
-      select: { id: true, name: true, displayOrder: true },
+      select: {
+        id: true, name: true, displayOrder: true,
+        gradeGroupId: true,
+        gradeGroup: { select: { id: true, name: true } },
+      },
     }),
     db.subject.findMany({
       where: { tenantId },
@@ -46,7 +50,11 @@ export async function GET(_req: NextRequest) {
 
   return ok({
     grades: grades.map(g => ({
-      ...g,
+      id: g.id,
+      name: g.name,
+      displayOrder: g.displayOrder,
+      gradeGroupId: g.gradeGroupId ?? null,
+      gradeGroupName: g.gradeGroup?.name ?? null,
       curriculum: (gradeSubjectMap[g.id] ?? []).map(gs => ({
         id: gs.id,
         subjectId: gs.subjectId,

@@ -22,7 +22,11 @@ type CurrGradeEntry = {
   maxMarks: number; passMarks: number;
 };
 
-type CurrGrade = { id: string; name: string; displayOrder: number; curriculum: CurrGradeEntry[] };
+type CurrGrade = {
+  id: string; name: string; displayOrder: number;
+  gradeGroupId: string | null; gradeGroupName: string | null;
+  curriculum: CurrGradeEntry[];
+};
 type Category  = { value: string; label: string; icon: string; color: string; description: string };
 type LangLevel = { value: string; label: string; description: string };
 type SchedSlot = { value: string; label: string; description: string };
@@ -363,26 +367,78 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
       </div>
 
       <div className="grid grid-cols-4 gap-5">
-        {/* ── Grade selector ── */}
+        {/* ── Grade selector (grouped by GradeGroup) ── */}
         <div className="col-span-1">
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/60">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Grade</p>
             </div>
-            <div className="divide-y divide-gray-50">
-              {grades.map(g => {
-                const count    = Object.values(drafts[g.id] ?? {}).filter(e => e.included).length;
-                const isActive = selectedGradeId === g.id;
-                return (
-                  <button key={g.id} onClick={() => setSelectedGradeId(g.id)}
-                    className={`w-full text-left px-4 py-3 flex items-center justify-between transition-colors ${isActive ? 'bg-navy text-white' : 'hover:bg-gray-50 text-gray-700'}`}>
-                    <span className={`text-sm font-dm-sans font-medium truncate ${isActive ? 'text-white' : ''}`}>{g.name}</span>
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-1 flex-shrink-0 ${isActive ? 'bg-white/20 text-white' : count > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
-                      {count > 0 ? count : '—'}
-                    </span>
-                  </button>
-                );
-              })}
+            <div className="overflow-y-auto max-h-[70vh]">
+              {(() => {
+                // Group grades by gradeGroupName (null → 'Unassigned')
+                const grouped = new Map<string, CurrGrade[]>();
+                for (const g of grades) {
+                  const key = g.gradeGroupName ?? '⚠ Unassigned';
+                  if (!grouped.has(key)) grouped.set(key, []);
+                  grouped.get(key)!.push(g);
+                }
+                const sortedKeys = [...grouped.keys()].sort((a, b) => {
+                  if (a.startsWith('⚠')) return 1;
+                  if (b.startsWith('⚠')) return -1;
+                  return a.localeCompare(b);
+                });
+                return sortedKeys.map((groupName) => {
+                  const groupGrades = grouped.get(groupName)!;
+                  const isUnassigned = groupName.startsWith('⚠');
+                  // Count grades in this group that have subjects configured
+                  const configuredCount = groupGrades.filter(g =>
+                    Object.values(drafts[g.id] ?? {}).some(e => e.included)
+                  ).length;
+                  return (
+                    <div key={groupName}>
+                      {/* Group header */}
+                      <div className={`px-3 py-2 flex items-center justify-between border-b ${
+                        isUnassigned
+                          ? 'bg-red-50 border-red-100'
+                          : 'bg-iceLight border-blue-100'
+                      }`}>
+                        <span className={`text-[10px] font-sora font-bold uppercase tracking-wide ${
+                          isUnassigned ? 'text-red-500' : 'text-navy'
+                        }`}>{groupName}</span>
+                        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${
+                          configuredCount > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'
+                        }`}>
+                          {configuredCount}/{groupGrades.length}
+                        </span>
+                      </div>
+                      {/* Grades in this group */}
+                      <div className="divide-y divide-gray-50">
+                        {groupGrades.map(g => {
+                          const count    = Object.values(drafts[g.id] ?? {}).filter(e => e.included).length;
+                          const isActive = selectedGradeId === g.id;
+                          return (
+                            <button key={g.id} onClick={() => setSelectedGradeId(g.id)}
+                              className={`w-full text-left px-4 py-2.5 flex items-center justify-between transition-colors ${
+                                isActive ? 'bg-navy text-white' : 'hover:bg-gray-50 text-gray-700'
+                              }`}>
+                              <span className={`text-sm font-dm-sans font-medium truncate ${isActive ? 'text-white' : ''}`}>
+                                {g.name}
+                              </span>
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-1 flex-shrink-0 ${
+                                isActive
+                                  ? 'bg-white/20 text-white'
+                                  : count > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'
+                              }`}>
+                                {count > 0 ? count : '—'}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </div>
         </div>
@@ -405,7 +461,7 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
                       {includedCount} subject{includedCount !== 1 ? 's' : ''} · {totalPeriods} periods/week
                       {totalPeriods > 0 && (
                         <span className="ml-2 text-navy font-semibold">
-                          (≈ {Math.ceil(totalPeriods / 6)} periods/day on 6-day week)
+                          (avg {(totalPeriods / 6).toFixed(1)} p/day over 6 days)
                         </span>
                       )}
                     </p>
