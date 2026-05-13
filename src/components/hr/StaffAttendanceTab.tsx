@@ -54,8 +54,10 @@ export default function StaffAttendanceTab() {
     setDirty(new Map());
     try {
       const res = await fetch(`/api/hr/attendance?date=${d}`);
+      if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      if (data.data?.rows) setRows(data.data.rows);
+      // ok() returns data directly (no wrapper)
+      setRows(data.rows ?? []);
     } catch {
       toast.error('Failed to load attendance');
     } finally {
@@ -66,23 +68,29 @@ export default function StaffAttendanceTab() {
   useEffect(() => { load(date); }, [date, load]);
 
   const updateRow = (personId: string, changes: Partial<AttendanceRow>) => {
-    setRows((prev) => prev.map((r) => r.personId === personId ? { ...r, ...changes } : r));
-    setDirty((prev) => {
-      const next = new Map(prev);
-      const row = rows.find((r) => r.personId === personId);
-      if (row) next.set(personId, { ...row, ...changes });
-      return next;
+    setRows((prev) => {
+      const updated = prev.map((r) => r.personId === personId ? { ...r, ...changes } : r);
+      // Update dirty inside setRows so we have the current row value
+      setDirty((d) => {
+        const next = new Map(d);
+        const row = updated.find((r) => r.personId === personId);
+        if (row) next.set(personId, row);
+        return next;
+      });
+      return updated;
     });
   };
 
   const markAllPresent = () => {
-    const newDirty = new Map(dirty);
-    setRows((prev) => prev.map((r) => {
-      if (r.onLeave) return r;
-      newDirty.set(r.personId, { ...r, status: 'PRESENT' });
-      return { ...r, status: 'PRESENT' };
-    }));
-    setDirty(newDirty);
+    setRows((prev) => {
+      const updated = prev.map((r) => r.onLeave ? r : { ...r, status: 'PRESENT' as AttendanceStatus });
+      setDirty((d) => {
+        const next = new Map(d);
+        updated.filter((r) => !r.onLeave).forEach((r) => next.set(r.personId, r));
+        return next;
+      });
+      return updated;
+    });
   };
 
   const save = async () => {
