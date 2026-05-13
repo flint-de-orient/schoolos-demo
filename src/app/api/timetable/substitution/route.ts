@@ -3,25 +3,58 @@ import { db } from '@/lib/db';
 import { requireSession, ok, err } from '@/lib/api-auth';
 import { DayOfWeek } from '@prisma/client';
 
+// GET /api/timetable/substitution?teacherId=X&date=YYYY-MM-DD
+// Also supports ?date=YYYY-MM-DD without teacherId — returns all absent teachers from attendance+leave
 export async function GET(req: NextRequest) {
   const { session, error } = await requireSession();
   if (error) return error;
 
   const { searchParams } = req.nextUrl;
-  const teacherId = searchParams.get('teacherId');
+  const teacherIdParam = searchParams.get('teacherId');
   const dateStr = searchParams.get('date');
 
-  if (!teacherId || !dateStr) return err('teacherId and date are required');
+  if (!dateStr) return err('date is required');
 
   const date = new Date(dateStr);
-  date.setHours(0, 0, 0, 0);
+  date.setUTCHours(0, 0, 0, 0);
   const dayOfWeek = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'][date.getDay()] as DayOfWeek;
 
-  // Get all periods assigned to the absent teacher on this day
+  const tenantId = session.user.tenantId;
+
+  // Gather absent teacher IDs from StaffAttendance (ABSENT / HALF_DAY) + approved leaves
+  const [absentAttendance, approvedLeaves] = await Promise.all([
+    db.staffAttendance.findMany({
+      where: { tenantId, date, status: { in: ['ABSENT', 'HALF_DAY'] }, teacherId: { not: null } },
+      select: { teacherId: true },
+    }),
+    db.leaveRequest.findMany({
+      where: { tenantId, status: 'APPROVED', fromDate: { lte: date }, toDate: { gte: date }, teacherId: { not: null } },
+      select: { teacherId: true },
+    }),
+  ]);
+
+  const absentTeacherIds = new Set([
+    ...absentAttendance.map((a) => a.teacherId!),
+    ...approvedLeaves.map((l) => l.teacherId!),
+  ]);
+
+  // If no specific teacher, return the list of absent teachers
+  if (!teacherIdParam) {
+    const absentTeachers = absentTeacherIds.size > 0
+      ? await db.teacher.findMany({
+          where: { id: { in: [...absentTeacherIds] }, tenantId },
+          select: { id: true, name: true, designation: true },
+        })
+      : [];
+    return ok({ absentTeachers, date: dateStr });
+  }
+
+  const teacherId = teacherIdParam;
+
   const activeTimetable = await db.timetable.findFirst({
-    where: { tenantId: session.user.tenantId, status: 'ACTIVE' },
+    where: { tenantId, status: 'ACTIVE' },
   });
-  if (!activeTimetable) return ok({ affectedPeriods: [], suggestions: [] });
+  if (!activeTimetable) return ok({ affectedPeriods: 0, suggestions: [] });
 
   const affectedEntries = await db.timetableEntry.findMany({
     where: { timetableId: activeTimetable.id, teacherId, day: dayOfWeek },
@@ -33,16 +66,19 @@ export async function GET(req: NextRequest) {
     orderBy: { periodSlot: { periodNo: 'asc' } },
   });
 
-  // For each affected period, find available substitute teachers
+  // Count substitutions already assigned today per candidate (for maxPeriodsDay check)
+  const todaySubCounts = await db.substitution.groupBy({
+    by: ['substituteTeacherId'],
+    where: { date, timetable: { tenantId } },
+    _count: { _all: true },
+  });
+  const subCountMap = new Map(todaySubCounts.map((r) => [r.substituteTeacherId, r._count._all]));
+
   const suggestions = await Promise.all(
     affectedEntries.map(async (entry) => {
-      // Find teachers who:
-      // 1. Teach this subject (primary preferred)
-      // 2. Are not assigned during this period
-      // 3. Are not on leave today
       const teachersWithSubject = await db.teacher.findMany({
         where: {
-          tenantId: session.user.tenantId,
+          tenantId,
           isActive: true,
           deletedAt: null,
           id: { not: teacherId },
@@ -50,37 +86,46 @@ export async function GET(req: NextRequest) {
         },
         include: {
           subjects: { where: { subjectId: entry.subjectId } },
-          availabilities: { where: { day: dayOfWeek, isAvailable: true } },
-          leaveRequests: {
+          // Part-time availability: slot must cover this period's time on this day
+          availabilities: {
             where: {
-              status: 'APPROVED',
-              fromDate: { lte: date },
-              toDate: { gte: date },
+              day: dayOfWeek,
+              isAvailable: true,
+              startTime: { lte: entry.periodSlot.startTime },
+              endTime: { gte: entry.periodSlot.endTime },
             },
-            take: 1,
           },
         },
       });
 
-      // Filter out busy teachers (assigned in the same period)
-      const busyTeacherIds = await db.timetableEntry.findMany({
-        where: {
-          timetableId: activeTimetable.id,
-          day: dayOfWeek,
-          periodSlotId: entry.periodSlotId,
-        },
-        select: { teacherId: true },
-      });
+      const [busyTeacherIds, periodsScheduledToday] = await Promise.all([
+        db.timetableEntry.findMany({
+          where: { timetableId: activeTimetable.id, day: dayOfWeek, periodSlotId: entry.periodSlotId },
+          select: { teacherId: true },
+        }),
+        db.timetableEntry.groupBy({
+          by: ['teacherId'],
+          where: { timetableId: activeTimetable.id, day: dayOfWeek },
+          _count: { _all: true },
+        }),
+      ]);
+
       const busySet = new Set(busyTeacherIds.map((b) => b.teacherId));
+      const scheduledCountMap = new Map(periodsScheduledToday.map((r) => [r.teacherId, r._count._all]));
 
-      const available = teachersWithSubject.filter(
-        (t) =>
-          !busySet.has(t.id) &&
-          t.leaveRequests.length === 0 &&
-          (t.type !== 'PART_TIME' || t.availabilities.length > 0)
-      );
+      const available = teachersWithSubject.filter((t) => {
+        if (busySet.has(t.id)) return false;
+        // Absent/on-leave candidates should not be suggested
+        if (absentTeacherIds.has(t.id)) return false;
+        // Part-time: must have matching availability window
+        if (t.type === 'PART_TIME' && t.availabilities.length === 0) return false;
+        // Workload cap: scheduled periods + already-assigned subs today < maxPeriodsDay
+        const scheduled = scheduledCountMap.get(t.id) ?? 0;
+        const subs = subCountMap.get(t.id) ?? 0;
+        if (t.maxPeriodsDay && scheduled + subs >= t.maxPeriodsDay) return false;
+        return true;
+      });
 
-      // Score: PRIMARY proficiency > SECONDARY > SUBSTITUTE
       const profOrder: Record<string, number> = { PRIMARY: 3, SECONDARY: 2, SUBSTITUTE: 1 };
       available.sort((a, b) => {
         const aProf = a.subjects[0]?.proficiency ?? 'SUBSTITUTE';
@@ -100,12 +145,13 @@ export async function GET(req: NextRequest) {
           id: t.id,
           name: t.name,
           proficiency: t.subjects[0]?.proficiency ?? 'SUBSTITUTE',
+          type: t.type,
         })),
       };
     })
   );
 
-  return ok({ affectedPeriods: affectedEntries.length, suggestions });
+  return ok({ affectedPeriods: affectedEntries.length, suggestions, isAbsent: absentTeacherIds.has(teacherId) });
 }
 
 export async function POST(req: NextRequest) {
@@ -125,7 +171,7 @@ export async function POST(req: NextRequest) {
   if (!entry) return err('Timetable entry not found', 404);
 
   const targetDate = new Date(date);
-  targetDate.setHours(0, 0, 0, 0);
+  targetDate.setUTCHours(0, 0, 0, 0);
 
   const sub = await db.substitution.create({
     data: {

@@ -288,22 +288,15 @@ export default function TimetablePage() {
     }).catch(() => {});
   }, []);
 
-  // ── Load absent teachers for substitution tab ────────────────────────────
+  // ── Load absent teachers for substitution tab (attendance + leave combined) ─
   useEffect(() => {
     if (activeTab !== 'substitution') return;
-    fetch(`/api/hr/leave?status=APPROVED`).then(r => r.json()).then(d => {
-      const data: any[] = d.data ?? d ?? [];
-      const todayDate = new Date(); todayDate.setHours(0, 0, 0, 0);
-      const absent: AbsentTeacher[] = [];
-      for (const lr of data) {
-        const from = new Date(lr.fromDate); from.setHours(0, 0, 0, 0);
-        const to   = new Date(lr.toDate);   to.setHours(0, 0, 0, 0);
-        if (from <= todayDate && to >= todayDate && lr.teacher) {
-          absent.push({ id: lr.teacher.id, name: lr.teacher.name });
-        }
-      }
-      setAbsentTeachers(absent);
-    }).catch(() => {});
+    const today = new Date().toISOString().split('T')[0];
+    // The substitution GET without teacherId returns the union of absent teachers
+    fetch(`/api/timetable/substitution?date=${today}`)
+      .then(r => r.json())
+      .then(d => setAbsentTeachers(d.data?.absentTeachers ?? d.absentTeachers ?? []))
+      .catch(() => {});
   }, [activeTab]);
 
   // ── Load substitution suggestions ────────────────────────────────────────
@@ -643,41 +636,90 @@ export default function TimetablePage() {
                     ))}
                   </div>
 
-                  {/* Section selector */}
+                  {/* Section selector — grouped by Grade Group */}
                   <div className="mb-5">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Classes to Generate</p>
-                    <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
-                      {preflight.sections.map(s => {
-                        const canSelect = s.hasCurriculum && s.hasGroup;
-                        const reason = !s.hasCurriculum ? 'No subjects configured' : !s.hasGroup ? 'No grade group assigned' : null;
-                        return (
-                          <label key={s.id}
-                            className={`flex items-center gap-2 rounded-lg px-1 py-1 ${canSelect ? 'cursor-pointer hover:bg-gray-50' : 'cursor-not-allowed opacity-50'}`}
-                            title={reason ?? undefined}>
-                            <input type="checkbox"
-                              disabled={!canSelect}
-                              checked={selectedGenSections.has(s.id)}
-                              onChange={e => {
-                                if (!canSelect) return;
-                                setSelectedGenSections(prev => {
-                                  const next = new Set(prev);
-                                  if (e.target.checked) { next.add(s.id); } else { next.delete(s.id); }
-                                  return next;
-                                });
-                              }}
-                              className="w-3.5 h-3.5 accent-navy rounded flex-shrink-0" />
-                            <span className="text-sm font-dm-sans text-gray-700 flex-1">{s.label}</span>
-                            <div className="flex items-center gap-1 flex-shrink-0">
-                              {s.hasCurriculum
-                                ? <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-semibold">Subjects ✓</span>
-                                : <span className="text-[9px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded-full font-semibold">No Subjects</span>}
-                              {s.hasGroup
-                                ? <span className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-semibold">{s.groupName}</span>
-                                : <span className="text-[9px] bg-red-100 text-red-500 px-1.5 py-0.5 rounded-full font-semibold">No Group</span>}
+                    <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                      {(() => {
+                        // Group sections by groupName (null → 'Unassigned')
+                        const grouped = new Map<string, PreflightSection[]>();
+                        for (const s of preflight.sections) {
+                          const key = s.groupName ?? '⚠ No Group';
+                          if (!grouped.has(key)) grouped.set(key, []);
+                          grouped.get(key)!.push(s);
+                        }
+                        // Sort: named groups first (alphabetical), then unassigned
+                        const sortedKeys = [...grouped.keys()].sort((a, b) => {
+                          if (a.startsWith('⚠')) return 1;
+                          if (b.startsWith('⚠')) return -1;
+                          return a.localeCompare(b);
+                        });
+                        return sortedKeys.map(groupName => {
+                          const sections = grouped.get(groupName)!;
+                          const isUnassigned = groupName.startsWith('⚠');
+                          const selectableSections = sections.filter(s => s.hasCurriculum && s.hasGroup);
+                          const allSelected = selectableSections.length > 0 && selectableSections.every(s => selectedGenSections.has(s.id));
+                          const someSelected = selectableSections.some(s => selectedGenSections.has(s.id));
+                          const periodsLabel = sections[0]?.groupPeriodsPerDay ? `${sections[0].groupPeriodsPerDay} periods/day` : '';
+                          return (
+                            <div key={groupName} className={`rounded-xl border ${isUnassigned ? 'border-red-200 bg-red-50/40' : 'border-blue-100 bg-blue-50/30'} overflow-hidden`}>
+                              {/* Group header with Select All */}
+                              <div className="flex items-center gap-2 px-3 py-2 border-b border-inherit">
+                                {!isUnassigned && (
+                                  <input
+                                    type="checkbox"
+                                    disabled={selectableSections.length === 0}
+                                    checked={allSelected}
+                                    ref={el => { if (el) el.indeterminate = someSelected && !allSelected; }}
+                                    onChange={e => {
+                                      setSelectedGenSections(prev => {
+                                        const next = new Set(prev);
+                                        selectableSections.forEach(s => e.target.checked ? next.add(s.id) : next.delete(s.id));
+                                        return next;
+                                      });
+                                    }}
+                                    className="w-3.5 h-3.5 accent-navy rounded flex-shrink-0"
+                                  />
+                                )}
+                                <span className={`text-[11px] font-sora font-bold flex-1 ${isUnassigned ? 'text-red-600' : 'text-navy'}`}>{groupName}</span>
+                                {periodsLabel && <span className="text-[9px] bg-white/70 border border-blue-200 text-blue-600 px-1.5 py-0.5 rounded-full font-semibold">{periodsLabel}</span>}
+                                {!isUnassigned && (
+                                  <span className="text-[9px] text-gray-400">{selectableSections.length}/{sections.length} ready</span>
+                                )}
+                              </div>
+                              {/* Sections in this group */}
+                              <div className="px-2 py-1 space-y-0.5">
+                                {sections.map(s => {
+                                  const canSelect = s.hasCurriculum && s.hasGroup;
+                                  const reason = !s.hasCurriculum ? 'No subjects configured' : !s.hasGroup ? 'No grade group assigned' : null;
+                                  return (
+                                    <label key={s.id}
+                                      className={`flex items-center gap-2 rounded-lg px-1 py-1 ${canSelect ? 'cursor-pointer hover:bg-white/60' : 'cursor-not-allowed opacity-50'}`}
+                                      title={reason ?? undefined}>
+                                      <input type="checkbox"
+                                        disabled={!canSelect}
+                                        checked={selectedGenSections.has(s.id)}
+                                        onChange={e => {
+                                          if (!canSelect) return;
+                                          setSelectedGenSections(prev => {
+                                            const next = new Set(prev);
+                                            if (e.target.checked) { next.add(s.id); } else { next.delete(s.id); }
+                                            return next;
+                                          });
+                                        }}
+                                        className="w-3.5 h-3.5 accent-navy rounded flex-shrink-0" />
+                                      <span className="text-xs font-dm-sans text-gray-700 flex-1">{s.label}</span>
+                                      {s.hasCurriculum
+                                        ? <span className="text-[9px] bg-green-100 text-green-700 px-1 py-0.5 rounded-full font-semibold">✓</span>
+                                        : <span className="text-[9px] bg-gray-100 text-gray-400 px-1 py-0.5 rounded-full font-semibold">–</span>}
+                                    </label>
+                                  );
+                                })}
+                              </div>
                             </div>
-                          </label>
-                        );
-                      })}
+                          );
+                        });
+                      })()}
                     </div>
                     {preflight.sections.every(s => !s.hasCurriculum) && (
                       <div className="mt-2 flex items-start gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">

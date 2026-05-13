@@ -301,6 +301,14 @@ enum FillerType {
   LEAVE_EMPTY
 }
 
+enum StaffAttendanceStatus {
+  PRESENT
+  ABSENT
+  HALF_DAY
+  LATE
+  ON_LEAVE
+}
+
 // ─────────────────────────────────────────────
 // SECTION 1 — CORE: TENANT + USER
 // ─────────────────────────────────────────────
@@ -371,6 +379,7 @@ model Tenant {
   integrationConfigs    TenantIntegrationConfig[]
   salarySettings        TenantSalarySettings?
   salaryGrades          SalaryGrade[]
+  staffAttendances      StaffAttendance[]
 }
 
 model TenantModule {
@@ -684,6 +693,7 @@ model Teacher {
   appraisals            StaffAppraisal[]
   cpdLogs               CPDLog[]
   ptmSlots              PTMSlot[]
+  staffAttendances      StaffAttendance[]
 
   @@unique([tenantId, employeeCode])
   @@index([tenantId])
@@ -745,6 +755,28 @@ model TeacherWorkloadSnapshot {
   @@index([timetableId])
 }
 
+model StaffAttendance {
+  id        String                @id @default(cuid())
+  tenantId  String
+  teacherId String?
+  staffId   String?
+  date      DateTime              @db.Date
+  status    StaffAttendanceStatus @default(PRESENT)
+  checkIn   String?
+  checkOut  String?
+  remarks   String?
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+  teacher Teacher? @relation(fields: [teacherId], references: [id])
+  staff   Staff?   @relation(fields: [staffId], references: [id])
+
+  @@unique([teacherId, date])
+  @@unique([staffId, date])
+  @@index([tenantId, date])
+}
+
 model Staff {
   id           String    @id @default(cuid())
   tenantId     String
@@ -763,10 +795,11 @@ model Staff {
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
-  tenant        Tenant         @relation(fields: [tenantId], references: [id])
-  user          User?          @relation(fields: [userId], references: [id])
-  leaveRequests LeaveRequest[]
-  payrolls      Payroll[]
+  tenant           Tenant              @relation(fields: [tenantId], references: [id])
+  user             User?               @relation(fields: [userId], references: [id])
+  leaveRequests    LeaveRequest[]
+  payrolls         Payroll[]
+  staffAttendances StaffAttendance[]
 
   @@unique([tenantId, employeeCode])
   @@index([tenantId])

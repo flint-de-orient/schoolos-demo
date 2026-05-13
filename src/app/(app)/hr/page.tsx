@@ -19,6 +19,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid
 } from 'recharts';
 import TeacherProfileSheet from '@/components/hr/TeacherProfileSheet';
+import StaffAttendanceTab from '@/components/hr/StaffAttendanceTab';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Staff = {
@@ -37,7 +38,7 @@ type LeaveRequest = {
   reason: string; status: 'Pending' | 'Approved' | 'Rejected';
 };
 
-type Tab = 'directory' | 'leave' | 'payroll' | 'analytics' | 'availability';
+type Tab = 'directory' | 'leave' | 'payroll' | 'analytics' | 'availability' | 'attendance';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -1336,6 +1337,7 @@ export default function HRPage() {
 
   const tabs: { id: Tab; label: string; icon: React.ElementType; badge?: number; ai?: boolean }[] = [
     { id: 'directory',   label: 'Staff Directory',    icon: Users, badge: staffList.length },
+    { id: 'attendance',  label: 'Attendance',          icon: UserCheck },
     { id: 'leave',       label: 'Leave Management',   icon: Calendar, badge: pendingLeaveCount },
     { id: 'availability',label: 'Availability & Workload', icon: CalendarClock, ai: true },
     { id: 'payroll',     label: 'Payroll',             icon: Banknote },
@@ -2179,6 +2181,9 @@ export default function HRPage() {
               )}
             </div>
           )}
+
+          {/* ── Staff Attendance ── */}
+          {activeTab === 'attendance' && <StaffAttendanceTab />}
 
           {/* ── Availability & Workload ── */}
           {activeTab === 'availability' && (
