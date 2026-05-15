@@ -214,7 +214,7 @@ export async function POST(req: NextRequest) {
 
   // ── Per-group: generate slots, then schedule sections ────────────────────────
   const WEEKEND_DAYS = new Set(['SATURDAY', 'SUNDAY']);
-  const usedSlots = new Set<string>(); // `${teacherId}-${day}-${slotId}`
+  const usedSlots = new Set<string>(); // `${teacherId}-${day}-${startTime}` — shared across groups to prevent cross-group conflicts
 
   const allEntries: {
     sectionId: string; subjectId: string; teacherId: string;
@@ -307,38 +307,40 @@ export async function POST(req: NextRequest) {
 
           if (eligible.length === 0) continue; // leave slot empty (filler shown client-side)
 
-          // Most remaining quota goes first
+          // Most remaining quota goes first; if that subject's teacher is busy, try the next eligible
           eligible.sort((a, b) => {
             const remA = a.periodsPerWeek - (weeklyCount.get(a.subjectId) ?? 0);
             const remB = b.periodsPerWeek - (weeklyCount.get(b.subjectId) ?? 0);
             return remB - remA;
           });
 
-          const chosen = eligible[0];
-          const subjectInfo = subjectMap.get(chosen.subjectId)!;
-
-          let assignedTeacherId: string | null = null;
-          for (const teacher of subjectInfo.teachers) {
-            const key = `${teacher.teacherId}-${day}-${slot.id}`;
-            if (!usedSlots.has(key)) {
-              usedSlots.add(key);
-              assignedTeacherId = teacher.teacherId;
-              break;
+          for (const chosen of eligible) {
+            const subjectInfo = subjectMap.get(chosen.subjectId)!;
+            let assignedTeacherId: string | null = null;
+            for (const teacher of subjectInfo.teachers) {
+              // Use startTime as discriminator so cross-group conflicts are correctly detected
+              const key = `${teacher.teacherId}-${day}-${slot.startTime}`;
+              if (!usedSlots.has(key)) {
+                usedSlots.add(key);
+                assignedTeacherId = teacher.teacherId;
+                break;
+              }
             }
+            if (!assignedTeacherId) continue; // all teachers for this subject busy — try next subject
+
+            weeklyCount.set(chosen.subjectId, (weeklyCount.get(chosen.subjectId) ?? 0) + 1);
+            usedSubjectsToday.add(chosen.subjectId);
+            allEntries.push({
+              sectionId,
+              subjectId: chosen.subjectId,
+              teacherId: assignedTeacherId,
+              periodSlotId: slot.id,
+              day,
+              roomNumber: `R-${100 + slot.periodNo}`,
+            });
+            break; // slot filled — move to next slot
           }
-          if (!assignedTeacherId) continue;
-
-          weeklyCount.set(chosen.subjectId, (weeklyCount.get(chosen.subjectId) ?? 0) + 1);
-          usedSubjectsToday.add(chosen.subjectId);
-
-          allEntries.push({
-            sectionId,
-            subjectId: chosen.subjectId,
-            teacherId: assignedTeacherId,
-            periodSlotId: slot.id,
-            day,
-            roomNumber: `R-${100 + slot.periodNo}`,
-          });
+          // if every eligible subject had all teachers busy, slot stays empty (rendered as filler)
         }
       }
 
