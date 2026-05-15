@@ -213,7 +213,9 @@ export async function POST(req: NextRequest) {
   });
 
   // ── Per-group: generate slots, then schedule sections ────────────────────────
-  const WEEKEND_DAYS = new Set(['SATURDAY', 'SUNDAY']);
+  // Only SUNDAY is treated as a non-working weekend day; Saturday is a regular
+  // working day for Indian schools operating Mon–Sat.
+  const WEEKEND_DAYS = new Set(['SUNDAY']);
   const usedSlots = new Set<string>(); // `${teacherId}-${day}-${startTime}` — shared across groups to prevent cross-group conflicts
 
   const allEntries: {
