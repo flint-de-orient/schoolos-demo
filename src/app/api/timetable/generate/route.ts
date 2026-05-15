@@ -253,64 +253,74 @@ export async function POST(req: NextRequest) {
       groupName: group.name,
     };
 
-    // ── Schedule each section in this group ─────────────────────────────────
+    // ── Build per-section state for this group ──────────────────────────────
+    // Defined before scheduling so weeklyCount persists across the day loop.
+    type SectionState = {
+      sectionId: string; gradeName: string; curriculum: CurrEntry[];
+      regularPool: CurrEntry[]; weekendPool: CurrEntry[]; activityPool: CurrEntry[];
+      weeklyCount: Map<string, number>;
+    };
+    const sectionStates: SectionState[] = [];
     for (const sectionId of groupSectionIds) {
       const sectionObj = sections.find(s => s.id === sectionId);
       const gradeId    = sectionObj?.grade.id;
       const gradeName  = sectionObj?.grade.name ?? sectionId;
-
       let curriculum: CurrEntry[] = gradeId ? (gradeCurriculumMap.get(gradeId) ?? []) : [];
-
       if (curriculum.length === 0) {
-        warnings.push(`${gradeName}: no subjects configured — skipped`);
-        continue;
+        warnings.push(`${gradeName}: no subjects configured — skipped`); continue;
       }
-
-      // Drop subjects with no teacher
       curriculum = curriculum.filter(e => subjectMap.has(e.subjectId));
       if (curriculum.length === 0) {
-        warnings.push(`${gradeName}: no subjects have teachers assigned — skipped`);
-        continue;
+        warnings.push(`${gradeName}: no subjects have teachers assigned — skipped`); continue;
       }
+      sectionStates.push({
+        sectionId, gradeName, curriculum,
+        regularPool:  curriculum.filter(e => ['REGULAR', 'DOUBLE_PERIOD'].includes(e.schedulingSlot)),
+        weekendPool:  curriculum.filter(e => e.schedulingSlot === 'WEEKEND'),
+        activityPool: curriculum.filter(e => e.schedulingSlot === 'ACTIVITY'),
+        weeklyCount:  new Map<string, number>(),
+      });
+    }
 
-      // Partition by scheduling slot
-      const regularPool  = curriculum.filter(e => ['REGULAR', 'DOUBLE_PERIOD'].includes(e.schedulingSlot));
-      const weekendPool  = curriculum.filter(e => e.schedulingSlot === 'WEEKEND');
-      const activityPool = curriculum.filter(e => e.schedulingSlot === 'ACTIVITY');
+    // ── Schedule: day → slot → section (interleaved) ────────────────────────
+    // Processing all sections at each (day, slot) before advancing ensures every
+    // section gets a fair turn at Saturday's teacher slots instead of the first
+    // section claiming all of them sequentially.
+    for (const day of workingDays) {
+      const isWeekend = WEEKEND_DAYS.has(day.toUpperCase());
+      // Per-section daily subject-usage tracker, reset each new day
+      const dayUsed = new Map<string, Set<string>>(
+        sectionStates.map(s => [s.sectionId, new Set<string>()])
+      );
 
-      const weeklyCount = new Map<string, number>();
+      for (const slot of periodSlots) {
+        const isLastPeriod = slot.id === lastSlotId;
 
-      for (const day of workingDays) {
-        const isWeekend = WEEKEND_DAYS.has(day.toUpperCase());
-        const usedSubjectsToday = new Set<string>();
-
-        for (const slot of periodSlots) {
-          const isLastPeriod = slot.id === lastSlotId;
+        for (const state of sectionStates) {
+          const usedSubjectsToday = dayUsed.get(state.sectionId)!;
 
           let pool: CurrEntry[];
           if (isWeekend) {
-            pool = weekendPool;
-          } else if (isLastPeriod && activityPool.length > 0) {
-            const avail = activityPool.filter(e =>
+            pool = state.weekendPool;
+          } else if (isLastPeriod && state.activityPool.length > 0) {
+            const avail = state.activityPool.filter(e =>
               !usedSubjectsToday.has(e.subjectId) &&
-              (weeklyCount.get(e.subjectId) ?? 0) < e.periodsPerWeek
+              (state.weeklyCount.get(e.subjectId) ?? 0) < e.periodsPerWeek
             );
-            pool = avail.length > 0 ? avail : regularPool;
+            pool = avail.length > 0 ? avail : state.regularPool;
           } else {
-            pool = regularPool;
+            pool = state.regularPool;
           }
 
           const eligible = pool.filter(e =>
             !usedSubjectsToday.has(e.subjectId) &&
-            (weeklyCount.get(e.subjectId) ?? 0) < e.periodsPerWeek
+            (state.weeklyCount.get(e.subjectId) ?? 0) < e.periodsPerWeek
           );
+          if (eligible.length === 0) continue;
 
-          if (eligible.length === 0) continue; // leave slot empty (filler shown client-side)
-
-          // Most remaining quota goes first; if that subject's teacher is busy, try the next eligible
           eligible.sort((a, b) => {
-            const remA = a.periodsPerWeek - (weeklyCount.get(a.subjectId) ?? 0);
-            const remB = b.periodsPerWeek - (weeklyCount.get(b.subjectId) ?? 0);
+            const remA = a.periodsPerWeek - (state.weeklyCount.get(a.subjectId) ?? 0);
+            const remB = b.periodsPerWeek - (state.weeklyCount.get(b.subjectId) ?? 0);
             return remB - remA;
           });
 
@@ -318,7 +328,6 @@ export async function POST(req: NextRequest) {
             const subjectInfo = subjectMap.get(chosen.subjectId)!;
             let assignedTeacherId: string | null = null;
             for (const teacher of subjectInfo.teachers) {
-              // Use startTime as discriminator so cross-group conflicts are correctly detected
               const key = `${teacher.teacherId}-${day}-${slot.startTime}`;
               if (!usedSlots.has(key)) {
                 usedSlots.add(key);
@@ -326,30 +335,31 @@ export async function POST(req: NextRequest) {
                 break;
               }
             }
-            if (!assignedTeacherId) continue; // all teachers for this subject busy — try next subject
+            if (!assignedTeacherId) continue;
 
-            weeklyCount.set(chosen.subjectId, (weeklyCount.get(chosen.subjectId) ?? 0) + 1);
+            state.weeklyCount.set(chosen.subjectId, (state.weeklyCount.get(chosen.subjectId) ?? 0) + 1);
             usedSubjectsToday.add(chosen.subjectId);
             allEntries.push({
-              sectionId,
+              sectionId: state.sectionId,
               subjectId: chosen.subjectId,
               teacherId: assignedTeacherId,
               periodSlotId: slot.id,
               day,
               roomNumber: `R-${100 + slot.periodNo}`,
             });
-            break; // slot filled — move to next slot
+            break;
           }
-          // if every eligible subject had all teachers busy, slot stays empty (rendered as filler)
         }
       }
+    }
 
-      // Warn about under-scheduled subjects
-      for (const e of curriculum) {
-        const scheduled = weeklyCount.get(e.subjectId) ?? 0;
+    // Warn about under-scheduled subjects
+    for (const state of sectionStates) {
+      for (const e of state.curriculum) {
+        const scheduled = state.weeklyCount.get(e.subjectId) ?? 0;
         if (scheduled < e.periodsPerWeek && e.schedulingSlot !== 'AFTER_SCHOOL') {
           const name = subjectMap.get(e.subjectId)?.subjectName ?? e.subjectId;
-          warnings.push(`${gradeName}: ${name} — scheduled ${scheduled}/${e.periodsPerWeek} periods`);
+          warnings.push(`${state.gradeName}: ${name} — scheduled ${scheduled}/${e.periodsPerWeek} periods`);
         }
       }
     }
