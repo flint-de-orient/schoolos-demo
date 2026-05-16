@@ -47,6 +47,19 @@ export async function PATCH(
     where: { timetableId, sectionId: entryA.sectionId, day: targetDay, periodSlotId: targetPeriodSlotId },
   });
 
+  // ── Resolve maxPerDay for both subjects ─────────────────────────────────────
+  const sectionRow = await db.section.findFirst({ where: { id: entryA.sectionId }, select: { gradeId: true } });
+  const gradeId = sectionRow?.gradeId;
+
+  async function getMaxPerDay(subjectId: string): Promise<number> {
+    if (!gradeId) return 1;
+    const gs = await db.gradeSubject.findFirst({
+      where: { gradeId, subjectId, sessionType: 'THEORY' },
+      select: { maxPerDay: true },
+    });
+    return gs?.maxPerDay ?? 1;
+  }
+
   // ── Conflict checks ─────────────────────────────────────────────────────────
 
   // 1. Teacher of A at target slot (other sections, excluding B's slot if swapping)
@@ -56,25 +69,28 @@ export async function PATCH(
       teacherId: entryA.teacherId,
       day: targetDay,
       periodSlotId: targetPeriodSlotId,
-      NOT: { sectionId: entryA.sectionId }, // same-section conflict is the existing entryB, handled by swap
+      NOT: { sectionId: entryA.sectionId },
     },
   });
   if (teacherAConflict) {
     return err(`Teacher conflict: teacher already has a class at that slot in another section`, 409);
   }
 
-  // 2. Subject A already taught to this section on targetDay (other than its current slot and entryB's slot)
-  const subjectADayConflict = await db.timetableEntry.findFirst({
-    where: {
-      timetableId,
-      sectionId: entryA.sectionId,
-      subjectId: entryA.subjectId,
-      day: targetDay,
-      NOT: { id: { in: [entryId, ...(entryB ? [entryB.id] : [])] } },
-    },
-  });
-  if (subjectADayConflict) {
-    return err(`Subject already appears on ${targetDay} for this section`, 409);
+  // 2. Subject A on targetDay — count existing entries excluding both A and B (they'll swap/move)
+  const maxA = await getMaxPerDay(entryA.subjectId);
+  if (maxA > 0) {
+    const subjectADayCount = await db.timetableEntry.count({
+      where: {
+        timetableId,
+        sectionId: entryA.sectionId,
+        subjectId: entryA.subjectId,
+        day: targetDay,
+        NOT: { id: { in: [entryId, ...(entryB ? [entryB.id] : [])] } },
+      },
+    });
+    if (subjectADayCount >= maxA) {
+      return err(`Subject already appears ${subjectADayCount}× on ${targetDay} (max per day: ${maxA})`, 409);
+    }
   }
 
   if (entryB) {
@@ -89,21 +105,24 @@ export async function PATCH(
       },
     });
     if (teacherBConflict) {
-      return err(`Swap conflict: ${entryB.teacherId}'s teacher already has a class at the source slot in another section`, 409);
+      return err(`Swap conflict: teacher already has a class at the source slot in another section`, 409);
     }
 
-    // 4. Subject B already taught on sourceDay (other than its current position and entry A)
-    const subjectBDayConflict = await db.timetableEntry.findFirst({
-      where: {
-        timetableId,
-        sectionId: entryB.sectionId,
-        subjectId: entryB.subjectId,
-        day: sourceDay,
-        NOT: { id: { in: [entryB.id, entryId] } },
-      },
-    });
-    if (subjectBDayConflict) {
-      return err(`Swap conflict: subject already appears on ${sourceDay} for this section`, 409);
+    // 4. Subject B on sourceDay — count excluding both entries
+    const maxB = await getMaxPerDay(entryB.subjectId);
+    if (maxB > 0) {
+      const subjectBDayCount = await db.timetableEntry.count({
+        where: {
+          timetableId,
+          sectionId: entryB.sectionId,
+          subjectId: entryB.subjectId,
+          day: sourceDay,
+          NOT: { id: { in: [entryB.id, entryId] } },
+        },
+      });
+      if (subjectBDayCount >= maxB) {
+        return err(`Swap conflict: subject already appears ${subjectBDayCount}× on ${sourceDay} (max per day: ${maxB})`, 409);
+      }
     }
   }
 

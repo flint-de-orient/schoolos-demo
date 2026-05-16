@@ -94,6 +94,8 @@ type DraftEntry = {
   // Phase 3: lab session
   hasLabSession: boolean;
   labPeriodsPerWeek: number;
+  // Max appearances per day (0 = unlimited)
+  maxPerDay: number;
 };
 
 type GradeDraft = Record<string, DraftEntry>;
@@ -111,6 +113,7 @@ function defaultDraft(subject: CurrSubject): DraftEntry {
     passMarks: cat === 'PRACTICAL' ? 17 : 33,
     hasLabSession: false,
     labPeriodsPerWeek: 2,
+    maxPerDay: 1,
   };
 }
 
@@ -140,6 +143,7 @@ function buildDraft(curriculum: CurrGradeEntry[], subjects: CurrSubject[]): Grad
       passMarks: theoryEntry.passMarks,
       hasLabSession: !!labEntry,
       labPeriodsPerWeek: labEntry?.periodsPerWeek ?? 2,
+      maxPerDay: (theoryEntry as { maxPerDay?: number }).maxPerDay ?? 1,
     };
   }
   return draft;
@@ -252,6 +256,24 @@ function SubjectRow({ subject, entry, onChange, langLevels, schedSlots }: {
               <input type="number" value={entry.passMarks} min={0} max={200}
                 onChange={e => onChange({ passMarks: Number(e.target.value) })}
                 className="w-16 border border-gray-200 rounded px-1.5 py-1 text-xs text-center bg-white focus:outline-none" />
+            </div>
+          </div>
+          {/* Max per day — double-entry config */}
+          <div className="col-span-2">
+            <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide block mb-1">
+              Max periods per day
+            </label>
+            <div className="flex items-center gap-2">
+              {[1, 2, 3, 0].map(n => (
+                <button key={n}
+                  onClick={() => onChange({ maxPerDay: n })}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors ${entry.maxPerDay === n ? 'bg-navy text-white border-navy' : 'bg-white text-gray-500 border-gray-200 hover:border-navy/30'}`}>
+                  {n === 0 ? '∞' : n}
+                </button>
+              ))}
+              <span className="text-[10px] text-gray-400">
+                {entry.maxPerDay === 0 ? 'No daily limit' : entry.maxPerDay === 1 ? 'Only once per day' : `Up to ${entry.maxPerDay}× per day`}
+              </span>
             </div>
           </div>
           {canHaveLab && (
@@ -407,6 +429,7 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
       isCompulsory: boolean; isOptional: boolean;
       languageLevel: string | null; schedulingSlot: string;
       maxMarks: number; passMarks: number; sessionType: string;
+      maxPerDay: number;
     }[] = [];
 
     for (const [subjectId, e] of Object.entries(draft)) {
@@ -422,6 +445,7 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
         maxMarks: e.maxMarks,
         passMarks: e.passMarks,
         sessionType: 'THEORY',
+        maxPerDay: e.maxPerDay ?? 1,
       });
       // Lab row (if enabled)
       if (e.hasLabSession) {
@@ -435,6 +459,7 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
           maxMarks: e.maxMarks,
           passMarks: e.passMarks,
           sessionType: 'LAB',
+          maxPerDay: 1,
         });
       }
     }

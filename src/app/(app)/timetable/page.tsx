@@ -92,7 +92,7 @@ const GEN_STEPS = [
 type DragSource = { entryId: string; subjectId: string; day: string; periodNo: number; slotId: string };
 type CopySource = { entryId: string; subjectId: string; subjectName: string; day: string; periodNo: number };
 
-function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, shortBreakAfterPeriod, fillerLabels, halfDayRules, gradeGroupId, editMode, copyMode, copySrc, timetableId, onCellMoved, onCopyCellClick }: {
+function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, shortBreakAfterPeriod, fillerLabels, halfDayRules, gradeGroupId, editMode, copyMode, copySrc, placeMode, placeReady, timetableId, onCellMoved, onCopyCellClick, onPlaceCellClick }: {
   grid: Grid;
   periodSlots: PeriodSlot[];
   workingDays: string[];
@@ -104,9 +104,12 @@ function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, s
   editMode?: boolean;
   copyMode?: boolean;
   copySrc?: CopySource | null;
+  placeMode?: boolean;
+  placeReady?: boolean;
   timetableId?: string;
   onCellMoved?: (newGrid: Grid) => void;
   onCopyCellClick?: (cell: GridCell | null, day: string, periodNo: number, slotId: string) => void;
+  onPlaceCellClick?: (cell: GridCell | null, day: string, periodNo: number, slotId: string) => void;
 }) {
   const [dragSrc, setDragSrc]       = useState<DragSource | null>(null);
   const [dragOver, setDragOver]     = useState<{ day: string; periodNo: number } | null>(null);
@@ -256,19 +259,24 @@ function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, s
                             onDragOver={editMode ? e => { e.preventDefault(); setDragOver({ day, periodNo: slot.periodNo }); } : undefined}
                             onDragLeave={editMode ? () => setDragOver(null) : undefined}
                             onDrop={editMode ? e => { e.preventDefault(); handleDrop(day, slot.id, slot.periodNo); } : undefined}
-                            onClick={copyMode && copySrc ? () => onCopyCellClick?.(null, day, slot.periodNo, slot.id) : undefined}
+                            onClick={copyMode && copySrc ? () => onCopyCellClick?.(null, day, slot.periodNo, slot.id)
+                              : placeMode && placeReady ? () => onPlaceCellClick?.(null, day, slot.periodNo, slot.id)
+                              : undefined}
                           >
                             <div className={`rounded-lg border border-dashed px-2 py-1.5 text-center transition-colors ${
                               copyMode && copySrc
                                 ? 'border-amber-300 bg-amber-50 cursor-pointer hover:border-amber-400'
-                                : isDragOver && dragSrc
-                                  ? dropValid ? 'border-green-400 bg-green-50' : 'border-red-300 bg-red-50'
-                                  : 'border-gray-200 bg-gray-50/80'
+                                : placeMode && placeReady
+                                  ? 'border-purple-300 bg-purple-50 cursor-pointer hover:border-purple-400'
+                                  : isDragOver && dragSrc
+                                    ? dropValid ? 'border-green-400 bg-green-50' : 'border-red-300 bg-red-50'
+                                    : 'border-gray-200 bg-gray-50/80'
                             }`}>
                               {fillerLabel
                                 ? <div className="text-[10px] text-gray-400 font-dm-sans">{fillerLabel}</div>
                                 : <div className="text-center text-xs text-gray-200">—</div>}
                               {copyMode && copySrc && <div className="text-[9px] text-amber-500 mt-0.5">click to paste</div>}
+                              {placeMode && placeReady && <div className="text-[9px] text-purple-500 mt-0.5">click to fill</div>}
                             </div>
                           </td>
                         );
@@ -284,11 +292,13 @@ function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, s
                           onDragOver={editMode ? e => { e.preventDefault(); setDragOver({ day, periodNo: slot.periodNo }); } : undefined}
                           onDragLeave={editMode ? () => setDragOver(null) : undefined}
                           onDrop={editMode ? e => { e.preventDefault(); handleDrop(day, slot.id, slot.periodNo); } : undefined}
-                          onClick={copyMode ? () => onCopyCellClick?.(cell, day, slot.periodNo, slot.id) : undefined}
+                          onClick={copyMode ? () => onCopyCellClick?.(cell, day, slot.periodNo, slot.id)
+                            : placeMode && placeReady ? () => onPlaceCellClick?.(cell, day, slot.periodNo, slot.id)
+                            : undefined}
                         >
                           <div
-                            draggable={!!(editMode && !copyMode)}
-                            onDragStart={editMode && !copyMode ? () => {
+                            draggable={!!(editMode && !copyMode && !placeMode)}
+                            onDragStart={editMode && !copyMode && !placeMode ? () => {
                               const src: DragSource = { entryId: cell.entryId, subjectId: cell.subjectId, day, periodNo: slot.periodNo, slotId: slot.id };
                               setDragSrc(src);
                               dragSrcRef.current = src;
@@ -303,15 +313,16 @@ function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, s
                                     ? dropValid
                                       ? `${colorClass} ring-2 ring-green-400 shadow-md`
                                       : `${colorClass} ring-2 ring-red-300 opacity-60`
-                                    : `${colorClass} hover:shadow-sm ${editMode && !copyMode ? 'cursor-grab active:cursor-grabbing' : ''} ${copyMode ? 'cursor-pointer' : ''}`
+                                    : `${colorClass} hover:shadow-sm ${editMode && !copyMode && !placeMode ? 'cursor-grab active:cursor-grabbing' : ''} ${copyMode ? 'cursor-pointer' : ''} ${placeMode && placeReady ? 'cursor-pointer ring-1 ring-purple-300' : ''}`
                             }`}
                           >
                             <div className="text-[11px] font-semibold leading-tight truncate">{cell.subject}</div>
                             <div className="text-[9px] opacity-70 truncate mt-0.5">{cell.teacher.split(' ').slice(-1)[0]}</div>
                             {cell.room && <div className="text-[9px] opacity-60">{cell.room}</div>}
-                            {editMode && !copyMode && <div className="text-[8px] opacity-40 mt-0.5">⠿ drag</div>}
+                            {editMode && !copyMode && !placeMode && <div className="text-[8px] opacity-40 mt-0.5">⠿ drag</div>}
                             {copyMode && !isCopySrc && copySrc && <div className="text-[9px] text-amber-500 mt-0.5">click to replace</div>}
                             {isCopySrc && <div className="text-[9px] text-amber-600 font-semibold mt-0.5">✓ selected</div>}
+                            {placeMode && placeReady && <div className="text-[9px] text-purple-600 mt-0.5">click to replace</div>}
                           </div>
                         </td>
                       );
@@ -366,6 +377,18 @@ export default function TimetablePage() {
   const [freeTeachers, setFreeTeachers] = useState<{ id: string; name: string; proficiency: string; free: boolean }[]>([]);
   const [copyTeacherId, setCopyTeacherId] = useState('');
   const [copyApplying, setCopyApplying] = useState(false);
+
+  // ── Place Period mode ─────────────────────────────────────────────────────
+  const [placeMode, setPlaceMode]     = useState(false);
+  const [placeSubjectId, setPlaceSubjectId]     = useState('');
+  const [placeSubjectName, setPlaceSubjectName] = useState('');
+  const [placeSubjectColor, setPlaceSubjectColor] = useState('#1E2761');
+  const [placeTeacherId2, setPlaceTeacherId2]   = useState('');
+  const [placeTeachers, setPlaceTeachers]       = useState<{ id: string; name: string; proficiency: string }[]>([]);
+  const [placeSubjects, setPlaceSubjects]       = useState<{ id: string; name: string; subjectCategory: string; colorHex: string | null; teachers: { id: string; name: string }[] }[]>([]);
+  const [placeCatFilter, setPlaceCatFilter]     = useState('ALL');
+  const [placeApplying, setPlaceApplying]       = useState(false);
+
   const [viewMode, setViewMode]         = useState<'class' | 'teacher'>('class');
   const [teachers, setTeachers]         = useState<{ id: string; name: string }[]>([]);
   const [selectedTeacherId, setSelectedTeacherId] = useState('');
@@ -494,6 +517,67 @@ export default function TimetablePage() {
       .catch(() => toast.error('Failed to load available teachers'));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [copyTarget]);
+
+  // Load all tenant subjects (with teacher lists) when entering place mode
+  useEffect(() => {
+    if (!placeMode) return;
+    fetch('/api/timetable/curriculum')
+      .then(r => r.json())
+      .then(data => {
+        const subjectList = (data.data ?? data).subjects ?? [];
+        setPlaceSubjects(subjectList);
+      })
+      .catch(() => toast.error('Failed to load subjects'));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placeMode]);
+
+  // Update teacher list when place subject changes
+  useEffect(() => {
+    if (!placeSubjectId) { setPlaceTeachers([]); setPlaceTeacherId2(''); return; }
+    const subject = placeSubjects.find(s => s.id === placeSubjectId);
+    const ts = subject?.teachers ?? [];
+    setPlaceTeachers(ts.map((t: { id: string; name: string }) => ({ ...t, proficiency: '' })));
+    setPlaceTeacherId2(ts[0]?.id ?? '');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placeSubjectId]);
+
+  function handlePlaceCellClick(cell: GridCell | null, day: string, periodNo: number, slotId: string) {
+    if (!placeMode || !placeSubjectId || !placeTeacherId2 || !timetableId || !selectedSectionId) return;
+    setPlaceApplying(true);
+    fetch('/api/timetable/entries', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        timetableId,
+        sectionId: selectedSectionId,
+        subjectId: placeSubjectId,
+        teacherId: placeTeacherId2,
+        targetDay: day,
+        targetPeriodSlotId: slotId,
+      }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) { toast.error(data.error); return; }
+        const entry = (data.data ?? data).entry;
+        const replaced = (data.data ?? data).replaced;
+        const newGrid: Grid = JSON.parse(JSON.stringify(grid));
+        if (!newGrid[day]) newGrid[day] = {};
+        newGrid[day][periodNo] = {
+          subject: entry.subject.name,
+          colorHex: entry.subject.colorHex ?? placeSubjectColor,
+          teacher: placeTeachers.find(t => t.id === placeTeacherId2)?.name ?? '',
+          room: null,
+          teacherId: placeTeacherId2,
+          entryId: entry.id,
+          subjectId: entry.subject.id,
+        };
+        setGrid(newGrid);
+        toast.success(replaced ? `Replaced with ${placeSubjectName}` : `${placeSubjectName} placed`);
+      })
+      .catch(() => toast.error('Network error'))
+      .finally(() => setPlaceApplying(false));
+  }
 
   async function handleCopyApply() {
     if (!copySrc || !copyTarget || !copyTeacherId || !timetableId || !selectedSectionId) return;
@@ -753,13 +837,21 @@ export default function TimetablePage() {
                   }`}>
                   {editMode ? <><X className="w-3.5 h-3.5" /> Exit Edit</> : <><Pencil className="w-3.5 h-3.5" /> Edit Timetable</>}
                 </button>
-                <button onClick={() => { setCopyMode(c => !c); setEditMode(false); setCopySrc(null); setCopyTarget(null); }}
+                <button onClick={() => { setCopyMode(c => !c); setEditMode(false); setCopySrc(null); setCopyTarget(null); setPlaceMode(false); }}
                   className={`flex items-center gap-2 text-sm border rounded-lg px-4 py-2 font-semibold font-dm-sans transition-colors shadow-sm ${
                     copyMode
                       ? 'bg-teal-500 border-teal-500 text-white hover:bg-teal-600'
                       : 'bg-white border-gray-200 text-gray-600 hover:border-teal-400 hover:text-teal-700'
                   }`}>
                   {copyMode ? <><X className="w-3.5 h-3.5" /> Exit Copy</> : <>⧉ Copy Period</>}
+                </button>
+                <button onClick={() => { setPlaceMode(p => !p); setEditMode(false); setCopyMode(false); setCopySrc(null); setCopyTarget(null); setPlaceSubjectId(''); setPlaceCatFilter('ALL'); }}
+                  className={`flex items-center gap-2 text-sm border rounded-lg px-4 py-2 font-semibold font-dm-sans transition-colors shadow-sm ${
+                    placeMode
+                      ? 'bg-purple-500 border-purple-500 text-white hover:bg-purple-600'
+                      : 'bg-white border-gray-200 text-gray-600 hover:border-purple-400 hover:text-purple-700'
+                  }`}>
+                  {placeMode ? <><X className="w-3.5 h-3.5" /> Exit Place</> : <>＋ Place Period</>}
                 </button>
               </>
             )}
@@ -834,6 +926,71 @@ export default function TimetablePage() {
             </div>
           )}
 
+          {/* Place Period panel */}
+          {placeMode && (() => {
+            const CATS = ['ALL', 'CORE', 'LANGUAGE', 'ARTS', 'SPORTS', 'PRACTICAL', 'ACTIVITY', 'TECHNOLOGY', 'VALUE_EDUCATION', 'ELECTIVE', 'OTHER'];
+            const CAT_LABEL: Record<string, string> = { ALL: 'All', CORE: 'Core', LANGUAGE: 'Language', ARTS: 'Arts', SPORTS: 'Sports/PE', PRACTICAL: 'Practical', ACTIVITY: 'Activity', TECHNOLOGY: 'Technology', VALUE_EDUCATION: 'Value Ed', ELECTIVE: 'Elective', OTHER: 'Other' };
+            const CAT_COLOR: Record<string, string> = { CORE: '#1E2761', LANGUAGE: '#028090', ARTS: '#993556', SPORTS: '#3B6D11', PRACTICAL: '#534AB7', ACTIVITY: '#BA7517', TECHNOLOGY: '#028090', VALUE_EDUCATION: '#D85A30', ELECTIVE: '#6366F1', OTHER: '#9CA3AF' };
+            const filtered = placeSubjects.filter(s => placeCatFilter === 'ALL' || s.subjectCategory === placeCatFilter);
+            const placeReady = !!placeSubjectId && !!placeTeacherId2;
+            return (
+              <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-3 space-y-3">
+                <div className="flex items-center gap-3">
+                  <span className="text-base leading-none">＋</span>
+                  <p className="text-sm text-purple-800 font-dm-sans flex-1 font-semibold">
+                    Place Period &mdash; pick a subject, pick a teacher, then click any cell to place it.
+                  </p>
+                  <button onClick={() => { setPlaceMode(false); setPlaceSubjectId(''); }} className="text-xs text-purple-800 font-bold underline hover:no-underline whitespace-nowrap">Exit</button>
+                </div>
+
+                {/* Category filter */}
+                <div className="flex flex-wrap gap-1.5">
+                  {CATS.filter(c => c === 'ALL' || placeSubjects.some(s => s.subjectCategory === c)).map(c => (
+                    <button key={c} onClick={() => setPlaceCatFilter(c)}
+                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition-colors ${placeCatFilter === c ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-gray-600 border-gray-200 hover:border-purple-300'}`}>
+                      {CAT_LABEL[c] ?? c}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Subject chips */}
+                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                  {filtered.length === 0 && <span className="text-xs text-gray-400 italic">No subjects in this category.</span>}
+                  {filtered.map(s => {
+                    const active = placeSubjectId === s.id;
+                    const color = s.colorHex ?? CAT_COLOR[s.subjectCategory] ?? '#9CA3AF';
+                    return (
+                      <button key={s.id}
+                        onClick={() => { setPlaceSubjectId(s.id); setPlaceSubjectName(s.name); setPlaceSubjectColor(s.colorHex ?? '#1E2761'); }}
+                        style={active ? { backgroundColor: color, borderColor: color, color: '#fff' } : { borderColor: color + '55', color: color }}
+                        className="px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors">
+                        {s.name}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Teacher picker */}
+                {placeSubjectId && (
+                  <div className="flex items-center gap-3 bg-white/70 rounded-lg px-3 py-2 border border-purple-200">
+                    <span className="text-xs text-gray-500 font-dm-sans whitespace-nowrap">Teacher for <strong>{placeSubjectName}</strong>:</span>
+                    <select value={placeTeacherId2} onChange={e => setPlaceTeacherId2(e.target.value)}
+                      className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-purple-300 font-dm-sans">
+                      {placeTeachers.length === 0 && <option value="">No teachers assigned to this subject</option>}
+                      {placeTeachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                    {placeReady && (
+                      <span className="text-xs text-purple-700 font-semibold whitespace-nowrap">
+                        {placeApplying ? <><RefreshCw className="w-3 h-3 inline animate-spin mr-1" />Placing…</> : '↓ Click any cell'}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {!placeSubjectId && <p className="text-[11px] text-purple-500 font-dm-sans">Select a subject above to continue.</p>}
+              </div>
+            );
+          })()}
+
           {/* Grid */}
           {ttLoading ? (
             <div className="h-64 bg-white rounded-xl border border-gray-100 flex items-center justify-center">
@@ -858,9 +1015,12 @@ export default function TimetablePage() {
               editMode={editMode}
               copyMode={copyMode}
               copySrc={copySrc}
+              placeMode={placeMode}
+              placeReady={!!(placeSubjectId && placeTeacherId2)}
               timetableId={timetableId ?? undefined}
               onCellMoved={setGrid}
               onCopyCellClick={handleCopyCellClick}
+              onPlaceCellClick={handlePlaceCellClick}
             />
           )}
 

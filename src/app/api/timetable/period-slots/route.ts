@@ -40,7 +40,13 @@ export async function GET(req: NextRequest) {
 
     // Return activity names in the order the group selected them (for rotation)
     const activityMap = Object.fromEntries(activityTypes.map(a => [a.id, a.name]));
-    const fillerLabels = group.fillerActivityIds.map((id: string) => activityMap[id]).filter(Boolean);
+    const LEGACY: Record<string, string> = {
+      STUDY_PERIOD: 'Study Period', REVISION: 'Revision',
+      SPORTS: 'Sports', REPEAT_COMPULSORY: 'Revision', LEAVE_EMPTY: '',
+    };
+    const fillerLabels = group.fillerActivityIds.length > 0
+      ? group.fillerActivityIds.map((id: string) => activityMap[id]).filter(Boolean)
+      : (group.fillerTypes as string[]).map(ft => LEGACY[ft] ?? '').filter(Boolean);
 
     return ok({ config, group: { ...group, fillerLabels }, periodSlots });
   }

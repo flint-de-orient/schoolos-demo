@@ -589,6 +589,8 @@ model GradeSubject {
   schedulingSlot String  @default("REGULAR")
   // Session type: THEORY (default) or LAB (generator books two consecutive periods)
   sessionType    String  @default("THEORY")
+  // Max times this subject may appear in a single day (0 = unlimited)
+  maxPerDay      Int     @default(1)
 
   grade   Grade   @relation(fields: [gradeId], references: [id])
   subject Subject @relation(fields: [subjectId], references: [id])
