@@ -404,14 +404,16 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Shuffle which slot is visited first so empty slots land at varied positions
-      // throughout the day instead of always clustering at the tail. Seed is stable
-      // per (day) so all sections share the same visit order — teacher conflict
-      // prevention (usedSlots) still works correctly across sections.
-      const slotVisitOrder = seededShuffle(
-        activePeriodSlots.map((_, i) => i),
-        strHash(`visit-${day}`)
-      );
+      // Period 1 (index 0) is always visited first so it is never left empty.
+      // The remaining slots are shuffled so empty slots scatter across the day
+      // instead of always clustering at the tail.
+      const slotVisitOrder = [
+        0,
+        ...seededShuffle(
+          activePeriodSlots.map((_, i) => i).filter(i => i !== 0),
+          strHash(`visit-${day}`)
+        ),
+      ];
 
       for (const slotIndex of slotVisitOrder) {
         const slot = activePeriodSlots[slotIndex];
