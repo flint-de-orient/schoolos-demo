@@ -127,20 +127,31 @@ export async function PATCH(
   }
 
   // ── Commit swap / move ──────────────────────────────────────────────────────
+  // For a swap we exchange the CONTENT (subjectId, teacherId, roomNumber) of the
+  // two entries rather than moving their (day, periodSlotId) positions.
+  // This sidesteps Postgres's immediate unique constraint check which fires after
+  // each UPDATE — the slot columns never change so no constraint is touched.
   await db.$transaction(async tx => {
     if (entryB) {
-      // Swap: move A to target, move B to source
-      // Use intermediate dummy to avoid unique constraint collision during swap
+      // Swap content: A gets B's subject/teacher, B gets A's subject/teacher
       await tx.timetableEntry.update({
         where: { id: entryId },
-        data: { day: targetDay, periodSlotId: targetPeriodSlotId },
+        data: {
+          subjectId:  entryB.subjectId,
+          teacherId:  entryB.teacherId,
+          roomNumber: entryB.roomNumber,
+        },
       });
       await tx.timetableEntry.update({
         where: { id: entryB.id },
-        data: { day: sourceDay, periodSlotId: sourcePSId },
+        data: {
+          subjectId:  entryA.subjectId,
+          teacherId:  entryA.teacherId,
+          roomNumber: entryA.roomNumber,
+        },
       });
     } else {
-      // Simple move — target slot is empty
+      // Move to empty slot — update position (single row, no conflict possible)
       await tx.timetableEntry.update({
         where: { id: entryId },
         data: { day: targetDay, periodSlotId: targetPeriodSlotId },
