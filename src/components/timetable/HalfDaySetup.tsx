@@ -46,8 +46,8 @@ export default function HalfDaySetup() {
         fetch('/api/timetable/half-day-config').then(r => r.json()),
         fetch('/api/timetable/grade-groups').then(r => r.json()),
       ]);
-      setConfigs(hdRes.data?.configs ?? []);
-      setGroups(ggRes.data?.groups ?? []);
+      setConfigs(hdRes.configs ?? []);
+      setGroups(ggRes.groups ?? []);
     } finally {
       setLoading(false);
     }
