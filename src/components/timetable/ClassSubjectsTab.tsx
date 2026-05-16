@@ -33,8 +33,6 @@ type Category  = { value: string; label: string; icon: string; color: string; de
 type LangLevel = { value: string; label: string; description: string };
 type SchedSlot = { value: string; label: string; description: string };
 
-type BoardRec = { subjectName: string; theoryPPW: number; labPPW: number; notes?: string | null };
-
 // ── Display maps ──────────────────────────────────────────────────────────────
 
 const CAT_COLORS: Record<string, string> = {
@@ -72,14 +70,6 @@ const DEFAULT_SLOT: Record<string, string> = {
   ENRICHMENT: 'ACTIVITY',
 };
 
-// Grade name → board recommendation gradeLevel
-function gradeLevelFromName(gradeName: string): string {
-  const n = gradeName.toLowerCase();
-  if (n.includes('xi') || n.includes('xii') || n.includes('11') || n.includes('12')) return 'Senior Secondary';
-  if (n.includes('ix') || n.includes('x') || n.includes('9') || n.includes('10'))    return 'Secondary';
-  if (n.includes('vi') || n.includes('vii') || n.includes('viii') || n.includes('6') || n.includes('7') || n.includes('8')) return 'Middle';
-  return 'Primary';
-}
 
 // ── Draft types ───────────────────────────────────────────────────────────────
 
@@ -491,63 +481,68 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
 
   async function handleBoardSuggest() {
     if (!selectedGradeId) return;
-    const selectedGrade = grades.find(g => g.id === selectedGradeId);
-    if (!selectedGrade) return;
-
-    const gradeLevel = gradeLevelFromName(selectedGrade.name);
+    const candidateSubjects = subjects.filter(s =>
+      s.isSubPart ? draft[s.id]?.included === true : !gradeSubPartsMap.has(s.id)
+    );
+    if (candidateSubjects.length === 0) {
+      toast.info('No subjects configured for this grade.');
+      return;
+    }
     setSuggesting(true);
     try {
-      const res = await fetch(`/api/timetable/board-recommendations?gradeLevel=${encodeURIComponent(gradeLevel)}`);
+      const res = await fetch('/api/timetable/board-suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gradeId: selectedGradeId,
+          subjects: candidateSubjects.map(s => ({
+            id: s.id,
+            name: s.name,
+            subjectCategory: s.subjectCategory,
+            partLabel: s.partLabel ?? null,
+          })),
+        }),
+      });
       const data = await res.json();
-      const recs: BoardRec[] = (data.data ?? data).recommendations ?? [];
-      if (recs.length === 0) {
-        toast.info('No board recommendations found for this grade level');
-        return;
-      }
+      if (!res.ok || data.error) { toast.error(data.error ?? 'Board suggest failed'); return; }
 
-      // Normalize a name for fuzzy matching
-      function normName(n: string) {
-        return n.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
-      }
-      function wordsOf(n: string) { return normName(n).split(' '); }
-      function matchScore(subjectName: string, recName: string): number {
-        const sn = normName(subjectName); const rn = normName(recName);
-        if (sn === rn) return 3;
-        if (sn.includes(rn) || rn.includes(sn)) return 2;
-        const subWords = wordsOf(subjectName); const recWords = wordsOf(recName);
-        const overlap = subWords.filter(w => w.length > 3 && recWords.includes(w)).length;
-        return overlap > 0 ? 1 : 0;
-      }
+      const payload = data.data ?? data;
+      const suggestions: {
+        subjectId: string; include: boolean; periodsPerWeek: number;
+        schedulingSlot: string; isCompulsory: boolean; maxPerDay: number;
+        hasLabSession: boolean; labPeriodsPerWeek: number;
+      }[] = payload.suggestions ?? [];
+      const isFallback = payload.fallback === true;
 
       setDrafts(prev => {
         const updated = { ...prev[selectedGradeId] };
-        let matched = 0;
-        // Only operate on schedulable subjects for this grade (standalone + grade-specific sub-parts)
-        const candidates = subjects.filter(s =>
-          s.teachers.length > 0 && (s.isSubPart ? draft[s.id]?.included === true : !gradeSubPartsMap.has(s.id))
-        );
-        for (const subject of candidates) {
-          let bestRec: BoardRec | null = null; let bestScore = 0;
-          for (const rec of recs) {
-            const score = matchScore(subject.name, rec.subjectName);
-            if (score > bestScore) { bestScore = score; bestRec = rec; }
-          }
-          if (!bestRec || bestScore === 0) continue;
-          const cur = updated[subject.id] ?? defaultDraft(subject);
-          updated[subject.id] = {
+        for (const sug of suggestions) {
+          const subject = subjects.find(s => s.id === sug.subjectId);
+          if (!subject) continue;
+          const cur = updated[sug.subjectId] ?? defaultDraft(subject);
+          updated[sug.subjectId] = {
             ...cur,
-            included: true, // include the subject if board recommends it
-            periodsPerWeek: bestRec.theoryPPW,
-            hasLabSession: bestRec.labPPW > 0,
-            labPeriodsPerWeek: bestRec.labPPW > 0 ? bestRec.labPPW : cur.labPeriodsPerWeek,
+            included: sug.include,
+            periodsPerWeek: sug.periodsPerWeek,
+            schedulingSlot: sug.schedulingSlot,
+            isCompulsory: sug.isCompulsory,
+            isOptional: !sug.isCompulsory,
+            maxPerDay: sug.maxPerDay ?? 1,
+            hasLabSession: sug.hasLabSession ?? false,
+            labPeriodsPerWeek: sug.labPeriodsPerWeek > 0 ? sug.labPeriodsPerWeek : cur.labPeriodsPerWeek,
           };
-          matched++;
         }
         return { ...prev, [selectedGradeId]: updated };
       });
-      toast.success(`Board (${gradeLevel}) recommendations applied`);
+
+      if (isFallback) {
+        const reason = payload.fallbackReason ?? 'unknown error';
+        toast.warning(`Board AI unavailable (${reason}) — applied category defaults`);
+      } else {
+        toast.success(`${payload.board} board curriculum applied for ${payload.gradeName} — review and save`);
+      }
     } catch {
-      toast.error('Failed to fetch board recommendations');
+      toast.error('Failed to fetch board suggestions');
     } finally {
       setSuggesting(false);
     }
