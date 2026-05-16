@@ -105,6 +105,7 @@ Return ONLY a raw JSON object (no markdown, no code fences):
 
     return ok({ suggestions: parsed.suggestions, gradeName, board });
   } catch (e) {
+    console.error('[ai-curriculum-suggest] Anthropic call failed:', e);
     // Graceful degradation: fall back to category-based defaults
     const FALLBACK_PPW: Record<string, number> = {
       LANGUAGE: 6, CORE: 5, ELECTIVE: 3, PRACTICAL: 3,

@@ -477,7 +477,8 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
         return { ...prev, [selectedGradeId]: updated };
       });
       if (isFallback) {
-        toast.warning('AI unavailable — applied category defaults instead. Set ANTHROPIC_API_KEY for real AI suggestions.');
+        const reason = (data.data ?? data).fallbackReason ?? 'unknown error';
+        toast.warning(`AI unavailable (${reason}) — applied category defaults`);
       } else {
         toast.success(`🤖 AI suggestions applied for ${grades.find(g => g.id === selectedGradeId)?.name} — review and save`);
       }
