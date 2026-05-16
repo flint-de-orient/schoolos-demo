@@ -83,13 +83,14 @@ Return ONLY a raw JSON object (no markdown, no code fences):
   try {
     const response = await anthropic.messages.create({
       model: HAIKU,
-      max_tokens: 1024,
+      max_tokens: 4096,
       messages: [{ role: 'user', content: prompt }],
     });
 
     const raw = response.content[0].type === 'text' ? response.content[0].text : '';
     // Strip markdown code fences if Claude wraps in them
     const cleaned = raw.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
+    if (!cleaned) throw new Error('Empty response from AI');
     const parsed = JSON.parse(cleaned) as {
       suggestions: {
         subjectId: string;
