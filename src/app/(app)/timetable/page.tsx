@@ -5,6 +5,7 @@ import PageWrapper from '@/components/layout/PageWrapper';
 import AIBadge from '@/components/shared/AIBadge';
 import ClassSubjectsTab from '@/components/timetable/ClassSubjectsTab';
 import GradeGroupsSetup from '@/components/timetable/GradeGroupsSetup';
+import HalfDaySetup from '@/components/timetable/HalfDaySetup';
 import { toast } from 'sonner';
 import {
   AlertCircle, CheckCircle2, Sparkles, LayoutGrid, Zap, RotateCcw,
@@ -1026,6 +1027,11 @@ export default function TimetablePage() {
           {/* Grade groups */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
             <GradeGroupsSetup />
+          </div>
+
+          {/* Half-day rules */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+            <HalfDaySetup />
           </div>
 
           {setupExisting && (

@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Fetch all prerequisites ──────────────────────────────────────────────────
-  const [config, teacherSubjects, academicYear, sections, gradeSubjects] = await Promise.all([
+  const [config, teacherSubjects, academicYear, sections, gradeSubjects, halfDayConfigs] = await Promise.all([
     db.timetableConfig.findFirst({ where: { tenantId } }),
     db.teacherSubject.findMany({
       where: { teacher: { tenantId } },
@@ -159,6 +159,10 @@ export async function POST(req: NextRequest) {
     db.gradeSubject.findMany({
       where: { grade: { tenantId } },
       select: { gradeId: true, subjectId: true, periodsPerWeek: true, schedulingSlot: true },
+    }),
+    db.halfDayConfig.findMany({
+      where: { tenantId, isActive: true },
+      select: { gradeGroupId: true, dayOfWeek: true, periodsPerDay: true },
     }),
   ]);
 
@@ -270,8 +274,6 @@ export async function POST(req: NextRequest) {
       orderBy: { periodNo: 'asc' },
     });
 
-    const lastSlotId = periodSlots[periodSlots.length - 1]?.id;
-
     groupSlotMeta[groupId] = {
       periodsPerDay: group.periodsPerDay,
       fillerType: group.fillerType,
@@ -323,9 +325,14 @@ export async function POST(req: NextRequest) {
         sectionStates.map(s => [s.sectionId, new Set<string>()])
       );
 
-      for (let slotIndex = 0; slotIndex < periodSlots.length; slotIndex++) {
-        const slot = periodSlots[slotIndex];
-        const isLastPeriod = slot.id === lastSlotId;
+      // Apply half-day config: group-specific rule takes priority over school-wide
+      const halfDay = halfDayConfigs.find(hd => hd.gradeGroupId === groupId && hd.dayOfWeek === day.toUpperCase())
+                   ?? halfDayConfigs.find(hd => hd.gradeGroupId === null    && hd.dayOfWeek === day.toUpperCase());
+      const activePeriodSlots = halfDay ? periodSlots.slice(0, halfDay.periodsPerDay) : periodSlots;
+
+      for (let slotIndex = 0; slotIndex < activePeriodSlots.length; slotIndex++) {
+        const slot = activePeriodSlots[slotIndex];
+        const isLastPeriod = slot.id === activePeriodSlots[activePeriodSlots.length - 1]?.id;
 
         for (const state of sectionStates) {
           const usedSubjectsToday = dayUsed.get(state.sectionId)!;

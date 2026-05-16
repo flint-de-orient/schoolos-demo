@@ -351,6 +351,7 @@ model Tenant {
   students              Student[]
   parents               Parent[]
   timetableConfigs      TimetableConfig[]
+  halfDayConfigs        HalfDayConfig[]
   timetables            Timetable[]
   feeComponents         FeeComponent[]
   studentCategories     StudentCategory[]
@@ -978,11 +979,28 @@ model GradeGroup {
   fillerType            FillerType @default(STUDY_PERIOD)
   grades                Grade[]
   periodSlots           PeriodSlot[]
+  halfDayConfigs        HalfDayConfig[]
   tenant                Tenant     @relation(fields: [tenantId], references: [id])
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt
 
   @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+model HalfDayConfig {
+  id            String    @id @default(cuid())
+  tenantId      String
+  gradeGroupId  String?
+  dayOfWeek     DayOfWeek
+  periodsPerDay Int
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  gradeGroup GradeGroup? @relation(fields: [gradeGroupId], references: [id])
+
   @@index([tenantId])
 }
 
