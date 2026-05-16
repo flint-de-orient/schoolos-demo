@@ -550,12 +550,12 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
   const draft         = useMemo(() => drafts[selectedGradeId] ?? {}, [drafts, selectedGradeId]);
   const selectedGrade = grades.find(g => g.id === selectedGradeId);
 
-  // Sub-parts that belong to THIS grade's curriculum (have a draft entry for this grade)
-  // Key: parentSubjectId → list of sub-part CurrSubjects in this grade
+  // Sub-parts that are INCLUDED in THIS grade's curriculum
+  // Key: parentSubjectId → list of sub-part CurrSubjects included for this grade
   const gradeSubPartsMap = useMemo(() => {
     const map = new Map<string, CurrSubject[]>();
     for (const s of subjects) {
-      if (s.isSubPart && s.parentSubjectId && draft[s.id] !== undefined) {
+      if (s.isSubPart && s.parentSubjectId && draft[s.id]?.included === true) {
         if (!map.has(s.parentSubjectId)) map.set(s.parentSubjectId, []);
         map.get(s.parentSubjectId)!.push(s);
       }
@@ -563,17 +563,17 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
     return map;
   }, [subjects, draft]);
 
-  // Root subjects that have sub-parts IN THIS GRADE — shown as section headers, not directly schedulable
+  // Root subjects that have INCLUDED sub-parts for this grade — shown as section headers
   const parentsWithParts = useMemo(() => {
     const ids = new Set(gradeSubPartsMap.keys());
     return subjects.filter(s => !s.isSubPart && ids.has(s.id));
   }, [subjects, gradeSubPartsMap]);
 
-  // Schedulable subjects for this grade: root subjects without grade-level parts, plus sub-parts in this grade
+  // Schedulable subjects for this grade
   const schedulableSubjects = useMemo(() =>
     subjects.filter(s => {
-      if (s.isSubPart) return draft[s.id] !== undefined; // only this grade's sub-parts
-      return !gradeSubPartsMap.has(s.id);                 // root subjects with no parts in this grade
+      if (s.isSubPart) return draft[s.id]?.included === true; // only included sub-parts
+      return !gradeSubPartsMap.has(s.id);                      // root subjects with no included parts
     }),
   [subjects, gradeSubPartsMap, draft]);
 
