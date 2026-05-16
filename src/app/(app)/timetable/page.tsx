@@ -124,35 +124,39 @@ function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, s
     return rule?.periodsPerDay ?? null;
   }
 
-  // FIX (Issue 2): correctly detect same-day conflicts by excluding both source
-  // and target cells — a straight swap on the same day is always valid.
+  // A move is valid when it doesn't cause any day to hold MORE occurrences of a
+  // subject than the maximum it currently holds on any single day.
+  // This naturally handles lab double-periods (2× on one day) — moving a theory
+  // period to that day is fine because 1+1 = 2 = the existing max.
+  function countPerDay(subjectId: string): Record<string, number> {
+    const counts: Record<string, number> = {};
+    for (const [d, periods] of Object.entries(grid)) {
+      for (const cell of Object.values(periods)) {
+        if (cell.subjectId === subjectId) counts[d] = (counts[d] ?? 0) + 1;
+      }
+    }
+    return counts;
+  }
+
   function isValidDrop(src: DragSource, targetDay: string, targetPeriodNo: number): boolean {
     if (src.day === targetDay && src.periodNo === targetPeriodNo) return false;
     const targetCell = grid[targetDay]?.[targetPeriodNo];
-    // Count other occurrences of src subject on targetDay (excluding src pos and target pos)
-    for (const [d, periods] of Object.entries(grid)) {
-      if (d !== targetDay) continue;
-      for (const [pStr, cell] of Object.entries(periods)) {
-        if (cell.subjectId !== src.subjectId) continue;
-        const p = Number(pStr);
-        if (src.day === d && src.periodNo === p) continue;   // the cell being moved
-        if (targetDay === d && targetPeriodNo === p) continue; // the cell being displaced
-        return false; // another occurrence of src subject on targetDay
-      }
+
+    // Check src subject won't exceed its daily max on targetDay
+    const srcCounts = countPerDay(src.subjectId);
+    const srcMax = Math.max(...Object.values(srcCounts), 1);
+    // After move: targetDay gains one, srcDay loses one (swap: targetDay also loses one already)
+    const srcOnTarget = (srcCounts[targetDay] ?? 0) - (targetCell?.subjectId === src.subjectId ? 1 : 0);
+    if (srcOnTarget + 1 > srcMax) return false;
+
+    // Check target subject won't exceed its daily max on srcDay (swap case)
+    if (targetCell && targetCell.subjectId !== src.subjectId) {
+      const tgtCounts = countPerDay(targetCell.subjectId);
+      const tgtMax = Math.max(...Object.values(tgtCounts), 1);
+      const tgtOnSrc = (tgtCounts[src.day] ?? 0) - (src.day === targetDay ? 1 : 0);
+      if (tgtOnSrc + 1 > tgtMax) return false;
     }
-    // Count other occurrences of target subject on sourceDay (excluding src pos and target pos)
-    if (targetCell) {
-      for (const [d, periods] of Object.entries(grid)) {
-        if (d !== src.day) continue;
-        for (const [pStr, cell] of Object.entries(periods)) {
-          if (cell.subjectId !== targetCell.subjectId) continue;
-          const p = Number(pStr);
-          if (src.day === d && src.periodNo === p) continue;
-          if (targetDay === d && targetPeriodNo === p) continue;
-          return false;
-        }
-      }
-    }
+
     return true;
   }
 
