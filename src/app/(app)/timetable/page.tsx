@@ -140,21 +140,23 @@ function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, s
 
   function isValidDrop(src: DragSource, targetDay: string, targetPeriodNo: number): boolean {
     if (src.day === targetDay && src.periodNo === targetPeriodNo) return false;
+    // Same-day reorder: no subject's daily count changes — always valid
+    if (src.day === targetDay) return true;
+
     const targetCell = grid[targetDay]?.[targetPeriodNo];
 
-    // Check src subject won't exceed its daily max on targetDay
+    // Cross-day move: src subject gains one occurrence on targetDay
     const srcCounts = countPerDay(src.subjectId);
     const srcMax = Math.max(...Object.values(srcCounts), 1);
-    // After move: targetDay gains one, srcDay loses one (swap: targetDay also loses one already)
-    const srcOnTarget = (srcCounts[targetDay] ?? 0) - (targetCell?.subjectId === src.subjectId ? 1 : 0);
-    if (srcOnTarget + 1 > srcMax) return false;
+    const srcAlreadyOnTarget = srcCounts[targetDay] ?? 0;
+    if (srcAlreadyOnTarget + 1 > srcMax) return false;
 
-    // Check target subject won't exceed its daily max on srcDay (swap case)
+    // Cross-day swap: target subject gains one occurrence on srcDay
     if (targetCell && targetCell.subjectId !== src.subjectId) {
       const tgtCounts = countPerDay(targetCell.subjectId);
       const tgtMax = Math.max(...Object.values(tgtCounts), 1);
-      const tgtOnSrc = (tgtCounts[src.day] ?? 0) - (src.day === targetDay ? 1 : 0);
-      if (tgtOnSrc + 1 > tgtMax) return false;
+      const tgtAlreadyOnSrc = tgtCounts[src.day] ?? 0;
+      if (tgtAlreadyOnSrc + 1 > tgtMax) return false;
     }
 
     return true;
