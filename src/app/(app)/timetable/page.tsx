@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import PageWrapper from '@/components/layout/PageWrapper';
 import AIBadge from '@/components/shared/AIBadge';
 import ClassSubjectsTab from '@/components/timetable/ClassSubjectsTab';
@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import {
   AlertCircle, CheckCircle2, Sparkles, LayoutGrid, Zap, RotateCcw,
   Brain, TrendingUp, User, Timer, Shield, RefreshCw, ChevronDown, BookOpen,
-  Settings2, Clock, GraduationCap,
+  Settings2, Clock, GraduationCap, Pencil, X,
 } from 'lucide-react';
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -18,7 +18,10 @@ import {
 type PeriodSlot = { id: string; periodNo: number; startTime: string; endTime: string; label: string };
 type Section    = { id: string; name: string };
 type Grade      = { id: string; name: string; displayOrder: number; sections: Section[] };
-type GridCell   = { subject: string; colorHex: string; teacher: string; room: string | null; teacherId: string };
+type GridCell   = {
+  subject: string; colorHex: string; teacher: string; room: string | null; teacherId: string;
+  entryId: string; subjectId: string;  // Phase 4: drag-and-drop identifiers
+};
 type Grid       = Record<string, Record<number, GridCell>>; // day → periodNo → cell
 type TimetableConfig = { workingDays: string[]; schoolStartTime: string };
 type GradeGroupMeta  = { id: string; mainBreakAfterPeriod: number; shortBreakEnabled: boolean; shortBreakAfterPeriod: number | null; fillerTypes: string[] };
@@ -91,7 +94,9 @@ const FILLER_LABELS: Record<string, string> = {
   SPORTS: 'Sports', REPEAT_COMPULSORY: 'Revision', LEAVE_EMPTY: '',
 };
 
-function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, shortBreakAfterPeriod, fillerTypes, halfDayRules, gradeGroupId }: {
+type DragSource = { entryId: string; subjectId: string; day: string; periodNo: number; slotId: string };
+
+function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, shortBreakAfterPeriod, fillerTypes, halfDayRules, gradeGroupId, editMode, timetableId, onCellMoved }: {
   grid: Grid;
   periodSlots: PeriodSlot[];
   workingDays: string[];
@@ -100,20 +105,115 @@ function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, s
   fillerTypes?: string[];
   halfDayRules?: HalfDayRule[];
   gradeGroupId?: string | null;
+  editMode?: boolean;
+  timetableId?: string;
+  onCellMoved?: (newGrid: Grid) => void;
 }) {
-  // Look up the half-day period limit for a given day
+  const [dragSrc, setDragSrc]       = useState<DragSource | null>(null);
+  const [dragOver, setDragOver]     = useState<{ day: string; periodNo: number } | null>(null);
+  const [saving, setSaving]         = useState(false);
+  const dragSrcRef = useRef<DragSource | null>(null);
+
   function halfDayLimit(day: string): number | null {
     if (!halfDayRules?.length) return null;
     const rule = halfDayRules.find(r => r.gradeGroupId === gradeGroupId && r.dayOfWeek === day)
               ?? halfDayRules.find(r => !r.gradeGroupId && r.dayOfWeek === day);
     return rule?.periodsPerDay ?? null;
   }
+
+  // Build subject→days map for same-day conflict detection
+  function buildSubjectDayMap(): Map<string, Set<string>> {
+    const m = new Map<string, Set<string>>();
+    for (const [day, periods] of Object.entries(grid)) {
+      for (const cell of Object.values(periods)) {
+        if (!m.has(cell.subjectId)) m.set(cell.subjectId, new Set());
+        m.get(cell.subjectId)!.add(day);
+      }
+    }
+    return m;
+  }
+
+  function isValidDrop(src: DragSource, targetDay: string, targetPeriodNo: number): boolean {
+    if (src.day === targetDay && src.periodNo === targetPeriodNo) return false; // same cell
+    const subjectDayMap = buildSubjectDayMap();
+    // Check source subject on targetDay — allowed if: target cell has source subject (i.e. it's the only occurrence there)
+    // OR source subject doesn't appear on targetDay at all
+    // OR source subject only appears there because of src cell itself (which moves away)
+    const srcSubjectDays = subjectDayMap.get(src.subjectId);
+    const targetCell = grid[targetDay]?.[targetPeriodNo];
+    if (srcSubjectDays?.has(targetDay)) {
+      // Source subject already on targetDay — only OK if it's the target cell itself (a swap where target moves to src's old day)
+      if (!targetCell || targetCell.subjectId !== src.subjectId) return false;
+    }
+    // Check target cell's subject on sourceDay
+    if (targetCell) {
+      const tgtSubjectDays = subjectDayMap.get(targetCell.subjectId);
+      if (tgtSubjectDays?.has(src.day)) {
+        // Only OK if the only occurrence on src.day is entry A itself
+        if (targetCell.subjectId !== src.subjectId) return false;
+      }
+    }
+    return true;
+  }
+
+  async function handleDrop(targetDay: string, targetSlotId: string, targetPeriodNo: number) {
+    const src = dragSrcRef.current;
+    setDragSrc(null);
+    setDragOver(null);
+    dragSrcRef.current = null;
+    if (!src || !timetableId || saving) return;
+    if (src.day === targetDay && src.periodNo === targetPeriodNo) return;
+    if (!isValidDrop(src, targetDay, targetPeriodNo)) {
+      toast.error('Invalid move — subject already appears on that day');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/timetable/entries/${src.entryId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetDay, targetPeriodSlotId: targetSlotId }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        toast.error(data.error ?? 'Failed to move period');
+        return;
+      }
+      // Optimistic local grid update
+      const newGrid: Grid = JSON.parse(JSON.stringify(grid));
+      const srcCell = newGrid[src.day]?.[src.periodNo];
+      const tgtCell = newGrid[targetDay]?.[targetPeriodNo];
+      if (!newGrid[targetDay]) newGrid[targetDay] = {};
+      if (srcCell) newGrid[targetDay][targetPeriodNo] = srcCell;
+      else delete newGrid[targetDay][targetPeriodNo];
+      if (tgtCell) {
+        if (!newGrid[src.day]) newGrid[src.day] = {};
+        newGrid[src.day][src.periodNo] = tgtCell;
+      } else {
+        delete newGrid[src.day][src.periodNo];
+      }
+      onCellMoved?.(newGrid);
+      toast.success(data.data?.swapped || data.swapped ? 'Periods swapped' : 'Period moved');
+    } catch {
+      toast.error('Network error — could not save');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const days = DAYS_ORDER.filter(d => workingDays.includes(d));
   const subjectIndexMap: Record<string, number> = {};
   let subjectCounter = 0;
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      {saving && (
+        <div className="px-4 py-2 bg-amber-50 border-b border-amber-100 flex items-center gap-2">
+          <RefreshCw className="w-3.5 h-3.5 text-amber-600 animate-spin" />
+          <span className="text-xs text-amber-700 font-dm-sans font-semibold">Saving change…</span>
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px]">
           <thead>
@@ -138,41 +238,76 @@ function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, s
                     </td>
                     {days.map((day, dayIdx) => {
                       const cell = grid[day]?.[slot.periodNo];
+                      const isHalfDay = (() => { const limit = halfDayLimit(day); return limit !== null && slot.periodNo > limit; })();
+                      const isDragSrc = editMode && dragSrc?.day === day && dragSrc?.periodNo === slot.periodNo;
+                      const isDragOver = editMode && dragOver?.day === day && dragOver?.periodNo === slot.periodNo;
+                      const dropValid  = editMode && dragSrc && isDragOver ? isValidDrop(dragSrc, day, slot.periodNo) : null;
+
                       if (!cell) {
-                        // If this slot is beyond the half-day limit, show a muted indicator
-                        const limit = halfDayLimit(day);
-                        if (limit !== null && slot.periodNo > limit) {
+                        if (isHalfDay) {
                           return (
                             <td key={day} className="px-2 py-2 bg-gray-50/60">
                               <div className="text-center text-[9px] text-gray-300 font-dm-sans italic">half day</div>
                             </td>
                           );
                         }
-                        // Cycle through selected filler types by day index
                         const types = fillerTypes?.length ? fillerTypes : ['STUDY_PERIOD'];
                         const fillerLabel = FILLER_LABELS[types[dayIdx % types.length]] ?? '';
+                        // Empty cell drop target
                         return (
-                          <td key={day} className="px-2 py-2">
-                            {fillerLabel ? (
-                              <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50/80 px-2 py-1.5 text-center">
-                                <div className="text-[10px] text-gray-400 font-dm-sans">{fillerLabel}</div>
-                              </div>
-                            ) : (
-                              <div className="text-center text-xs text-gray-200">—</div>
-                            )}
+                          <td key={day} className="px-2 py-2"
+                            onDragOver={editMode ? e => { e.preventDefault(); setDragOver({ day, periodNo: slot.periodNo }); } : undefined}
+                            onDragLeave={editMode ? () => setDragOver(null) : undefined}
+                            onDrop={editMode ? e => { e.preventDefault(); handleDrop(day, slot.id, slot.periodNo); } : undefined}
+                          >
+                            <div className={`rounded-lg border border-dashed px-2 py-1.5 text-center transition-colors ${
+                              isDragOver && dragSrc
+                                ? dropValid
+                                  ? 'border-green-400 bg-green-50'
+                                  : 'border-red-300 bg-red-50'
+                                : 'border-gray-200 bg-gray-50/80'
+                            }`}>
+                              {fillerLabel
+                                ? <div className="text-[10px] text-gray-400 font-dm-sans">{fillerLabel}</div>
+                                : <div className="text-center text-xs text-gray-200">—</div>}
+                            </div>
                           </td>
                         );
                       }
+
                       if (!(cell.subject in subjectIndexMap)) {
                         subjectIndexMap[cell.subject] = subjectCounter++;
                       }
                       const colorClass = subjectColorClass(cell.subject, subjectIndexMap[cell.subject]);
+
                       return (
-                        <td key={day} className="px-2 py-2">
-                          <div className={`rounded-lg border px-2 py-1.5 ${colorClass} hover:shadow-sm transition-shadow`}>
+                        <td key={day} className="px-2 py-2"
+                          onDragOver={editMode ? e => { e.preventDefault(); setDragOver({ day, periodNo: slot.periodNo }); } : undefined}
+                          onDragLeave={editMode ? () => setDragOver(null) : undefined}
+                          onDrop={editMode ? e => { e.preventDefault(); handleDrop(day, slot.id, slot.periodNo); } : undefined}
+                        >
+                          <div
+                            draggable={!!editMode}
+                            onDragStart={editMode ? () => {
+                              const src: DragSource = { entryId: cell.entryId, subjectId: cell.subjectId, day, periodNo: slot.periodNo, slotId: slot.id };
+                              setDragSrc(src);
+                              dragSrcRef.current = src;
+                            } : undefined}
+                            onDragEnd={editMode ? () => { setDragSrc(null); setDragOver(null); dragSrcRef.current = null; } : undefined}
+                            className={`rounded-lg border px-2 py-1.5 transition-all select-none ${
+                              isDragSrc
+                                ? 'opacity-40 border-gray-300 bg-gray-100'
+                                : isDragOver && dragSrc
+                                  ? dropValid
+                                    ? `${colorClass} ring-2 ring-green-400 shadow-md`
+                                    : `${colorClass} ring-2 ring-red-300 opacity-60`
+                                  : `${colorClass} hover:shadow-sm ${editMode ? 'cursor-grab active:cursor-grabbing' : ''}`
+                            }`}
+                          >
                             <div className="text-[11px] font-semibold leading-tight truncate">{cell.subject}</div>
                             <div className="text-[9px] opacity-70 truncate mt-0.5">{cell.teacher.split(' ').slice(-1)[0]}</div>
                             {cell.room && <div className="text-[9px] opacity-60">{cell.room}</div>}
+                            {editMode && <div className="text-[8px] opacity-40 mt-0.5">⠿ drag</div>}
                           </div>
                         </td>
                       );
@@ -217,8 +352,10 @@ export default function TimetablePage() {
   const [groupMeta, setGroupMeta]       = useState<GradeGroupMeta | null>(null);
   const [halfDayRules, setHalfDayRules] = useState<HalfDayRule[]>([]);
   const [grid, setGrid]                 = useState<Grid>({});
+  const [timetableId, setTimetableId]   = useState<string | null>(null);
   const [timetableLabel, setTimetableLabel] = useState('');
   const [ttLoading, setTtLoading]       = useState(false);
+  const [editMode, setEditMode]         = useState(false);
   const [viewMode, setViewMode]         = useState<'class' | 'teacher'>('class');
   const [teachers, setTeachers]         = useState<{ id: string; name: string }[]>([]);
   const [selectedTeacherId, setSelectedTeacherId] = useState('');
@@ -290,8 +427,9 @@ export default function TimetablePage() {
       const tt = res.data?.timetable ?? res.timetable;
       const subs = res.data?.substitutions ?? res.substitutions ?? [];
       setSubstitutions(subs);
-      if (!tt) { setGrid({}); setTimetableLabel(''); return; }
+      if (!tt) { setGrid({}); setTimetableLabel(''); setTimetableId(null); return; }
       setTimetableLabel(tt.label ?? '');
+      setTimetableId(tt.id ?? null);
       const newGrid: Grid = {};
       for (const e of tt.entries ?? []) {
         if (!newGrid[e.day]) newGrid[e.day] = {};
@@ -301,6 +439,8 @@ export default function TimetablePage() {
           teacher: e.teacher.name,
           room: e.roomNumber ?? null,
           teacherId: e.teacher.id,
+          entryId: e.id,
+          subjectId: e.subject.id,
         };
       }
       setGrid(newGrid);
@@ -308,6 +448,7 @@ export default function TimetablePage() {
   }, []);
 
   useEffect(() => {
+    setEditMode(false);
     if (viewMode === 'class' && selectedSectionId) loadTimetable(selectedSectionId);
     if (viewMode === 'teacher' && selectedTeacherId) loadTimetable('', selectedTeacherId);
   }, [selectedSectionId, selectedTeacherId, viewMode, loadTimetable]);
@@ -523,6 +664,16 @@ export default function TimetablePage() {
               <User className="w-3.5 h-3.5" />
               {viewMode === 'class' ? 'Teacher View' : 'Class View'}
             </button>
+            {Object.keys(grid).length > 0 && viewMode === 'class' && timetableId && (
+              <button onClick={() => setEditMode(e => !e)}
+                className={`flex items-center gap-2 text-sm border rounded-lg px-4 py-2 font-semibold font-dm-sans transition-colors shadow-sm ${
+                  editMode
+                    ? 'bg-amber-500 border-amber-500 text-white hover:bg-amber-600'
+                    : 'bg-white border-gray-200 text-gray-600 hover:border-amber-400 hover:text-amber-600'
+                }`}>
+                {editMode ? <><X className="w-3.5 h-3.5" /> Exit Edit</> : <><Pencil className="w-3.5 h-3.5" /> Edit Timetable</>}
+              </button>
+            )}
           </div>
 
           {/* Substitution alert from DB */}
@@ -538,6 +689,18 @@ export default function TimetablePage() {
                   Manage all substitutions →
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Edit mode banner */}
+          {editMode && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-3">
+              <Pencil className="w-4 h-4 text-amber-600 flex-shrink-0" />
+              <p className="text-sm text-amber-800 font-dm-sans">
+                <strong>Edit mode:</strong> Drag any period cell to a new slot to move it. Drag two cells onto each other to swap.
+                Green highlight = valid · Red highlight = conflict.
+              </p>
+              <button onClick={() => setEditMode(false)} className="ml-auto text-xs text-amber-700 font-semibold underline hover:no-underline">Done</button>
             </div>
           )}
 
@@ -562,6 +725,9 @@ export default function TimetablePage() {
               fillerTypes={groupMeta?.fillerTypes}
               halfDayRules={halfDayRules}
               gradeGroupId={groupMeta?.id ?? null}
+              editMode={editMode}
+              timetableId={timetableId ?? undefined}
+              onCellMoved={setGrid}
             />
           )}
 
