@@ -4,6 +4,16 @@ import { requireSession, ok, err } from '@/lib/api-auth';
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
+/** FNV-1a hash — fast, deterministic, no dependencies */
+function strHash(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
 function addMinutes(time: string, mins: number): string {
   const [h, m] = time.split(':').map(Number);
   const total = h * 60 + m + mins;
@@ -126,7 +136,10 @@ export async function POST(req: NextRequest) {
     db.timetableConfig.findFirst({ where: { tenantId } }),
     db.teacherSubject.findMany({
       where: { teacher: { tenantId } },
-      include: {
+      select: {
+        teacherId: true,
+        subjectId: true,
+        proficiency: true,
         subject: { select: { id: true, name: true } },
         teacher: { select: { id: true, name: true } },
       },
@@ -175,13 +188,23 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Build subject → teachers map ─────────────────────────────────────────────
-  type SubjectInfo = { subjectId: string; subjectName: string; teachers: { teacherId: string; name: string }[] };
+  type TeacherRef = { teacherId: string; name: string; proficiency: string };
+  type SubjectInfo = { subjectId: string; subjectName: string; teachers: TeacherRef[] };
   const subjectMap = new Map<string, SubjectInfo>();
   for (const ts of teacherSubjects) {
     if (!subjectMap.has(ts.subjectId)) {
       subjectMap.set(ts.subjectId, { subjectId: ts.subjectId, subjectName: ts.subject.name, teachers: [] });
     }
-    subjectMap.get(ts.subjectId)!.teachers.push({ teacherId: ts.teacherId, name: ts.teacher.name });
+    subjectMap.get(ts.subjectId)!.teachers.push({
+      teacherId: ts.teacherId,
+      name: ts.teacher.name,
+      proficiency: ts.proficiency as string,
+    });
+  }
+  // PRIMARY teachers are tried first — sort each subject's pool by proficiency
+  const profOrder: Record<string, number> = { PRIMARY: 0, SECONDARY: 1, SUBSTITUTE: 2 };
+  for (const info of subjectMap.values()) {
+    info.teachers.sort((a, b) => (profOrder[a.proficiency] ?? 1) - (profOrder[b.proficiency] ?? 1));
   }
 
   // ── Group sections by their grade group ──────────────────────────────────────
@@ -261,6 +284,10 @@ export async function POST(req: NextRequest) {
       sectionId: string; gradeName: string; curriculum: CurrEntry[];
       regularPool: CurrEntry[]; weekendPool: CurrEntry[]; activityPool: CurrEntry[];
       weeklyCount: Map<string, number>;
+      // slotHistory tracks which slot indices (0-based) each subject has appeared at.
+      // Used to rotate subjects across slot positions so the same subject doesn't
+      // always land at the same period number each day.
+      slotHistory: Map<string, Set<number>>;
     };
     const sectionStates: SectionState[] = [];
     for (const sectionId of groupSectionIds) {
@@ -281,6 +308,7 @@ export async function POST(req: NextRequest) {
         weekendPool:  curriculum.filter(e => e.schedulingSlot === 'WEEKEND'),
         activityPool: curriculum.filter(e => e.schedulingSlot === 'ACTIVITY'),
         weeklyCount:  new Map<string, number>(),
+        slotHistory:  new Map<string, Set<number>>(),
       });
     }
 
@@ -295,7 +323,8 @@ export async function POST(req: NextRequest) {
         sectionStates.map(s => [s.sectionId, new Set<string>()])
       );
 
-      for (const slot of periodSlots) {
+      for (let slotIndex = 0; slotIndex < periodSlots.length; slotIndex++) {
+        const slot = periodSlots[slotIndex];
         const isLastPeriod = slot.id === lastSlotId;
 
         for (const state of sectionStates) {
@@ -320,15 +349,27 @@ export async function POST(req: NextRequest) {
           );
           if (eligible.length === 0) continue;
 
+          // Rotation-aware sort:
+          // 1. Prefer subjects NOT yet seen at this slotIndex (novelty → rotation)
+          // 2. Most remaining quota (coverage guarantee)
+          // 3. Seeded hash tiebreaker so ties resolve differently each day
+          const tieHash = strHash(`${state.sectionId}-${day}-${slotIndex}`);
           eligible.sort((a, b) => {
+            const aSeenHere = state.slotHistory.get(a.subjectId)?.has(slotIndex) ? 1 : 0;
+            const bSeenHere = state.slotHistory.get(b.subjectId)?.has(slotIndex) ? 1 : 0;
+            if (aSeenHere !== bSeenHere) return aSeenHere - bSeenHere;
+
             const remA = a.periodsPerWeek - (state.weeklyCount.get(a.subjectId) ?? 0);
             const remB = b.periodsPerWeek - (state.weeklyCount.get(b.subjectId) ?? 0);
-            return remB - remA;
+            if (remA !== remB) return remB - remA;
+
+            return (strHash(a.subjectId + tieHash) % 1000) - (strHash(b.subjectId + tieHash) % 1000);
           });
 
           for (const chosen of eligible) {
             const subjectInfo = subjectMap.get(chosen.subjectId)!;
             let assignedTeacherId: string | null = null;
+            // Teachers are pre-sorted PRIMARY first; first available is best-qualified
             for (const teacher of subjectInfo.teachers) {
               const key = `${teacher.teacherId}-${day}-${slot.startTime}`;
               if (!usedSlots.has(key)) {
@@ -341,6 +382,11 @@ export async function POST(req: NextRequest) {
 
             state.weeklyCount.set(chosen.subjectId, (state.weeklyCount.get(chosen.subjectId) ?? 0) + 1);
             usedSubjectsToday.add(chosen.subjectId);
+
+            // Record slot position for this subject so it rotates next day
+            if (!state.slotHistory.has(chosen.subjectId)) state.slotHistory.set(chosen.subjectId, new Set());
+            state.slotHistory.get(chosen.subjectId)!.add(slotIndex);
+
             allEntries.push({
               sectionId: state.sectionId,
               subjectId: chosen.subjectId,
@@ -371,6 +417,24 @@ export async function POST(req: NextRequest) {
     return err('Could not schedule any periods — ensure teachers are assigned to subjects.', 400);
   }
 
+  // ── Compute actual quality score from all section states ─────────────────────
+  // Collect sectionStates across groups for scoring (they're locally scoped above, so
+  // we re-derive from allEntries and the warnings list)
+  const totalDemand = (() => {
+    let d = 0;
+    for (const section of sections) {
+      const gradeId = section.grade.id;
+      const curriculum = gradeCurriculumMap.get(gradeId) ?? [];
+      for (const e of curriculum) {
+        if (e.schedulingSlot !== 'AFTER_SCHOOL' && subjectMap.has(e.subjectId)) {
+          d += e.periodsPerWeek;
+        }
+      }
+    }
+    return d;
+  })();
+  const actualQuality = totalDemand > 0 ? Math.round((allEntries.length / totalDemand) * 100) : 100;
+
   // ── Persist timetable ────────────────────────────────────────────────────────
   const label = `AI Generated — ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`;
 
@@ -383,7 +447,7 @@ export async function POST(req: NextRequest) {
       generatedByAI: true,
       generatedAt: new Date(),
       publishedAt: new Date(),
-      qualityScore: 94,
+      qualityScore: actualQuality,
       conflictCount: 0,
     },
   });
@@ -406,6 +470,8 @@ export async function POST(req: NextRequest) {
       totalEntries:       allEntries.length,
       teachersScheduled:  new Set(allEntries.map(e => e.teacherId)).size,
       subjectsScheduled:  new Set(allEntries.map(e => e.subjectId)).size,
+      qualityScore:       actualQuality,
+      totalDemand,
       conflictsFound:     0,
     },
   }, 201);
