@@ -31,12 +31,18 @@ export async function GET(req: NextRequest) {
     });
     if (!group) return err('Grade group not found', 404);
 
-    const periodSlots = await db.periodSlot.findMany({
-      where: { gradeGroupId: resolvedGroupId },
-      orderBy: { periodNo: 'asc' },
-    });
+    const [periodSlots, activityTypes] = await Promise.all([
+      db.periodSlot.findMany({ where: { gradeGroupId: resolvedGroupId }, orderBy: { periodNo: 'asc' } }),
+      group.fillerActivityIds.length > 0
+        ? db.activityType.findMany({ where: { id: { in: group.fillerActivityIds } }, select: { id: true, name: true, colorHex: true } })
+        : Promise.resolve([]),
+    ]);
 
-    return ok({ config, group, periodSlots });
+    // Return activity names in the order the group selected them (for rotation)
+    const activityMap = Object.fromEntries(activityTypes.map(a => [a.id, a.name]));
+    const fillerLabels = group.fillerActivityIds.map((id: string) => activityMap[id]).filter(Boolean);
+
+    return ok({ config, group: { ...group, fillerLabels }, periodSlots });
   }
 
   // No group context — return config only (no slots yet)

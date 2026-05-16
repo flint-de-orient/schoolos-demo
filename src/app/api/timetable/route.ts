@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
         include: {
           subject: { select: { id: true, name: true, colorHex: true } },
           teacher: { select: { id: true, name: true } },
-          section: { include: { grade: { select: { name: true, gradeGroupId: true, gradeGroup: { select: { id: true, name: true, fillerTypes: true, mainBreakAfterPeriod: true, shortBreakEnabled: true, shortBreakAfterPeriod: true } } } } } },
+          section: { include: { grade: { select: { name: true, gradeGroupId: true, gradeGroup: { select: { id: true, name: true, fillerTypes: true, fillerActivityIds: true, mainBreakAfterPeriod: true, shortBreakEnabled: true, shortBreakAfterPeriod: true } } } } } },
           periodSlot: true,
         },
         orderBy: [{ day: 'asc' }, { periodSlot: { periodNo: 'asc' } }],
@@ -33,6 +33,15 @@ export async function GET(req: NextRequest) {
   });
 
   if (!timetable) return ok({ timetable: null });
+
+  // Resolve fillerActivityIds → names so client never needs a second fetch
+  const allActivityIds = [...new Set(
+    timetable.entries.flatMap(e => e.section.grade.gradeGroup?.fillerActivityIds ?? [])
+  )];
+  const activityTypes = allActivityIds.length > 0
+    ? await db.activityType.findMany({ where: { id: { in: allActivityIds } }, select: { id: true, name: true, colorHex: true } })
+    : [];
+  const activityMap = Object.fromEntries(activityTypes.map(a => [a.id, a]));
 
   // Also fetch today's substitutions
   const today = new Date();
@@ -45,7 +54,7 @@ export async function GET(req: NextRequest) {
     },
   });
 
-  return ok({ timetable, substitutions });
+  return ok({ timetable, substitutions, activityMap });
 }
 
 export async function POST(req: NextRequest) {

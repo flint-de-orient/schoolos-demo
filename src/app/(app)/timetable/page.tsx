@@ -24,7 +24,7 @@ type GridCell   = {
 };
 type Grid       = Record<string, Record<number, GridCell>>; // day → periodNo → cell
 type TimetableConfig = { workingDays: string[]; schoolStartTime: string };
-type GradeGroupMeta  = { id: string; mainBreakAfterPeriod: number; shortBreakEnabled: boolean; shortBreakAfterPeriod: number | null; fillerTypes: string[] };
+type GradeGroupMeta  = { id: string; mainBreakAfterPeriod: number; shortBreakEnabled: boolean; shortBreakAfterPeriod: number | null; fillerLabels: string[] };
 type HalfDayRule     = { gradeGroupId: string | null; dayOfWeek: string; periodsPerDay: number };
 
 type SubCandidate = { id: string; name: string; proficiency: string };
@@ -89,21 +89,16 @@ const GEN_STEPS = [
 
 // ── TimetableGrid ────────────────────────────────────────────────────────────
 
-const FILLER_LABELS: Record<string, string> = {
-  STUDY_PERIOD: 'Study Period', REVISION: 'Revision',
-  SPORTS: 'Sports', REPEAT_COMPULSORY: 'Revision', LEAVE_EMPTY: '',
-};
-
 type DragSource = { entryId: string; subjectId: string; day: string; periodNo: number; slotId: string };
 type CopySource = { entryId: string; subjectId: string; subjectName: string; day: string; periodNo: number };
 
-function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, shortBreakAfterPeriod, fillerTypes, halfDayRules, gradeGroupId, editMode, copyMode, copySrc, timetableId, onCellMoved, onCopyCellClick }: {
+function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, shortBreakAfterPeriod, fillerLabels, halfDayRules, gradeGroupId, editMode, copyMode, copySrc, timetableId, onCellMoved, onCopyCellClick }: {
   grid: Grid;
   periodSlots: PeriodSlot[];
   workingDays: string[];
   mainBreakAfterPeriod?: number;
   shortBreakAfterPeriod?: number | null;
-  fillerTypes?: string[];
+  fillerLabels?: string[];
   halfDayRules?: HalfDayRule[];
   gradeGroupId?: string | null;
   editMode?: boolean;
@@ -253,8 +248,9 @@ function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, s
                             </td>
                           );
                         }
-                        const types = fillerTypes?.length ? fillerTypes : ['STUDY_PERIOD'];
-                        const fillerLabel = FILLER_LABELS[types[dayIdx % types.length]] ?? '';
+                        const fillerLabel = fillerLabels?.length
+                          ? (fillerLabels[dayIdx % fillerLabels.length] ?? '')
+                          : '';
                         return (
                           <td key={day} className="px-2 py-2"
                             onDragOver={editMode ? e => { e.preventDefault(); setDragOver({ day, periodNo: slot.periodNo }); } : undefined}
@@ -434,7 +430,7 @@ export default function TimetablePage() {
         const freshSlots: PeriodSlot[] = psRes.data?.periodSlots ?? psRes.periodSlots ?? [];
         setPeriodSlots(freshSlots.sort((a: PeriodSlot, b: PeriodSlot) => a.periodNo - b.periodNo));
         const g = psRes.data?.group ?? psRes.group;
-        if (g) setGroupMeta({ id: g.id, mainBreakAfterPeriod: g.mainBreakAfterPeriod, shortBreakEnabled: g.shortBreakEnabled, shortBreakAfterPeriod: g.shortBreakAfterPeriod, fillerTypes: g.fillerTypes ?? ['STUDY_PERIOD'] });
+        if (g) setGroupMeta({ id: g.id, mainBreakAfterPeriod: g.mainBreakAfterPeriod, shortBreakEnabled: g.shortBreakEnabled, shortBreakAfterPeriod: g.shortBreakAfterPeriod, fillerLabels: g.fillerLabels ?? [] });
         else setGroupMeta(null);
       }
 
@@ -856,7 +852,7 @@ export default function TimetablePage() {
               workingDays={ttConfig.workingDays}
               mainBreakAfterPeriod={groupMeta?.mainBreakAfterPeriod}
               shortBreakAfterPeriod={groupMeta?.shortBreakEnabled ? groupMeta.shortBreakAfterPeriod : null}
-              fillerTypes={groupMeta?.fillerTypes}
+              fillerLabels={groupMeta?.fillerLabels}
               halfDayRules={halfDayRules}
               gradeGroupId={groupMeta?.id ?? null}
               editMode={editMode}

@@ -4,60 +4,60 @@ import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import {
   Plus, Trash2, RefreshCw, ChevronDown, ChevronUp, Users,
-  CheckCircle2, Settings2, Copy,
+  CheckCircle2, Settings2, Copy, Palette, X,
 } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type GradeRef   = { id: string; name: string; displayOrder: number };
-type GradeGroup = {
+type GradeRef    = { id: string; name: string; displayOrder: number };
+type ActivityType = { id: string; name: string; colorHex: string; sortOrder: number };
+type GradeGroup  = {
   id: string; name: string; displayOrder: number;
   periodsPerDay: number; periodDuration: number;
   shortBreakEnabled: boolean; shortBreakAfterPeriod: number | null; shortBreakDuration: number;
   mainBreakAfterPeriod: number; mainBreakDuration: number;
   fillerTypes: string[];
+  fillerActivityIds: string[];
   grades: GradeRef[];
 };
-
-const FILLER_OPTIONS = [
-  { value: 'STUDY_PERIOD',      label: 'Study Period' },
-  { value: 'REVISION',          label: 'Revision' },
-  { value: 'SPORTS',            label: 'Sports / Activity' },
-  { value: 'REPEAT_COMPULSORY', label: 'Repeat Compulsory' },
-  { value: 'LEAVE_EMPTY',       label: 'Leave Empty' },
-];
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function GradeGroupsSetup() {
-  const [groups, setGroups]       = useState<GradeGroup[]>([]);
-  const [allGrades, setAllGrades] = useState<(GradeRef & { gradeGroupId: string | null })[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [expanded, setExpanded]   = useState<Set<string>>(new Set());
-  const [saving, setSaving]       = useState<string | null>(null); // groupId being saved
-  const [newName, setNewName]     = useState('');
-  const [creating, setCreating]   = useState(false);
+  const [groups, setGroups]           = useState<GradeGroup[]>([]);
+  const [allGrades, setAllGrades]     = useState<(GradeRef & { gradeGroupId: string | null })[]>([]);
+  const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [expanded, setExpanded]       = useState<Set<string>>(new Set());
+  const [saving, setSaving]           = useState<string | null>(null);
+  const [newName, setNewName]         = useState('');
+  const [creating, setCreating]       = useState(false);
 
-  // Local edit state per group (draft edits before save)
+  // New activity type form
+  const [newActName, setNewActName]   = useState('');
+  const [newActColor, setNewActColor] = useState('#6366F1');
+  const [addingAct, setAddingAct]     = useState(false);
+  const [deletingAct, setDeletingAct] = useState<string | null>(null);
+
   const [drafts, setDrafts] = useState<Record<string, Partial<GradeGroup>>>({});
 
   function draft(id: string): Partial<GradeGroup> { return drafts[id] ?? {}; }
   function setDraft(id: string, patch: Partial<GradeGroup>) {
     setDrafts(prev => ({ ...prev, [id]: { ...prev[id], ...patch } }));
   }
-
-  function merged(g: GradeGroup): GradeGroup {
-    return { ...g, ...draft(g.id) };
-  }
+  function merged(g: GradeGroup): GradeGroup { return { ...g, ...draft(g.id) }; }
 
   // ── Load ───────────────────────────────────────────────────────────────────
   function load() {
     setLoading(true);
-    fetch('/api/timetable/grade-groups')
-      .then(r => r.json())
-      .then(d => {
-        setGroups(d.data?.groups ?? d.groups ?? []);
-        setAllGrades(d.data?.allGrades ?? d.allGrades ?? []);
+    Promise.all([
+      fetch('/api/timetable/grade-groups').then(r => r.json()),
+      fetch('/api/timetable/activity-types').then(r => r.json()),
+    ])
+      .then(([gd, ad]) => {
+        setGroups(gd.data?.groups ?? gd.groups ?? []);
+        setAllGrades(gd.data?.allGrades ?? gd.allGrades ?? []);
+        setActivityTypes(ad.data?.activityTypes ?? ad.activityTypes ?? []);
       })
       .catch(() => toast.error('Failed to load grade groups'))
       .finally(() => setLoading(false));
@@ -65,7 +65,7 @@ export default function GradeGroupsSetup() {
 
   useEffect(() => { load(); }, []);
 
-  // ── Create ─────────────────────────────────────────────────────────────────
+  // ── Create group ───────────────────────────────────────────────────────────
   function handleCreate() {
     if (!newName.trim()) return;
     setCreating(true);
@@ -102,7 +102,7 @@ export default function GradeGroupsSetup() {
         shortBreakDuration: m.shortBreakDuration,
         mainBreakAfterPeriod: m.mainBreakAfterPeriod,
         mainBreakDuration: m.mainBreakDuration,
-        fillerTypes: m.fillerTypes,
+        fillerActivityIds: m.fillerActivityIds,
         gradeIds,
         applyToAll,
       }),
@@ -131,7 +131,7 @@ export default function GradeGroupsSetup() {
       .catch(() => toast.error('Failed to delete'));
   }
 
-  // ── Grade assignment helpers ────────────────────────────────────────────────
+  // ── Grade assignment ────────────────────────────────────────────────────────
   function toggleGradeInGroup(groupId: string, gradeId: string, currentGrades: GradeRef[]) {
     const isIn = currentGrades.some(g => g.id === gradeId);
     const newGrades = isIn
@@ -140,262 +140,355 @@ export default function GradeGroupsSetup() {
     setDraft(groupId, { grades: newGrades as GradeRef[] });
   }
 
+  // ── Activity type CRUD ─────────────────────────────────────────────────────
+  function handleAddActivity() {
+    if (!newActName.trim()) return;
+    setAddingAct(true);
+    fetch('/api/timetable/activity-types', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newActName.trim(), colorHex: newActColor }),
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) { toast.error(d.error); return; }
+        toast.success(`"${newActName.trim()}" added`);
+        setNewActName('');
+        setNewActColor('#6366F1');
+        fetch('/api/timetable/activity-types').then(r => r.json()).then(ad => {
+          setActivityTypes(ad.data?.activityTypes ?? ad.activityTypes ?? []);
+        });
+      })
+      .catch(() => toast.error('Failed to add activity'))
+      .finally(() => setAddingAct(false));
+  }
+
+  function handleDeleteActivity(at: ActivityType) {
+    if (!confirm(`Remove "${at.name}"? This will also remove it from all grade groups.`)) return;
+    setDeletingAct(at.id);
+    fetch(`/api/timetable/activity-types/${at.id}`, { method: 'DELETE' })
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) { toast.error(d.error); return; }
+        toast.success(`"${at.name}" removed`);
+        load();
+      })
+      .catch(() => toast.error('Failed to remove'))
+      .finally(() => setDeletingAct(null));
+  }
+
   if (loading) return (
     <div className="flex items-center gap-2 py-8 justify-center text-sm text-gray-400">
-      <RefreshCw className="w-4 h-4 animate-spin" /> Loading grade groups…
+      <RefreshCw className="w-4 h-4 animate-spin" /> Loading…
     </div>
   );
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-sora font-semibold text-navy">Grade Groups</h3>
-          <p className="text-xs text-gray-400 font-dm-sans mt-0.5">
-            Groups define periods per day, period length, and break configuration for each level of classes.
-          </p>
+    <div className="space-y-6">
+
+      {/* ── Activity Classes Manager ─────────────────────────────────────────── */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <Palette className="w-4 h-4 text-navy" />
+          <h3 className="text-sm font-sora font-semibold text-navy">Activity Classes</h3>
+          <span className="text-[10px] text-gray-400 font-dm-sans">
+            — define labels that fill empty timetable slots (e.g. Sports, Dance, Music, Library…)
+          </span>
         </div>
-      </div>
 
-      {/* Unassigned grades notice */}
-      {allGrades.filter(g => !g.gradeGroupId).length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700 font-dm-sans">
-          <strong>Unassigned grades:</strong>{' '}
-          {allGrades.filter(g => !g.gradeGroupId).map(g => g.name).join(', ')} — assign them to a group below.
-        </div>
-      )}
-
-      {/* Group cards */}
-      {groups.map(g => {
-        const m = merged(g);
-        const isOpen = expanded.has(g.id);
-        const isDirty = Object.keys(draft(g.id)).length > 0;
-
-        return (
-          <div key={g.id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-            {/* Group header */}
-            <div className="flex items-center gap-3 px-5 py-3 border-b border-gray-50 bg-gray-50/60">
-              <button onClick={() => setExpanded(prev => {
-                const n = new Set(prev);
-                if (n.has(g.id)) n.delete(g.id); else n.add(g.id);
-                return n;
-              })} className="flex items-center gap-2 flex-1 text-left">
-                {isOpen ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
-                <span className="font-sora font-semibold text-sm text-navy">{m.name}</span>
-                <span className="text-xs text-gray-400 font-dm-sans">
-                  {m.periodsPerDay} periods · {m.periodDuration}min · {m.grades.length} grade{m.grades.length !== 1 ? 's' : ''}
-                </span>
-                {isDirty && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-semibold">Unsaved</span>}
-              </button>
-              <button onClick={() => handleDelete(g)} className="p-1.5 text-gray-300 hover:text-red-500 transition-colors rounded">
-                <Trash2 className="w-3.5 h-3.5" />
+        {/* Existing activity chips */}
+        <div className="flex flex-wrap gap-2 mb-3">
+          {activityTypes.map(at => (
+            <div key={at.id}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold"
+              style={{ backgroundColor: at.colorHex + '22', borderColor: at.colorHex + '55', color: at.colorHex }}>
+              <span>{at.name}</span>
+              <button
+                onClick={() => handleDeleteActivity(at)}
+                disabled={deletingAct === at.id}
+                className="hover:opacity-60 transition-opacity ml-0.5"
+                title={`Remove "${at.name}"`}>
+                {deletingAct === at.id
+                  ? <RefreshCw className="w-3 h-3 animate-spin" />
+                  : <X className="w-3 h-3" />}
               </button>
             </div>
+          ))}
+        </div>
 
-            {/* Expanded config */}
-            {isOpen && (
-              <div className="p-5 space-y-5">
-                {/* Grades assignment */}
-                <div>
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">
-                    <Users className="w-3 h-3 inline mr-1" />Grades in this group
-                  </label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {allGrades.map(grade => {
-                      const inGroup = (draft(g.id).grades ?? g.grades).some(gg => gg.id === grade.id);
-                      const inOtherGroup = !inGroup && grade.gradeGroupId && grade.gradeGroupId !== g.id;
-                      return (
-                        <button key={grade.id}
-                          disabled={!!inOtherGroup}
-                          onClick={() => toggleGradeInGroup(g.id, grade.id, draft(g.id).grades ?? g.grades)}
-                          title={inOtherGroup ? `In another group` : undefined}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors ${inGroup ? 'bg-navy text-white border-navy' : inOtherGroup ? 'bg-gray-100 text-gray-300 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-500 border-gray-200 hover:border-navy/30'}`}>
-                          {grade.name}
-                        </button>
-                      );
-                    })}
-                  </div>
+        {/* Add new activity */}
+        <div className="flex items-center gap-2">
+          <input
+            type="color"
+            value={newActColor}
+            onChange={e => setNewActColor(e.target.value)}
+            className="w-8 h-8 rounded-lg border border-gray-200 cursor-pointer p-0.5"
+            title="Pick a colour" />
+          <input
+            type="text"
+            value={newActName}
+            onChange={e => setNewActName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleAddActivity()}
+            placeholder="e.g. Dance, Music, Art & Craft, Library Period, Assembly…"
+            className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-navy/20 font-dm-sans" />
+          <button
+            onClick={handleAddActivity}
+            disabled={!newActName.trim() || addingAct}
+            className="flex items-center gap-1.5 bg-navy text-white font-semibold rounded-lg px-3 py-2 hover:bg-navyMid transition-colors disabled:opacity-50 text-sm whitespace-nowrap">
+            {addingAct ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+            Add
+          </button>
+        </div>
+        <p className="text-[10px] text-gray-400 mt-1.5 font-dm-sans">
+          Pick a colour, type a name, press Add. Then select which ones cycle in each grade group&apos;s empty slots below.
+        </p>
+      </div>
+
+      {/* ── Grade Groups ─────────────────────────────────────────────────────── */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="text-sm font-sora font-semibold text-navy">Grade Groups</h3>
+            <p className="text-xs text-gray-400 font-dm-sans mt-0.5">
+              Groups define periods per day, period length, break configuration, and which activity classes fill empty slots.
+            </p>
+          </div>
+        </div>
+
+        {allGrades.filter(g => !g.gradeGroupId).length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700 font-dm-sans mb-4">
+            <strong>Unassigned grades:</strong>{' '}
+            {allGrades.filter(g => !g.gradeGroupId).map(g => g.name).join(', ')} — assign them to a group below.
+          </div>
+        )}
+
+        <div className="space-y-4">
+          {groups.map(g => {
+            const m = merged(g);
+            const isOpen = expanded.has(g.id);
+            const isDirty = Object.keys(draft(g.id)).length > 0;
+            const selectedActivityIds: string[] = m.fillerActivityIds ?? [];
+
+            return (
+              <div key={g.id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                {/* Group header */}
+                <div className="flex items-center gap-3 px-5 py-3 border-b border-gray-50 bg-gray-50/60">
+                  <button onClick={() => setExpanded(prev => {
+                    const n = new Set(prev);
+                    if (n.has(g.id)) n.delete(g.id); else n.add(g.id);
+                    return n;
+                  })} className="flex items-center gap-2 flex-1 text-left">
+                    {isOpen ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                    <span className="font-sora font-semibold text-sm text-navy">{m.name}</span>
+                    <span className="text-xs text-gray-400 font-dm-sans">
+                      {m.periodsPerDay} periods · {m.periodDuration}min · {m.grades.length} grade{m.grades.length !== 1 ? 's' : ''}
+                    </span>
+                    {isDirty && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-semibold">Unsaved</span>}
+                  </button>
+                  <button onClick={() => handleDelete(g)} className="p-1.5 text-gray-300 hover:text-red-500 transition-colors rounded">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-5">
-                  {/* Periods per day */}
-                  <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Periods Per Day</label>
-                    <input type="number" min={1} max={16} value={m.periodsPerDay}
-                      onChange={e => setDraft(g.id, { periodsPerDay: Number(e.target.value) })}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-navy font-sora font-semibold focus:outline-none focus:ring-2 focus:ring-navy/20" />
-                  </div>
-
-                  {/* Period duration */}
-                  <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Period Duration (min)</label>
-                    <div className="flex items-center gap-2">
-                      <input type="number" min={15} max={90} value={m.periodDuration}
-                        onChange={e => setDraft(g.id, { periodDuration: Number(e.target.value) })}
-                        className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-navy/20" />
-                      <button
-                        onClick={() => handleSave(g, ['periodDuration'])}
-                        title="Apply this duration to all groups"
-                        className="p-2 text-gray-400 hover:text-navy border border-gray-200 rounded-lg hover:border-navy/30 transition-colors">
-                        <Copy className="w-3.5 h-3.5" />
-                      </button>
+                {isOpen && (
+                  <div className="p-5 space-y-5">
+                    {/* Grades */}
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">
+                        <Users className="w-3 h-3 inline mr-1" />Grades in this group
+                      </label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {allGrades.map(grade => {
+                          const inGroup = (draft(g.id).grades ?? g.grades).some(gg => gg.id === grade.id);
+                          const inOtherGroup = !inGroup && grade.gradeGroupId && grade.gradeGroupId !== g.id;
+                          return (
+                            <button key={grade.id}
+                              disabled={!!inOtherGroup}
+                              onClick={() => toggleGradeInGroup(g.id, grade.id, draft(g.id).grades ?? g.grades)}
+                              title={inOtherGroup ? 'In another group' : undefined}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors ${inGroup ? 'bg-navy text-white border-navy' : inOtherGroup ? 'bg-gray-100 text-gray-300 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-500 border-gray-200 hover:border-navy/30'}`}>
+                              {grade.name}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <p className="text-[10px] text-gray-400 mt-1">Copy icon → apply to all groups</p>
-                  </div>
 
-                  {/* Main break */}
-                  <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Main Break After Period</label>
-                    <div className="flex gap-1 flex-wrap">
-                      {Array.from({ length: m.periodsPerDay }, (_, i) => i + 1).map(p => (
-                        <button key={p}
-                          onClick={() => setDraft(g.id, { mainBreakAfterPeriod: p })}
-                          className={`w-8 h-8 rounded-lg text-xs font-bold border transition-colors ${m.mainBreakAfterPeriod === p ? 'bg-gold text-navy border-gold' : 'bg-white text-gray-500 border-gray-200 hover:border-navy/30'}`}>
-                          {p}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Main break duration */}
-                  <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Main Break Duration (min)</label>
-                    <div className="flex items-center gap-2">
-                      <input type="number" min={5} max={90} value={m.mainBreakDuration}
-                        onChange={e => setDraft(g.id, { mainBreakDuration: Number(e.target.value) })}
-                        className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-navy/20" />
-                      <button
-                        onClick={() => handleSave(g, ['mainBreakAfterPeriod', 'mainBreakDuration'])}
-                        title="Apply break config to all groups"
-                        className="p-2 text-gray-400 hover:text-navy border border-gray-200 rounded-lg hover:border-navy/30 transition-colors">
-                        <Copy className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Short break */}
-                <div className="border border-gray-100 rounded-xl p-4">
-                  <div className="flex items-center gap-3 mb-3">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={m.shortBreakEnabled}
-                        onChange={e => setDraft(g.id, { shortBreakEnabled: e.target.checked })}
-                        className="w-4 h-4 accent-navy" />
-                      <span className="text-sm font-semibold text-gray-700 font-dm-sans">Short Break (Optional)</span>
-                    </label>
-                    {m.shortBreakEnabled && (
-                      <button
-                        onClick={() => handleSave(g, ['shortBreakEnabled', 'shortBreakAfterPeriod', 'shortBreakDuration'])}
-                        title="Apply short break config to all groups"
-                        className="ml-auto p-1.5 text-gray-400 hover:text-navy border border-gray-200 rounded-lg hover:border-navy/30 transition-colors">
-                        <Copy className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                  {m.shortBreakEnabled && (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-5">
+                      {/* Periods per day */}
                       <div>
-                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Short Break After Period</label>
+                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Periods Per Day</label>
+                        <input type="number" min={1} max={16} value={m.periodsPerDay}
+                          onChange={e => setDraft(g.id, { periodsPerDay: Number(e.target.value) })}
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-navy font-sora font-semibold focus:outline-none focus:ring-2 focus:ring-navy/20" />
+                      </div>
+
+                      {/* Period duration */}
+                      <div>
+                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Period Duration (min)</label>
+                        <div className="flex items-center gap-2">
+                          <input type="number" min={15} max={90} value={m.periodDuration}
+                            onChange={e => setDraft(g.id, { periodDuration: Number(e.target.value) })}
+                            className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-navy/20" />
+                          <button onClick={() => handleSave(g, ['periodDuration'])}
+                            title="Apply to all groups"
+                            className="p-2 text-gray-400 hover:text-navy border border-gray-200 rounded-lg hover:border-navy/30 transition-colors">
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-1">Copy icon → apply to all groups</p>
+                      </div>
+
+                      {/* Main break */}
+                      <div>
+                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Main Break After Period</label>
                         <div className="flex gap-1 flex-wrap">
                           {Array.from({ length: m.periodsPerDay }, (_, i) => i + 1).map(p => (
                             <button key={p}
-                              onClick={() => setDraft(g.id, { shortBreakAfterPeriod: p === m.shortBreakAfterPeriod ? null : p })}
-                              className={`w-8 h-8 rounded-lg text-xs font-bold border transition-colors ${m.shortBreakAfterPeriod === p ? 'bg-gold text-navy border-gold' : 'bg-white text-gray-500 border-gray-200 hover:border-navy/30'}`}>
+                              onClick={() => setDraft(g.id, { mainBreakAfterPeriod: p })}
+                              className={`w-8 h-8 rounded-lg text-xs font-bold border transition-colors ${m.mainBreakAfterPeriod === p ? 'bg-gold text-navy border-gold' : 'bg-white text-gray-500 border-gray-200 hover:border-navy/30'}`}>
                               {p}
                             </button>
                           ))}
                         </div>
                       </div>
+
+                      {/* Main break duration */}
                       <div>
-                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Short Break Duration (min)</label>
-                        <input type="number" min={5} max={30} value={m.shortBreakDuration}
-                          onChange={e => setDraft(g.id, { shortBreakDuration: Number(e.target.value) })}
-                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-navy/20" />
+                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Main Break Duration (min)</label>
+                        <div className="flex items-center gap-2">
+                          <input type="number" min={5} max={90} value={m.mainBreakDuration}
+                            onChange={e => setDraft(g.id, { mainBreakDuration: Number(e.target.value) })}
+                            className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-navy/20" />
+                          <button onClick={() => handleSave(g, ['mainBreakAfterPeriod', 'mainBreakDuration'])}
+                            title="Apply to all groups"
+                            className="p-2 text-gray-400 hover:text-navy border border-gray-200 rounded-lg hover:border-navy/30 transition-colors">
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  )}
-                </div>
 
-                {/* Filler types — multi-select, cycles through selected types by day */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                      Empty Slot Filler
-                    </label>
-                    <button
-                      onClick={() => handleSave(g, ['fillerTypes'])}
-                      title="Apply to all groups"
-                      className="p-1.5 text-gray-400 hover:text-navy border border-gray-200 rounded-lg hover:border-navy/30 transition-colors">
-                      <Copy className="w-3 h-3" />
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {FILLER_OPTIONS.map(o => {
-                      const selected = (m.fillerTypes ?? ['STUDY_PERIOD']).includes(o.value);
-                      return (
-                        <button key={o.value}
-                          onClick={() => {
-                            const current = m.fillerTypes ?? ['STUDY_PERIOD'];
-                            const next = selected
-                              ? current.filter(v => v !== o.value)
-                              : [...current, o.value];
-                            if (next.length === 0) return; // must keep at least one
-                            setDraft(g.id, { fillerTypes: next });
-                          }}
-                          className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors ${selected ? 'bg-navy text-white border-navy' : 'bg-white text-gray-500 border-gray-200 hover:border-navy/40'}`}>
-                          {o.label}
+                    {/* Short break */}
+                    <div className="border border-gray-100 rounded-xl p-4">
+                      <div className="flex items-center gap-3 mb-3">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={m.shortBreakEnabled}
+                            onChange={e => setDraft(g.id, { shortBreakEnabled: e.target.checked })}
+                            className="w-4 h-4 accent-navy" />
+                          <span className="text-sm font-semibold text-gray-700 font-dm-sans">Short Break (Optional)</span>
+                        </label>
+                        {m.shortBreakEnabled && (
+                          <button onClick={() => handleSave(g, ['shortBreakEnabled', 'shortBreakAfterPeriod', 'shortBreakDuration'])}
+                            title="Apply to all groups"
+                            className="ml-auto p-1.5 text-gray-400 hover:text-navy border border-gray-200 rounded-lg hover:border-navy/30 transition-colors">
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                      {m.shortBreakEnabled && (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Short Break After Period</label>
+                            <div className="flex gap-1 flex-wrap">
+                              {Array.from({ length: m.periodsPerDay }, (_, i) => i + 1).map(p => (
+                                <button key={p}
+                                  onClick={() => setDraft(g.id, { shortBreakAfterPeriod: p === m.shortBreakAfterPeriod ? null : p })}
+                                  className={`w-8 h-8 rounded-lg text-xs font-bold border transition-colors ${m.shortBreakAfterPeriod === p ? 'bg-gold text-navy border-gold' : 'bg-white text-gray-500 border-gray-200 hover:border-navy/30'}`}>
+                                  {p}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Short Break Duration (min)</label>
+                            <input type="number" min={5} max={30} value={m.shortBreakDuration}
+                              onChange={e => setDraft(g.id, { shortBreakDuration: Number(e.target.value) })}
+                              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-navy/20" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Activity filler picker */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                          Empty Slot Activities
+                        </label>
+                        <button onClick={() => handleSave(g, ['fillerActivityIds'])}
+                          title="Apply this selection to all groups"
+                          className="p-1.5 text-gray-400 hover:text-navy border border-gray-200 rounded-lg hover:border-navy/30 transition-colors">
+                          <Copy className="w-3 h-3" />
                         </button>
-                      );
-                    })}
+                      </div>
+                      {activityTypes.length === 0 ? (
+                        <p className="text-xs text-gray-400 font-dm-sans italic">
+                          Add activity classes above first.
+                        </p>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {activityTypes.map(at => {
+                            const selected = selectedActivityIds.includes(at.id);
+                            return (
+                              <button key={at.id}
+                                onClick={() => {
+                                  const next = selected
+                                    ? selectedActivityIds.filter(id => id !== at.id)
+                                    : [...selectedActivityIds, at.id];
+                                  setDraft(g.id, { fillerActivityIds: next });
+                                }}
+                                style={selected ? { backgroundColor: at.colorHex, borderColor: at.colorHex, color: '#fff' }
+                                  : { borderColor: at.colorHex + '55', color: at.colorHex }}
+                                className="px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors">
+                                {at.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <p className="text-[10px] text-gray-400 mt-1.5">
+                        Select one or more — cycles through them Mon→Sat in order. None selected = slots stay blank.
+                      </p>
+                    </div>
+
+                    {/* Save */}
+                    <div className="flex items-center gap-3 pt-2 border-t border-gray-100">
+                      <button onClick={() => handleSave(g)} disabled={saving === g.id}
+                        className="flex items-center gap-2 bg-gold text-navy font-sora font-semibold rounded-xl px-5 py-2.5 hover:bg-gold/90 transition-colors disabled:opacity-50 text-sm">
+                        {saving === g.id ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                        {saving === g.id ? 'Saving…' : 'Save Group'}
+                      </button>
+                      {isDirty && (
+                        <button onClick={() => setDrafts(prev => { const n = { ...prev }; delete n[g.id]; return n; })}
+                          className="text-xs text-gray-400 hover:text-gray-600 font-dm-sans underline">
+                          Discard changes
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-[10px] text-gray-400 mt-1.5">
-                    Select one or more — rotates by day (Mon = first, Tue = second…)
-                  </p>
-                </div>
-
-                {/* Save button */}
-                <div className="flex items-center gap-3 pt-2 border-t border-gray-100">
-                  <button
-                    onClick={() => handleSave(g)}
-                    disabled={saving === g.id}
-                    className="flex items-center gap-2 bg-gold text-navy font-sora font-semibold rounded-xl px-5 py-2.5 hover:bg-gold/90 transition-colors disabled:opacity-50 text-sm">
-                    {saving === g.id ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                    {saving === g.id ? 'Saving…' : 'Save Group'}
-                  </button>
-                  {isDirty && (
-                    <button onClick={() => setDrafts(prev => { const n = { ...prev }; delete n[g.id]; return n; })}
-                      className="text-xs text-gray-400 hover:text-gray-600 font-dm-sans underline">
-                      Discard changes
-                    </button>
-                  )}
-                </div>
+                )}
               </div>
-            )}
-          </div>
-        );
-      })}
+            );
+          })}
 
-      {/* Create new group */}
-      <div className="bg-white rounded-xl border border-dashed border-gray-200 p-4">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-          <Settings2 className="w-3 h-3 inline mr-1" />Add New Group
-        </p>
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={newName}
-            onChange={e => setNewName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleCreate()}
-            placeholder="e.g. Pre Primary, Primary, Middle School, High School…"
-            className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-navy/20 font-dm-sans" />
-          <button
-            onClick={handleCreate}
-            disabled={!newName.trim() || creating}
-            className="flex items-center gap-2 bg-navy text-white font-semibold rounded-xl px-4 py-2 hover:bg-navyMid transition-colors disabled:opacity-50 text-sm">
-            {creating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-            Add
-          </button>
+          {/* Create new group */}
+          <div className="bg-white rounded-xl border border-dashed border-gray-200 p-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              <Settings2 className="w-3 h-3 inline mr-1" />Add New Group
+            </p>
+            <div className="flex items-center gap-2">
+              <input type="text" value={newName} onChange={e => setNewName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleCreate()}
+                placeholder="e.g. Pre Primary, Primary, Middle School, High School…"
+                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-navy/20 font-dm-sans" />
+              <button onClick={handleCreate} disabled={!newName.trim() || creating}
+                className="flex items-center gap-2 bg-navy text-white font-semibold rounded-xl px-4 py-2 hover:bg-navyMid transition-colors disabled:opacity-50 text-sm">
+                {creating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                Add
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

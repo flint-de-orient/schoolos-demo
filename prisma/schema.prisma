@@ -382,6 +382,7 @@ model Tenant {
   salarySettings        TenantSalarySettings?
   salaryGrades          SalaryGrade[]
   staffAttendances      StaffAttendance[]
+  activityTypes         ActivityType[]
 }
 
 model TenantModule {
@@ -999,6 +1000,7 @@ model GradeGroup {
   mainBreakAfterPeriod  Int        @default(4)
   mainBreakDuration     Int        @default(30)
   fillerTypes           FillerType[] @default([STUDY_PERIOD])
+  fillerActivityIds     String[]     @default([])
   grades                Grade[]
   periodSlots           PeriodSlot[]
   halfDayConfigs        HalfDayConfig[]
@@ -1006,6 +1008,19 @@ model GradeGroup {
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt
 
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+// Schools define their own activity labels that fill empty timetable slots.
+// Seeded with defaults on first access; fully customisable per tenant.
+model ActivityType {
+  id        String @id @default(cuid())
+  tenantId  String
+  name      String
+  colorHex  String @default("#9CA3AF")
+  sortOrder Int    @default(0)
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   @@unique([tenantId, name])
   @@index([tenantId])
 }
