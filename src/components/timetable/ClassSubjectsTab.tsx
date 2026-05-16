@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import {
   RefreshCw, Save, AlertCircle, ChevronDown, ChevronRight,
   GraduationCap, BookMarked, Sparkles, UserX, ArrowRight,
-  FlaskConical, BookOpen,
+  FlaskConical, BookOpen, Plus, Tag, X,
 } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -328,6 +328,10 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
   const [selectedGradeId, setSelectedGradeId] = useState('');
   const [drafts, setDrafts]         = useState<Record<string, GradeDraft>>({});
   const [collapsedCats, setCollapsedCats]     = useState<Set<string>>(new Set());
+  // Per-grade part management
+  const [addingPartFor, setAddingPartFor]     = useState<string | null>(null); // parentSubjectId
+  const [newPartLabel, setNewPartLabel]       = useState('');
+  const [creatingPart, setCreatingPart]       = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -354,6 +358,66 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
       ...prev,
       [gradeId]: { ...prev[gradeId], [subjectId]: { ...prev[gradeId][subjectId], ...patch } },
     }));
+  }
+
+  async function handleCreatePart(parentSubject: CurrSubject) {
+    const label = newPartLabel.trim();
+    if (!label || !selectedGradeId) return;
+    setCreatingPart(true);
+    try {
+      const res = await fetch('/api/hr/subjects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: `${parentSubject.name} — ${label}`,
+          colorHex: null,
+          isElective: parentSubject.isElective,
+          isLanguage: parentSubject.isLanguage,
+          isPractical: parentSubject.isPractical,
+          subjectCategory: parentSubject.subjectCategory,
+          parentSubjectId: parentSubject.id,
+          partLabel: label,
+          isSubPart: true,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) { toast.error(data.error); return; }
+      const created = data.data?.subject ?? data.subject;
+      if (!created?.id) { toast.error('Unexpected server response'); return; }
+      const newSubject: CurrSubject = {
+        id: created.id,
+        name: `${parentSubject.name} — ${label}`,
+        code: null,
+        subjectCategory: parentSubject.subjectCategory,
+        isLanguage: parentSubject.isLanguage,
+        isElective: parentSubject.isElective,
+        isPractical: parentSubject.isPractical,
+        isSubPart: true,
+        parentSubjectId: parentSubject.id,
+        partLabel: label,
+        teachers: [],
+      };
+      setSubjects(prev => [...prev, newSubject]);
+      // Add to this grade's draft (included)
+      setDrafts(prev => ({
+        ...prev,
+        [selectedGradeId]: {
+          ...prev[selectedGradeId],
+          [created.id]: { ...defaultDraft(newSubject), included: true },
+          // Auto-exclude parent if it was included directly
+          ...(prev[selectedGradeId]?.[parentSubject.id]?.included
+            ? { [parentSubject.id]: { ...prev[selectedGradeId][parentSubject.id], included: false } }
+            : {}),
+        },
+      }));
+      toast.success(`Part "${label}" added to ${parentSubject.name} for ${grades.find(g => g.id === selectedGradeId)?.name}`);
+      setNewPartLabel('');
+      setAddingPartFor(null);
+    } catch {
+      toast.error('Failed to create part');
+    } finally {
+      setCreatingPart(false);
+    }
   }
 
   function handleAISuggest() {
@@ -486,59 +550,58 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
   const draft         = useMemo(() => drafts[selectedGradeId] ?? {}, [drafts, selectedGradeId]);
   const selectedGrade = grades.find(g => g.id === selectedGradeId);
 
-  // Build a map: parentSubjectId → array of sub-part subjects that have teachers
-  const subPartsMap = useMemo(() => {
+  // Sub-parts that belong to THIS grade's curriculum (have a draft entry for this grade)
+  // Key: parentSubjectId → list of sub-part CurrSubjects in this grade
+  const gradeSubPartsMap = useMemo(() => {
     const map = new Map<string, CurrSubject[]>();
     for (const s of subjects) {
-      if (s.isSubPart && s.parentSubjectId) {
+      if (s.isSubPart && s.parentSubjectId && draft[s.id] !== undefined) {
         if (!map.has(s.parentSubjectId)) map.set(s.parentSubjectId, []);
         map.get(s.parentSubjectId)!.push(s);
       }
     }
     return map;
-  }, [subjects]);
+  }, [subjects, draft]);
 
-  // Subjects that are schedulable (either root without parts, or sub-parts)
-  // Root subjects that have sub-parts are section headers — not directly schedulable
+  // Root subjects that have sub-parts IN THIS GRADE — shown as section headers, not directly schedulable
+  const parentsWithParts = useMemo(() => {
+    const ids = new Set(gradeSubPartsMap.keys());
+    return subjects.filter(s => !s.isSubPart && ids.has(s.id));
+  }, [subjects, gradeSubPartsMap]);
+
+  // Schedulable subjects for this grade: root subjects without grade-level parts, plus sub-parts in this grade
   const schedulableSubjects = useMemo(() =>
     subjects.filter(s => {
-      if (s.isSubPart) return true;          // sub-parts are always schedulable
-      return !subPartsMap.has(s.id);          // root subjects are schedulable only if they have NO parts
+      if (s.isSubPart) return draft[s.id] !== undefined; // only this grade's sub-parts
+      return !gradeSubPartsMap.has(s.id);                 // root subjects with no parts in this grade
     }),
-  [subjects, subPartsMap]);
+  [subjects, gradeSubPartsMap, draft]);
 
   const withTeachers    = useMemo(() => schedulableSubjects.filter(s => s.teachers.length > 0), [schedulableSubjects]);
   const withoutTeachers = useMemo(() => schedulableSubjects.filter(s => s.teachers.length === 0), [schedulableSubjects]);
-
-  // Root subjects that have sub-parts (shown as section headers within their category)
-  const parentsWithParts = useMemo(() => {
-    const ids = new Set(subPartsMap.keys());
-    return subjects.filter(s => !s.isSubPart && ids.has(s.id));
-  }, [subjects, subPartsMap]);
 
   const includedCount   = Object.values(draft).filter(e => e.included).length;
   const totalPeriods    = Object.values(draft).filter(e => e.included).reduce((s, e) => {
     return s + e.periodsPerWeek + (e.hasLabSession ? e.labPeriodsPerWeek : 0);
   }, 0);
 
-  // Build category groups: each entry has root subjects (standalone) + parent headers with their sub-parts
+  // Build category groups per grade
   const subjectsByCategory = useMemo(() => {
     return categories.map(cat => {
       const catVal = cat.value;
-      // Standalone schedulable subjects in this category (with teachers, not sub-parts of a parent)
+      // Standalone root subjects in this category (with teachers, no parts in this grade)
       const standalone = withTeachers.filter(s => s.subjectCategory === catVal && !s.isSubPart);
-      // Parents with parts in this category
+      // Root subjects that have parts defined for this grade
       const parents = parentsWithParts.filter(p => p.subjectCategory === catVal);
-      // Sub-parts for each parent (that have teachers)
       const parentGroups = parents.map(p => ({
         parent: p,
-        parts: (subPartsMap.get(p.id) ?? []).filter(sp => sp.teachers.length > 0),
+        parts: (gradeSubPartsMap.get(p.id) ?? []).filter(sp => sp.teachers.length > 0),
+        allParts: gradeSubPartsMap.get(p.id) ?? [], // includes parts without teachers
       }));
-      // Only include category if there's something to show
-      const hasContent = standalone.length > 0 || parentGroups.some(pg => pg.parts.length > 0);
+      const hasContent = standalone.length > 0 || parentGroups.length > 0;
       return { cat, standalone, parentGroups, hasContent };
     }).filter(g => g.hasContent);
-  }, [categories, withTeachers, parentsWithParts, subPartsMap]);
+  }, [categories, withTeachers, parentsWithParts, gradeSubPartsMap]);
 
   const langSubjects = withTeachers.filter(s => s.subjectCategory === 'LANGUAGE');
   const langSummary  = ['L1', 'L2', 'L3', 'L4'].map(level => ({
@@ -746,32 +809,82 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
 
                     {!isCollapsed && (
                       <div className="p-3 space-y-2">
-                        {/* Standalone subjects (no parts) */}
+                        {/* Standalone subjects (no parts for this class) */}
                         {standalone.map(subject => (
-                          <SubjectRow key={subject.id} subject={subject}
-                            entry={draft[subject.id] ?? defaultDraft(subject)}
-                            onChange={patch => updateEntry(selectedGradeId, subject.id, patch)}
-                            langLevels={langLevels} schedSlots={schedSlots} />
+                          <div key={subject.id}>
+                            <SubjectRow subject={subject}
+                              entry={draft[subject.id] ?? defaultDraft(subject)}
+                              onChange={patch => updateEntry(selectedGradeId, subject.id, patch)}
+                              langLevels={langLevels} schedSlots={schedSlots} />
+                            {/* "Split into parts" affordance — only when included */}
+                            {draft[subject.id]?.included && (
+                              <div className="ml-4 mt-1 flex items-center gap-2">
+                                {addingPartFor === subject.id ? (
+                                  <div className="flex items-center gap-2 bg-white border border-navy/15 rounded-lg px-3 py-1.5 flex-1">
+                                    <Tag className="w-3 h-3 text-navy/40 flex-shrink-0" />
+                                    <input type="text" autoFocus placeholder="Part label, e.g. Literature"
+                                      value={newPartLabel} onChange={e => setNewPartLabel(e.target.value)}
+                                      onKeyDown={e => { if (e.key === 'Enter') handleCreatePart(subject); if (e.key === 'Escape') { setAddingPartFor(null); setNewPartLabel(''); } }}
+                                      className="flex-1 text-xs border-none outline-none bg-transparent font-dm-sans placeholder:text-gray-300" />
+                                    {newPartLabel.trim() && <span className="text-[9px] text-gray-300 whitespace-nowrap">{subject.name} — {newPartLabel}</span>}
+                                    <button onClick={() => handleCreatePart(subject)} disabled={!newPartLabel.trim() || creatingPart}
+                                      className="flex items-center gap-1 bg-navy text-white text-[10px] font-semibold px-2 py-0.5 rounded hover:bg-navyMid disabled:opacity-40 transition-colors">
+                                      {creatingPart ? <RefreshCw className="w-2.5 h-2.5 animate-spin" /> : <Plus className="w-2.5 h-2.5" />} Add
+                                    </button>
+                                    <button onClick={() => { setAddingPartFor(null); setNewPartLabel(''); }} className="text-gray-400 hover:text-gray-600"><X className="w-3 h-3" /></button>
+                                  </div>
+                                ) : (
+                                  <button onClick={() => { setAddingPartFor(subject.id); setNewPartLabel(''); }}
+                                    className="text-[10px] text-navy/50 hover:text-navy flex items-center gap-1 font-semibold transition-colors">
+                                    <Plus className="w-3 h-3" /> Split into parts for this class
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         ))}
-                        {/* Parent subjects with their parts */}
-                        {parentGroups.map(({ parent, parts }) => (
+                        {/* Parent subjects with their grade-specific parts */}
+                        {parentGroups.map(({ parent, parts, allParts }) => (
                           <div key={parent.id} className="border border-gray-100 rounded-xl overflow-hidden">
-                            {/* Parent header — not schedulable directly */}
                             <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 border-b border-gray-100">
                               <BookMarked className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
                               <span className="text-xs font-semibold text-gray-600 font-sora">{parent.name}</span>
-                              <span className="text-[9px] text-gray-400 ml-1">— split into {parts.length} part{parts.length !== 1 ? 's' : ''}</span>
+                              <span className="text-[9px] text-gray-400 ml-1">
+                                — split into {allParts.length} part{allParts.length !== 1 ? 's' : ''} for this class
+                              </span>
                             </div>
-                            {/* Sub-part rows indented */}
                             <div className="p-2 pl-6 space-y-1.5 bg-white">
                               {parts.length === 0 ? (
-                                <p className="text-xs text-gray-400 py-1 italic">No parts have teachers assigned yet.</p>
+                                <p className="text-xs text-gray-400 py-1 italic">Parts exist but no teachers assigned yet. Assign teachers in HR → Teachers.</p>
                               ) : parts.map(part => (
                                 <SubjectRow key={part.id} subject={part}
                                   entry={draft[part.id] ?? defaultDraft(part)}
                                   onChange={patch => updateEntry(selectedGradeId, part.id, patch)}
                                   langLevels={langLevels} schedSlots={schedSlots} />
                               ))}
+                              {/* Add more parts for this class */}
+                              <div className="pt-1">
+                                {addingPartFor === parent.id ? (
+                                  <div className="flex items-center gap-2 bg-white border border-navy/15 rounded-lg px-3 py-1.5">
+                                    <Tag className="w-3 h-3 text-navy/40 flex-shrink-0" />
+                                    <input type="text" autoFocus placeholder="Part label, e.g. Grammar"
+                                      value={newPartLabel} onChange={e => setNewPartLabel(e.target.value)}
+                                      onKeyDown={e => { if (e.key === 'Enter') handleCreatePart(parent); if (e.key === 'Escape') { setAddingPartFor(null); setNewPartLabel(''); } }}
+                                      className="flex-1 text-xs border-none outline-none bg-transparent font-dm-sans placeholder:text-gray-300" />
+                                    {newPartLabel.trim() && <span className="text-[9px] text-gray-300 whitespace-nowrap">{parent.name} — {newPartLabel}</span>}
+                                    <button onClick={() => handleCreatePart(parent)} disabled={!newPartLabel.trim() || creatingPart}
+                                      className="flex items-center gap-1 bg-navy text-white text-[10px] font-semibold px-2 py-0.5 rounded hover:bg-navyMid disabled:opacity-40">
+                                      {creatingPart ? <RefreshCw className="w-2.5 h-2.5 animate-spin" /> : <Plus className="w-2.5 h-2.5" />} Add
+                                    </button>
+                                    <button onClick={() => { setAddingPartFor(null); setNewPartLabel(''); }} className="text-gray-400 hover:text-gray-600"><X className="w-3 h-3" /></button>
+                                  </div>
+                                ) : (
+                                  <button onClick={() => { setAddingPartFor(parent.id); setNewPartLabel(''); }}
+                                    className="text-[10px] text-navy/50 hover:text-navy flex items-center gap-1 font-semibold transition-colors">
+                                    <Plus className="w-3 h-3" /> Add another part for this class
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
                         ))}
