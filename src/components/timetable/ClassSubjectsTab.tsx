@@ -323,8 +323,9 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
   const [langLevels, setLangLevels] = useState<LangLevel[]>([]);
   const [schedSlots, setSchedSlots] = useState<SchedSlot[]>([]);
   const [loading, setLoading]       = useState(true);
-  const [saving, setSaving]         = useState(false);
-  const [suggesting, setSuggesting] = useState(false);
+  const [saving, setSaving]           = useState(false);
+  const [aiSuggesting, setAiSuggesting] = useState(false);
+  const [suggesting, setSuggesting]   = useState(false);
   const [selectedGradeId, setSelectedGradeId] = useState('');
   const [drafts, setDrafts]         = useState<Record<string, GradeDraft>>({});
   const [collapsedCats, setCollapsedCats]     = useState<Set<string>>(new Set());
@@ -420,24 +421,71 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
     }
   }
 
-  function handleAISuggest() {
+  async function handleAISuggest() {
     if (!selectedGradeId) return;
-    const withTeachers = subjects.filter(s => s.teachers.length > 0);
-    setDrafts(prev => {
-      const updated = { ...prev[selectedGradeId] };
-      for (const s of withTeachers) {
-        const cat = s.subjectCategory;
-        const cur = updated[s.id] ?? defaultDraft(s);
-        updated[s.id] = {
-          ...cur,
-          included: true,
-          periodsPerWeek: DEFAULT_PPW[cat] ?? 5,
-          schedulingSlot: DEFAULT_SLOT[cat] ?? 'REGULAR',
-        };
+    // Only include standalone schedulable subjects with teachers (not sub-parts from other grades)
+    const candidateSubjects = subjects.filter(s =>
+      s.teachers.length > 0 && (s.isSubPart ? draft[s.id]?.included === true : !gradeSubPartsMap.has(s.id))
+    );
+    if (candidateSubjects.length === 0) {
+      toast.info('No subjects with teachers found for this grade. Assign teachers in HR first.');
+      return;
+    }
+    setAiSuggesting(true);
+    try {
+      const res = await fetch('/api/timetable/ai-curriculum-suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gradeId: selectedGradeId,
+          subjects: candidateSubjects.map(s => ({
+            id: s.id,
+            name: s.name,
+            subjectCategory: s.subjectCategory,
+            hasTeacher: true,
+            partLabel: s.partLabel ?? null,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) { toast.error(data.error ?? 'AI suggestion failed'); return; }
+      const suggestions: {
+        subjectId: string; include: boolean; periodsPerWeek: number;
+        schedulingSlot: string; isCompulsory: boolean; maxPerDay: number;
+        hasLabSession: boolean; labPeriodsPerWeek: number;
+      }[] = (data.data ?? data).suggestions ?? [];
+      const isFallback = (data.data ?? data).fallback === true;
+
+      setDrafts(prev => {
+        const updated = { ...prev[selectedGradeId] };
+        for (const sug of suggestions) {
+          const subject = subjects.find(s => s.id === sug.subjectId);
+          if (!subject) continue;
+          const cur = updated[sug.subjectId] ?? defaultDraft(subject);
+          updated[sug.subjectId] = {
+            ...cur,
+            included: sug.include,
+            periodsPerWeek: sug.periodsPerWeek,
+            schedulingSlot: sug.schedulingSlot,
+            isCompulsory: sug.isCompulsory,
+            isOptional: !sug.isCompulsory,
+            maxPerDay: sug.maxPerDay ?? 1,
+            hasLabSession: sug.hasLabSession ?? false,
+            labPeriodsPerWeek: sug.labPeriodsPerWeek > 0 ? sug.labPeriodsPerWeek : cur.labPeriodsPerWeek,
+          };
+        }
+        return { ...prev, [selectedGradeId]: updated };
+      });
+      if (isFallback) {
+        toast.warning('AI unavailable — applied category defaults instead. Set ANTHROPIC_API_KEY for real AI suggestions.');
+      } else {
+        toast.success(`🤖 AI suggestions applied for ${grades.find(g => g.id === selectedGradeId)?.name} — review and save`);
       }
-      return { ...prev, [selectedGradeId]: updated };
-    });
-    toast.success('AI suggested periods applied — review and adjust before saving');
+    } catch {
+      toast.error('Failed to fetch AI suggestions');
+    } finally {
+      setAiSuggesting(false);
+    }
   }
 
   async function handleBoardSuggest() {
@@ -456,29 +504,47 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
         return;
       }
 
+      // Normalize a name for fuzzy matching
+      function normName(n: string) {
+        return n.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+      }
+      function wordsOf(n: string) { return normName(n).split(' '); }
+      function matchScore(subjectName: string, recName: string): number {
+        const sn = normName(subjectName); const rn = normName(recName);
+        if (sn === rn) return 3;
+        if (sn.includes(rn) || rn.includes(sn)) return 2;
+        const subWords = wordsOf(subjectName); const recWords = wordsOf(recName);
+        const overlap = subWords.filter(w => w.length > 3 && recWords.includes(w)).length;
+        return overlap > 0 ? 1 : 0;
+      }
+
       setDrafts(prev => {
         const updated = { ...prev[selectedGradeId] };
         let matched = 0;
-        for (const subject of subjects) {
-          const recMatch = recs.find(r =>
-            r.subjectName.toLowerCase() === subject.name.toLowerCase() ||
-            subject.name.toLowerCase().includes(r.subjectName.toLowerCase()) ||
-            r.subjectName.toLowerCase().includes(subject.name.toLowerCase())
-          );
-          if (!recMatch) continue;
+        // Only operate on schedulable subjects for this grade (standalone + grade-specific sub-parts)
+        const candidates = subjects.filter(s =>
+          s.teachers.length > 0 && (s.isSubPart ? draft[s.id]?.included === true : !gradeSubPartsMap.has(s.id))
+        );
+        for (const subject of candidates) {
+          let bestRec: BoardRec | null = null; let bestScore = 0;
+          for (const rec of recs) {
+            const score = matchScore(subject.name, rec.subjectName);
+            if (score > bestScore) { bestScore = score; bestRec = rec; }
+          }
+          if (!bestRec || bestScore === 0) continue;
           const cur = updated[subject.id] ?? defaultDraft(subject);
-          if (!cur.included) continue; // only update already-included subjects
           updated[subject.id] = {
             ...cur,
-            periodsPerWeek: recMatch.theoryPPW,
-            hasLabSession: recMatch.labPPW > 0,
-            labPeriodsPerWeek: recMatch.labPPW > 0 ? recMatch.labPPW : cur.labPeriodsPerWeek,
+            included: true, // include the subject if board recommends it
+            periodsPerWeek: bestRec.theoryPPW,
+            hasLabSession: bestRec.labPPW > 0,
+            labPeriodsPerWeek: bestRec.labPPW > 0 ? bestRec.labPPW : cur.labPeriodsPerWeek,
           };
           matched++;
         }
         return { ...prev, [selectedGradeId]: updated };
       });
-      toast.success(`Board recommendations applied for ${gradeLevel} (${recs.length} subjects in syllabus)`);
+      toast.success(`Board (${gradeLevel}) recommendations applied`);
     } catch {
       toast.error('Failed to fetch board recommendations');
     } finally {
@@ -729,14 +795,15 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <button onClick={handleBoardSuggest} disabled={suggesting || includedCount === 0}
+                    <button onClick={handleBoardSuggest} disabled={suggesting || aiSuggesting}
                       className="flex items-center gap-1.5 border border-teal-200 text-teal-700 text-xs font-sora font-semibold px-3 py-2 rounded-lg hover:bg-teal-50 transition-colors disabled:opacity-40">
                       {suggesting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <BookOpen className="w-3.5 h-3.5" />}
-                      Board Suggest
+                      {suggesting ? 'Applying…' : 'Board Suggest'}
                     </button>
-                    <button onClick={handleAISuggest}
-                      className="flex items-center gap-1.5 border border-navy/20 text-navy text-xs font-sora font-semibold px-3 py-2 rounded-lg hover:bg-navy/5 transition-colors">
-                      <Sparkles className="w-3.5 h-3.5" /> AI Suggest
+                    <button onClick={handleAISuggest} disabled={aiSuggesting || suggesting}
+                      className="flex items-center gap-1.5 border border-purple-200 text-purple-700 text-xs font-sora font-semibold px-3 py-2 rounded-lg hover:bg-purple-50 transition-colors disabled:opacity-40">
+                      {aiSuggesting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                      {aiSuggesting ? 'AI thinking…' : '🤖 AI Suggest'}
                     </button>
                     <button onClick={() => handleSave(false)} disabled={saving || includedCount === 0}
                       className="flex items-center gap-2 border border-gray-200 text-gray-700 text-sm font-semibold rounded-lg px-4 py-2 hover:border-navy/30 transition-colors disabled:opacity-40">
