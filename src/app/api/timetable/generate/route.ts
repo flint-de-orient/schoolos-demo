@@ -84,7 +84,7 @@ export async function GET(_req: NextRequest) {
     db.academicYear.findFirst({ where: { tenantId }, orderBy: { startDate: 'desc' } }),
     db.gradeSubject.findMany({
       where: { grade: { tenantId } },
-      select: { gradeId: true, subjectId: true, periodsPerWeek: true, schedulingSlot: true },
+      select: { gradeId: true, subjectId: true, periodsPerWeek: true, schedulingSlot: true, sessionType: true },
     }),
     db.gradeGroup.findMany({
       where: { tenantId },
@@ -171,7 +171,7 @@ export async function POST(req: NextRequest) {
     }),
     db.gradeSubject.findMany({
       where: { grade: { tenantId } },
-      select: { gradeId: true, subjectId: true, periodsPerWeek: true, schedulingSlot: true },
+      select: { gradeId: true, subjectId: true, periodsPerWeek: true, schedulingSlot: true, sessionType: true },
     }),
     db.halfDayConfig.findMany({
       where: { tenantId, isActive: true },
@@ -193,7 +193,7 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Build grade curriculum map ───────────────────────────────────────────────
-  type CurrEntry = { subjectId: string; periodsPerWeek: number; schedulingSlot: string };
+  type CurrEntry = { subjectId: string; periodsPerWeek: number; schedulingSlot: string; sessionType: string };
   const gradeCurriculumMap = new Map<string, CurrEntry[]>();
   for (const gs of gradeSubjects) {
     if (!gradeCurriculumMap.has(gs.gradeId)) gradeCurriculumMap.set(gs.gradeId, []);
@@ -201,6 +201,7 @@ export async function POST(req: NextRequest) {
       subjectId: gs.subjectId,
       periodsPerWeek: gs.periodsPerWeek,
       schedulingSlot: gs.schedulingSlot,
+      sessionType: gs.sessionType ?? 'THEORY',
     });
   }
 
@@ -295,9 +296,12 @@ export async function POST(req: NextRequest) {
 
     // ── Build per-section state for this group ──────────────────────────────
     // Defined before scheduling so weeklyCount persists across the day loop.
+    // LAB entries (sessionType=LAB) are tracked separately — they require consecutive
+    // double-period booking and are handled in a dedicated first pass each day.
     type SectionState = {
       sectionId: string; gradeName: string; curriculum: CurrEntry[];
       regularPool: CurrEntry[]; weekendPool: CurrEntry[]; activityPool: CurrEntry[];
+      labPool: CurrEntry[];
       weeklyCount: Map<string, number>;
       // slotHistory tracks which slot indices (0-based) each subject has appeared at.
       // Used to rotate subjects across slot positions so the same subject doesn't
@@ -319,9 +323,10 @@ export async function POST(req: NextRequest) {
       }
       sectionStates.push({
         sectionId, gradeName, curriculum,
-        regularPool:  curriculum.filter(e => ['REGULAR', 'DOUBLE_PERIOD'].includes(e.schedulingSlot)),
-        weekendPool:  curriculum.filter(e => e.schedulingSlot === 'WEEKEND'),
-        activityPool: curriculum.filter(e => e.schedulingSlot === 'ACTIVITY'),
+        regularPool:  curriculum.filter(e => ['REGULAR'].includes(e.schedulingSlot) && e.sessionType !== 'LAB'),
+        weekendPool:  curriculum.filter(e => e.schedulingSlot === 'WEEKEND' && e.sessionType !== 'LAB'),
+        activityPool: curriculum.filter(e => e.schedulingSlot === 'ACTIVITY' && e.sessionType !== 'LAB'),
+        labPool:      curriculum.filter(e => e.sessionType === 'LAB'),
         weeklyCount:  new Map<string, number>(),
         slotHistory:  new Map<string, Set<number>>(),
       });
@@ -344,6 +349,60 @@ export async function POST(req: NextRequest) {
       const halfDay = halfDayConfigs.find(hd => hd.gradeGroupId === groupId && hd.dayOfWeek.toUpperCase() === dayUpper)
                    ?? halfDayConfigs.find(hd => !hd.gradeGroupId             && hd.dayOfWeek.toUpperCase() === dayUpper);
       const activePeriodSlots = halfDay ? periodSlots.slice(0, halfDay.periodsPerDay) : periodSlots;
+
+      // ── LAB first pass: schedule double-period lab sessions ─────────────────
+      // Labs are booked before regular periods so they get guaranteed back-to-back
+      // consecutive slots. Each LAB CurrEntry represents a full double period (2 slots).
+      // A lab needs periodsPerWeek/2 double-period bookings per week.
+      for (const state of sectionStates) {
+        const usedSubjectsToday = dayUsed.get(state.sectionId)!;
+        if (isWeekend) continue; // skip lab scheduling on weekends
+        for (const labEntry of state.labPool) {
+          const booked = state.weeklyCount.get(labEntry.subjectId) ?? 0;
+          if (booked >= labEntry.periodsPerWeek) continue;
+          if (usedSubjectsToday.has(labEntry.subjectId)) continue;
+          // Find two consecutive available slots (by sorted periodNo, skip breaks)
+          let placed = false;
+          for (let i = 0; i < activePeriodSlots.length - 1; i++) {
+            const slotA = activePeriodSlots[i];
+            const slotB = activePeriodSlots[i + 1];
+            // Slots must be adjacent by periodNo (no gap)
+            if (slotB.periodNo !== slotA.periodNo + 1) continue;
+            const subjectInfo = subjectMap.get(labEntry.subjectId)!;
+            let assignedTeacherId: string | null = null;
+            for (const teacher of subjectInfo.teachers) {
+              const keyA = `${teacher.teacherId}-${day}-${slotA.startTime}`;
+              const keyB = `${teacher.teacherId}-${day}-${slotB.startTime}`;
+              if (!usedSlots.has(keyA) && !usedSlots.has(keyB)) {
+                usedSlots.add(keyA);
+                usedSlots.add(keyB);
+                assignedTeacherId = teacher.teacherId;
+                break;
+              }
+            }
+            if (!assignedTeacherId) continue;
+            // Book both slots
+            state.weeklyCount.set(labEntry.subjectId, booked + 2);
+            usedSubjectsToday.add(labEntry.subjectId);
+            for (const slot of [slotA, slotB]) {
+              allEntries.push({
+                sectionId: state.sectionId,
+                subjectId: labEntry.subjectId,
+                teacherId: assignedTeacherId,
+                periodSlotId: slot.id,
+                day,
+                roomNumber: `Lab-${100 + slot.periodNo}`,
+              });
+            }
+            placed = true;
+            break;
+          }
+          if (!placed) {
+            const name = subjectMap.get(labEntry.subjectId)?.subjectName ?? labEntry.subjectId;
+            warnings.push(`${state.gradeName}: ${name} LAB — no consecutive slots available on ${day}`);
+          }
+        }
+      }
 
       // Shuffle which slot is visited first so empty slots land at varied positions
       // throughout the day instead of always clustering at the tail. Seed is stable
@@ -435,7 +494,8 @@ export async function POST(req: NextRequest) {
         const scheduled = state.weeklyCount.get(e.subjectId) ?? 0;
         if (scheduled < e.periodsPerWeek && e.schedulingSlot !== 'AFTER_SCHOOL') {
           const name = subjectMap.get(e.subjectId)?.subjectName ?? e.subjectId;
-          warnings.push(`${state.gradeName}: ${name} — scheduled ${scheduled}/${e.periodsPerWeek} periods`);
+          const suffix = e.sessionType === 'LAB' ? ' (LAB)' : '';
+          warnings.push(`${state.gradeName}: ${name}${suffix} — scheduled ${scheduled}/${e.periodsPerWeek} periods`);
         }
       }
     }
@@ -455,7 +515,7 @@ export async function POST(req: NextRequest) {
       const curriculum = gradeCurriculumMap.get(gradeId) ?? [];
       for (const e of curriculum) {
         if (e.schedulingSlot !== 'AFTER_SCHOOL' && subjectMap.has(e.subjectId)) {
-          d += e.periodsPerWeek;
+          d += e.periodsPerWeek; // LAB entries count by their periodsPerWeek (each double-period = 2)
         }
       }
     }

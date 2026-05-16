@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import {
   RefreshCw, Save, AlertCircle, ChevronDown, ChevronRight,
   GraduationCap, BookMarked, Sparkles, UserX, ArrowRight,
+  FlaskConical, BookOpen,
 } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -19,7 +20,7 @@ type CurrGradeEntry = {
   id: string; subjectId: string; periodsPerWeek: number;
   isCompulsory: boolean; isOptional: boolean;
   languageLevel: string | null; schedulingSlot: string;
-  maxMarks: number; passMarks: number;
+  maxMarks: number; passMarks: number; sessionType: string;
 };
 
 type CurrGrade = {
@@ -30,6 +31,8 @@ type CurrGrade = {
 type Category  = { value: string; label: string; icon: string; color: string; description: string };
 type LangLevel = { value: string; label: string; description: string };
 type SchedSlot = { value: string; label: string; description: string };
+
+type BoardRec = { subjectName: string; theoryPPW: number; labPPW: number; notes?: string | null };
 
 // ── Display maps ──────────────────────────────────────────────────────────────
 
@@ -53,7 +56,7 @@ const CAT_HEADER: Record<string, string> = {
   ENRICHMENT: 'bg-yellow-500',
 };
 
-// Default periods/week per category (AI Suggest)
+// Default periods/week per category
 const DEFAULT_PPW: Record<string, number> = {
   LANGUAGE: 6, CORE: 5, ELECTIVE: 3, PRACTICAL: 2,
   SPORTS: 2, ARTS: 2, TECHNOLOGY: 2, VALUE_EDUCATION: 1, REMEDIAL: 2,
@@ -68,6 +71,15 @@ const DEFAULT_SLOT: Record<string, string> = {
   ENRICHMENT: 'ACTIVITY',
 };
 
+// Grade name → board recommendation gradeLevel
+function gradeLevelFromName(gradeName: string): string {
+  const n = gradeName.toLowerCase();
+  if (n.includes('xi') || n.includes('xii') || n.includes('11') || n.includes('12')) return 'Senior Secondary';
+  if (n.includes('ix') || n.includes('x') || n.includes('9') || n.includes('10'))    return 'Secondary';
+  if (n.includes('vi') || n.includes('vii') || n.includes('viii') || n.includes('6') || n.includes('7') || n.includes('8')) return 'Middle';
+  return 'Primary';
+}
+
 // ── Draft types ───────────────────────────────────────────────────────────────
 
 type DraftEntry = {
@@ -79,6 +91,9 @@ type DraftEntry = {
   schedulingSlot: string;
   maxMarks: number;
   passMarks: number;
+  // Phase 3: lab session
+  hasLabSession: boolean;
+  labPeriodsPerWeek: number;
 };
 
 type GradeDraft = Record<string, DraftEntry>;
@@ -94,28 +109,44 @@ function defaultDraft(subject: CurrSubject): DraftEntry {
     schedulingSlot: DEFAULT_SLOT[cat] ?? 'REGULAR',
     maxMarks: cat === 'PRACTICAL' ? 50 : 100,
     passMarks: cat === 'PRACTICAL' ? 17 : 33,
+    hasLabSession: false,
+    labPeriodsPerWeek: 2,
   };
 }
 
 function buildDraft(curriculum: CurrGradeEntry[], subjects: CurrSubject[]): GradeDraft {
   const draft: GradeDraft = {};
   for (const s of subjects) draft[s.id] = defaultDraft(s);
+
+  // Group curriculum entries by subjectId — there may be THEORY + LAB rows
+  const bySubject = new Map<string, CurrGradeEntry[]>();
   for (const c of curriculum) {
-    if (draft[c.subjectId]) {
-      draft[c.subjectId] = {
-        included: true,
-        periodsPerWeek: c.periodsPerWeek,
-        isCompulsory: c.isCompulsory,
-        isOptional: c.isOptional,
-        languageLevel: c.languageLevel ?? '',
-        schedulingSlot: c.schedulingSlot,
-        maxMarks: c.maxMarks,
-        passMarks: c.passMarks,
-      };
-    }
+    if (!bySubject.has(c.subjectId)) bySubject.set(c.subjectId, []);
+    bySubject.get(c.subjectId)!.push(c);
+  }
+
+  for (const [subjectId, entries] of bySubject) {
+    if (!draft[subjectId]) continue;
+    const theoryEntry = entries.find(e => e.sessionType !== 'LAB') ?? entries[0];
+    const labEntry    = entries.find(e => e.sessionType === 'LAB');
+    draft[subjectId] = {
+      included: true,
+      periodsPerWeek: theoryEntry.periodsPerWeek,
+      isCompulsory: theoryEntry.isCompulsory,
+      isOptional: theoryEntry.isOptional,
+      languageLevel: theoryEntry.languageLevel ?? '',
+      schedulingSlot: theoryEntry.schedulingSlot,
+      maxMarks: theoryEntry.maxMarks,
+      passMarks: theoryEntry.passMarks,
+      hasLabSession: !!labEntry,
+      labPeriodsPerWeek: labEntry?.periodsPerWeek ?? 2,
+    };
   }
   return draft;
 }
+
+// Subjects eligible for lab sessions
+const LAB_CATEGORIES = new Set(['CORE', 'PRACTICAL', 'TECHNOLOGY', 'ELECTIVE']);
 
 // ── Subject row ───────────────────────────────────────────────────────────────
 
@@ -128,6 +159,7 @@ function SubjectRow({ subject, entry, onChange, langLevels, schedSlots }: {
 }) {
   const [expanded, setExpanded] = useState(false);
   const isLang    = subject.subjectCategory === 'LANGUAGE';
+  const canHaveLab = LAB_CATEGORIES.has(subject.subjectCategory);
   const colorClass = CAT_COLORS[subject.subjectCategory] ?? CAT_COLORS.CORE;
 
   return (
@@ -147,6 +179,11 @@ function SubjectRow({ subject, entry, onChange, langLevels, schedSlots }: {
             {entry.included && entry.schedulingSlot !== 'REGULAR' && (
               <span className="text-[9px] bg-navy/10 text-navy px-1.5 py-0.5 rounded-full font-semibold">
                 {schedSlots.find(s => s.value === entry.schedulingSlot)?.label ?? entry.schedulingSlot}
+              </span>
+            )}
+            {entry.included && entry.hasLabSession && (
+              <span className="text-[9px] bg-teal-600 text-white px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-0.5">
+                <FlaskConical className="w-2.5 h-2.5" /> Lab {entry.labPeriodsPerWeek}p/w
               </span>
             )}
             {entry.isOptional && (
@@ -217,6 +254,34 @@ function SubjectRow({ subject, entry, onChange, langLevels, schedSlots }: {
                 className="w-16 border border-gray-200 rounded px-1.5 py-1 text-xs text-center bg-white focus:outline-none" />
             </div>
           </div>
+          {canHaveLab && (
+            <div className="col-span-2 border-t border-black/5 pt-3 mt-1">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={entry.hasLabSession}
+                    onChange={e => onChange({ hasLabSession: e.target.checked })}
+                    className="w-3 h-3 accent-teal-600" />
+                  <div className="flex items-center gap-1.5">
+                    <FlaskConical className="w-3.5 h-3.5 text-teal-600" />
+                    <span className="text-xs font-semibold text-teal-700">Lab / Practical Session</span>
+                  </div>
+                </label>
+                {entry.hasLabSession && (
+                  <div className="flex items-center gap-1.5">
+                    <input type="number" value={entry.labPeriodsPerWeek} min={2} max={8} step={2}
+                      onChange={e => onChange({ labPeriodsPerWeek: Math.max(2, Math.min(8, Number(e.target.value))) })}
+                      className="w-10 border border-teal-200 rounded px-1.5 py-1 text-xs text-center bg-white focus:outline-none focus:ring-1 focus:ring-teal-300" />
+                    <span className="text-[10px] text-teal-600 font-medium">p/w (double-period)</span>
+                  </div>
+                )}
+              </div>
+              {entry.hasLabSession && (
+                <p className="text-[10px] text-teal-600 mt-1.5">
+                  Generator will book {entry.labPeriodsPerWeek / 2} back-to-back double period{entry.labPeriodsPerWeek > 2 ? 's' : ''} per week
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -233,6 +298,7 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
   const [schedSlots, setSchedSlots] = useState<SchedSlot[]>([]);
   const [loading, setLoading]       = useState(true);
   const [saving, setSaving]         = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
   const [selectedGradeId, setSelectedGradeId] = useState('');
   const [drafts, setDrafts]         = useState<Record<string, GradeDraft>>({});
   const [collapsedCats, setCollapsedCats]     = useState<Set<string>>(new Set());
@@ -266,13 +332,12 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
 
   function handleAISuggest() {
     if (!selectedGradeId) return;
-    // Auto-include all subjects with teachers and fill smart defaults
     const withTeachers = subjects.filter(s => s.teachers.length > 0);
     setDrafts(prev => {
       const updated = { ...prev[selectedGradeId] };
       for (const s of withTeachers) {
-        const cat  = s.subjectCategory;
-        const cur  = updated[s.id] ?? defaultDraft(s);
+        const cat = s.subjectCategory;
+        const cur = updated[s.id] ?? defaultDraft(s);
         updated[s.id] = {
           ...cur,
           included: true,
@@ -285,13 +350,69 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
     toast.success('AI suggested periods applied — review and adjust before saving');
   }
 
+  async function handleBoardSuggest() {
+    if (!selectedGradeId) return;
+    const selectedGrade = grades.find(g => g.id === selectedGradeId);
+    if (!selectedGrade) return;
+
+    const gradeLevel = gradeLevelFromName(selectedGrade.name);
+    setSuggesting(true);
+    try {
+      const res = await fetch(`/api/timetable/board-recommendations?gradeLevel=${encodeURIComponent(gradeLevel)}`);
+      const data = await res.json();
+      const recs: BoardRec[] = (data.data ?? data).recommendations ?? [];
+      if (recs.length === 0) {
+        toast.info('No board recommendations found for this grade level');
+        return;
+      }
+
+      setDrafts(prev => {
+        const updated = { ...prev[selectedGradeId] };
+        let matched = 0;
+        for (const subject of subjects) {
+          const recMatch = recs.find(r =>
+            r.subjectName.toLowerCase() === subject.name.toLowerCase() ||
+            subject.name.toLowerCase().includes(r.subjectName.toLowerCase()) ||
+            r.subjectName.toLowerCase().includes(subject.name.toLowerCase())
+          );
+          if (!recMatch) continue;
+          const cur = updated[subject.id] ?? defaultDraft(subject);
+          if (!cur.included) continue; // only update already-included subjects
+          updated[subject.id] = {
+            ...cur,
+            periodsPerWeek: recMatch.theoryPPW,
+            hasLabSession: recMatch.labPPW > 0,
+            labPeriodsPerWeek: recMatch.labPPW > 0 ? recMatch.labPPW : cur.labPeriodsPerWeek,
+          };
+          matched++;
+        }
+        return { ...prev, [selectedGradeId]: updated };
+      });
+      toast.success(`Board recommendations applied for ${gradeLevel} (${recs.length} subjects in syllabus)`);
+    } catch {
+      toast.error('Failed to fetch board recommendations');
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
   function handleSave(andGenerate = false) {
     if (!selectedGradeId) return;
     setSaving(true);
     const draft = drafts[selectedGradeId] ?? {};
-    const curriculum = Object.entries(draft)
-      .filter(([, e]) => e.included)
-      .map(([subjectId, e]) => ({
+
+    // Build curriculum rows — included subjects may produce two rows (THEORY + LAB)
+    const curriculum: {
+      subjectId: string; periodsPerWeek: number;
+      isCompulsory: boolean; isOptional: boolean;
+      languageLevel: string | null; schedulingSlot: string;
+      maxMarks: number; passMarks: number; sessionType: string;
+    }[] = [];
+
+    for (const [subjectId, e] of Object.entries(draft)) {
+      if (!e.included) continue;
+      // Theory row
+      curriculum.push({
         subjectId,
         periodsPerWeek: e.periodsPerWeek,
         isCompulsory: e.isCompulsory,
@@ -300,7 +421,23 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
         schedulingSlot: e.schedulingSlot,
         maxMarks: e.maxMarks,
         passMarks: e.passMarks,
-      }));
+        sessionType: 'THEORY',
+      });
+      // Lab row (if enabled)
+      if (e.hasLabSession) {
+        curriculum.push({
+          subjectId,
+          periodsPerWeek: e.labPeriodsPerWeek,
+          isCompulsory: e.isCompulsory,
+          isOptional: e.isOptional,
+          languageLevel: null,
+          schedulingSlot: 'DOUBLE_PERIOD',
+          maxMarks: e.maxMarks,
+          passMarks: e.passMarks,
+          sessionType: 'LAB',
+        });
+      }
+    }
 
     fetch('/api/timetable/curriculum', {
       method: 'POST',
@@ -320,12 +457,13 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
   const draft         = useMemo(() => drafts[selectedGradeId] ?? {}, [drafts, selectedGradeId]);
   const selectedGrade = grades.find(g => g.id === selectedGradeId);
 
-  // Hard split: with teachers (assignable) vs without (blocked)
   const withTeachers    = useMemo(() => subjects.filter(s => s.teachers.length > 0), [subjects]);
   const withoutTeachers = useMemo(() => subjects.filter(s => s.teachers.length === 0), [subjects]);
 
   const includedCount   = Object.values(draft).filter(e => e.included).length;
-  const totalPeriods    = Object.values(draft).filter(e => e.included).reduce((s, e) => s + e.periodsPerWeek, 0);
+  const totalPeriods    = Object.values(draft).filter(e => e.included).reduce((s, e) => {
+    return s + e.periodsPerWeek + (e.hasLabSession ? e.labPeriodsPerWeek : 0);
+  }, 0);
 
   const subjectsByCategory = useMemo(() =>
     categories.map(cat => ({
@@ -340,7 +478,6 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
     subject: langSubjects.find(s => draft[s.id]?.included && draft[s.id]?.languageLevel === level),
   }));
 
-  // Validation
   const langWithoutLevel = langSubjects.some(s => draft[s.id]?.included && !draft[s.id]?.languageLevel);
   const dupeLangLevels   = (() => {
     const counts: Record<string, number> = {};
@@ -362,7 +499,7 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
         <GraduationCap className="w-4 h-4 text-navy mt-0.5 flex-shrink-0" />
         <p className="text-sm text-navy/80 font-dm-sans">
           Assign subjects to each grade. Only subjects with an assigned teacher can be added.
-          The AI Generator uses this to build grade-appropriate timetables — periods per day are calculated automatically.
+          Enable <strong>Lab Session</strong> on any subject to schedule a back-to-back double period for practicals.
         </p>
       </div>
 
@@ -375,7 +512,6 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
             </div>
             <div className="overflow-y-auto max-h-[70vh]">
               {(() => {
-                // Group grades by gradeGroupName (null → 'Unassigned')
                 const grouped = new Map<string, CurrGrade[]>();
                 for (const g of grades) {
                   const key = g.gradeGroupName ?? '⚠ Unassigned';
@@ -390,17 +526,13 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
                 return sortedKeys.map((groupName) => {
                   const groupGrades = grouped.get(groupName)!;
                   const isUnassigned = groupName.startsWith('⚠');
-                  // Count grades in this group that have subjects configured
                   const configuredCount = groupGrades.filter(g =>
                     Object.values(drafts[g.id] ?? {}).some(e => e.included)
                   ).length;
                   return (
                     <div key={groupName}>
-                      {/* Group header */}
                       <div className={`px-3 py-2 flex items-center justify-between border-b ${
-                        isUnassigned
-                          ? 'bg-red-50 border-red-100'
-                          : 'bg-iceLight border-blue-100'
+                        isUnassigned ? 'bg-red-50 border-red-100' : 'bg-iceLight border-blue-100'
                       }`}>
                         <span className={`text-[10px] font-sora font-bold uppercase tracking-wide ${
                           isUnassigned ? 'text-red-500' : 'text-navy'
@@ -411,7 +543,6 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
                           {configuredCount}/{groupGrades.length}
                         </span>
                       </div>
-                      {/* Grades in this group */}
                       <div className="divide-y divide-gray-50">
                         {groupGrades.map(g => {
                           const count    = Object.values(drafts[g.id] ?? {}).filter(e => e.included).length;
@@ -467,9 +598,14 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
+                    <button onClick={handleBoardSuggest} disabled={suggesting || includedCount === 0}
+                      className="flex items-center gap-1.5 border border-teal-200 text-teal-700 text-xs font-sora font-semibold px-3 py-2 rounded-lg hover:bg-teal-50 transition-colors disabled:opacity-40">
+                      {suggesting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <BookOpen className="w-3.5 h-3.5" />}
+                      Board Suggest
+                    </button>
                     <button onClick={handleAISuggest}
                       className="flex items-center gap-1.5 border border-navy/20 text-navy text-xs font-sora font-semibold px-3 py-2 rounded-lg hover:bg-navy/5 transition-colors">
-                      <Sparkles className="w-3.5 h-3.5" /> AI Suggest Periods
+                      <Sparkles className="w-3.5 h-3.5" /> AI Suggest
                     </button>
                     <button onClick={() => handleSave(false)} disabled={saving || includedCount === 0}
                       className="flex items-center gap-2 border border-gray-200 text-gray-700 text-sm font-semibold rounded-lg px-4 py-2 hover:border-navy/30 transition-colors disabled:opacity-40">
@@ -505,6 +641,7 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
               {subjectsByCategory.map(({ cat, subjects: catSubjects }) => {
                 const isCollapsed   = collapsedCats.has(cat.value);
                 const includedInCat = catSubjects.filter(s => draft[s.id]?.included).length;
+                const labInCat      = catSubjects.filter(s => draft[s.id]?.included && draft[s.id]?.hasLabSession).length;
                 const headerBg      = CAT_HEADER[cat.value] ?? 'bg-gray-600';
                 return (
                   <div key={cat.value} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
@@ -524,6 +661,11 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
                         {includedInCat > 0 && (
                           <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold">
                             {includedInCat}/{catSubjects.length}
+                          </span>
+                        )}
+                        {labInCat > 0 && (
+                          <span className="text-[10px] bg-teal-300/40 text-white px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                            <FlaskConical className="w-2.5 h-2.5" /> {labInCat} lab
                           </span>
                         )}
                         {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -556,7 +698,6 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
                 </div>
               )}
 
-              {/* Subjects without teachers — informational, not assignable */}
               {withoutTeachers.length > 0 && (
                 <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
                   <div className="flex items-center gap-2 mb-2">

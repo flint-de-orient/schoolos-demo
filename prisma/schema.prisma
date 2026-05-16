@@ -550,9 +550,12 @@ model Subject {
   isElective      Boolean  @default(false)
   isLanguage      Boolean  @default(false)
   isPractical     Boolean  @default(false)
-  // 360° curriculum category — single source of truth for subject type
-  // Values: CORE | LANGUAGE | ELECTIVE | PRACTICAL | SPORTS | ARTS | TECHNOLOGY | VALUE_EDUCATION | REMEDIAL
   subjectCategory String   @default("CORE")
+  // Sub-part support: a language/practical subject can be divided into named parts
+  // e.g. English → [English Literature, English Grammar] each with own ppw + teachers
+  parentSubjectId String?
+  partLabel       String?  // "Literature", "Grammar", "Lab", etc.
+  isSubPart       Boolean  @default(false)
   createdAt       DateTime @default(now())
 
   tenant           Tenant           @relation(fields: [tenantId], references: [id])
@@ -563,9 +566,12 @@ model Subject {
   markEntries      MarkEntry[]
   lessonPlans      LessonPlan[]
   homework         Homework[]
+  parent           Subject?         @relation("SubjectParts", fields: [parentSubjectId], references: [id])
+  parts            Subject[]        @relation("SubjectParts")
 
   @@unique([tenantId, name])
   @@index([tenantId])
+  @@index([parentSubjectId])
 }
 
 model GradeSubject {
@@ -576,18 +582,33 @@ model GradeSubject {
   isCompulsory   Boolean @default(true)
   maxMarks       Int     @default(100)
   passMarks      Int     @default(33)
-  // Language level: L1 (First), L2 (Second), L3 (Third), L4 (Fourth/Optional)
-  languageLevel  String? // only set when subject is a LANGUAGE
-  // Whether student can opt out (for electives / optional co-curricular)
+  languageLevel  String?
   isOptional     Boolean @default(false)
-  // Scheduling slot: how this subject fits into the school day
   // REGULAR | ACTIVITY | DOUBLE_PERIOD | AFTER_SCHOOL | WEEKEND
   schedulingSlot String  @default("REGULAR")
+  // Session type: THEORY (default) or LAB (generator books two consecutive periods)
+  sessionType    String  @default("THEORY")
 
   grade   Grade   @relation(fields: [gradeId], references: [id])
   subject Subject @relation(fields: [subjectId], references: [id])
 
-  @@unique([gradeId, subjectId])
+  @@unique([gradeId, subjectId, sessionType])
+  @@index([gradeId])
+}
+
+// System-wide board syllabus reference — not tenant-specific, seeded at deploy time.
+// Used by the "Suggest" button in Class Subjects to recommend theory vs lab periods.
+model BoardSyllabusRecommendation {
+  id          String @id @default(cuid())
+  board       String // "WBBSE" | "CBSE" | "CISCE" | "ICSE" | "ISC"
+  gradeLevel  String // "Primary" | "Middle" | "Class IX-X" | "Class XI-XII"
+  subjectName String
+  theoryPPW   Int    @default(5)
+  labPPW      Int    @default(0)
+  notes       String?
+
+  @@unique([board, gradeLevel, subjectName])
+  @@index([board, gradeLevel])
 }
 
 model Syllabus {

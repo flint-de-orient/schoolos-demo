@@ -37,7 +37,7 @@ export async function GET(_req: NextRequest) {
         id: true, gradeId: true, subjectId: true,
         periodsPerWeek: true, isCompulsory: true, isOptional: true,
         languageLevel: true, schedulingSlot: true,
-        maxMarks: true, passMarks: true,
+        maxMarks: true, passMarks: true, sessionType: true,
       },
     }),
   ]);
@@ -65,6 +65,7 @@ export async function GET(_req: NextRequest) {
         schedulingSlot: gs.schedulingSlot,
         maxMarks: gs.maxMarks,
         passMarks: gs.passMarks,
+        sessionType: gs.sessionType,
       })),
     })),
     subjects: subjects.map(s => ({
@@ -99,6 +100,7 @@ export async function POST(req: NextRequest) {
       schedulingSlot: string;
       maxMarks: number;
       passMarks: number;
+      sessionType?: string;
     }[];
   };
 
@@ -122,6 +124,7 @@ export async function POST(req: NextRequest) {
         schedulingSlot: c.schedulingSlot ?? 'REGULAR',
         maxMarks: c.maxMarks ?? 100,
         passMarks: c.passMarks ?? 33,
+        sessionType: c.sessionType ?? 'THEORY',
       })),
     });
   }
