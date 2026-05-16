@@ -470,29 +470,34 @@ export default function TimetablePage() {
     if (viewMode === 'teacher' && selectedTeacherId) loadTimetable('', selectedTeacherId);
   }, [selectedSectionId, selectedTeacherId, viewMode, loadTimetable]);
 
-  // ── Copy mode: handle cell click ─────────────────────────────────────────
-  async function handleCopyCellClick(cell: GridCell | null, day: string, periodNo: number, slotId: string) {
+  // ── Copy mode: handle cell click (synchronous — avoids React 18 batching delay) ──
+  function handleCopyCellClick(cell: GridCell | null, day: string, periodNo: number, slotId: string) {
     if (!copyMode || !timetableId) return;
     if (!copySrc) {
-      // First click — pick source (must be an occupied cell)
       if (!cell) { toast.info('Click an occupied period first to select the subject to copy'); return; }
       setCopySrc({ entryId: cell.entryId, subjectId: cell.subjectId, subjectName: cell.subject, day, periodNo });
       return;
     }
-    // Second click — pick target
-    if (copySrc.day === day && copySrc.periodNo === periodNo) {
-      // Clicked same cell — deselect
-      setCopySrc(null);
-      return;
-    }
+    if (copySrc.day === day && copySrc.periodNo === periodNo) { setCopySrc(null); return; }
+    // Set target synchronously — tray appears immediately on next render
     setCopyTarget({ day, periodNo, slotId, existingCell: cell });
-    // Fetch free teachers for this subject at this slot
-    const res = await fetch(`/api/timetable/entries?subjectId=${copySrc.subjectId}&day=${day}&periodSlotId=${slotId}&timetableId=${timetableId}`);
-    const data = await res.json();
-    const teachers = (data.data ?? data).teachers ?? [];
-    setFreeTeachers(teachers);
-    setCopyTeacherId(teachers.find((t: { free: boolean }) => t.free)?.id ?? teachers[0]?.id ?? '');
+    setFreeTeachers([]);    // cleared — useEffect will populate
+    setCopyTeacherId('');
   }
+
+  // Fetch free teachers whenever copyTarget changes (runs after render, not inside click)
+  useEffect(() => {
+    if (!copyTarget || !copySrc || !timetableId) return;
+    fetch(`/api/timetable/entries?subjectId=${copySrc.subjectId}&day=${copyTarget.day}&periodSlotId=${copyTarget.slotId}&timetableId=${timetableId}`)
+      .then(r => r.json())
+      .then(data => {
+        const teachers: { id: string; name: string; proficiency: string; free: boolean }[] = (data.data ?? data).teachers ?? [];
+        setFreeTeachers(teachers);
+        setCopyTeacherId(teachers.find(t => t.free)?.id ?? teachers[0]?.id ?? '');
+      })
+      .catch(() => toast.error('Failed to load available teachers'));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [copyTarget]);
 
   async function handleCopyApply() {
     if (!copySrc || !copyTarget || !copyTeacherId || !timetableId || !selectedSectionId) return;
