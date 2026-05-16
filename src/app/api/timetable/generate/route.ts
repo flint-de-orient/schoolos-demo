@@ -307,6 +307,9 @@ export async function POST(req: NextRequest) {
       // Used to rotate subjects across slot positions so the same subject doesn't
       // always land at the same period number each day.
       slotHistory: Map<string, Set<number>>;
+      // bookedSlotIds: slot IDs already assigned in the lab first-pass for this section
+      // on the current day — prevents the regular pass from double-booking those slots.
+      bookedSlotIds: Set<string>;
     };
     const sectionStates: SectionState[] = [];
     for (const sectionId of groupSectionIds) {
@@ -329,6 +332,7 @@ export async function POST(req: NextRequest) {
         labPool:      curriculum.filter(e => e.sessionType === 'LAB'),
         weeklyCount:  new Map<string, number>(),
         slotHistory:  new Map<string, Set<number>>(),
+        bookedSlotIds: new Set<string>(),
       });
     }
 
@@ -342,6 +346,8 @@ export async function POST(req: NextRequest) {
       const dayUsed = new Map<string, Set<string>>(
         sectionStates.map(s => [s.sectionId, new Set<string>()])
       );
+      // Reset per-day booked slot tracking for each section
+      for (const state of sectionStates) state.bookedSlotIds = new Set<string>();
 
       // Apply half-day config: group-specific rule takes priority over school-wide.
       // Use loose comparison (.toUpperCase() on both sides, !hd.gradeGroupId for null/undefined).
@@ -381,9 +387,11 @@ export async function POST(req: NextRequest) {
               }
             }
             if (!assignedTeacherId) continue;
-            // Book both slots
+            // Book both slots; mark them so the regular pass skips these slots
             state.weeklyCount.set(labEntry.subjectId, booked + 2);
             usedSubjectsToday.add(labEntry.subjectId);
+            state.bookedSlotIds.add(slotA.id);
+            state.bookedSlotIds.add(slotB.id);
             for (const slot of [slotA, slotB]) {
               allEntries.push({
                 sectionId: state.sectionId,
@@ -419,6 +427,9 @@ export async function POST(req: NextRequest) {
         const slot = activePeriodSlots[slotIndex];
 
         for (const state of sectionStates) {
+          // Skip slots already occupied by lab double-periods for this section today
+          if (state.bookedSlotIds.has(slot.id)) continue;
+
           const usedSubjectsToday = dayUsed.get(state.sectionId)!;
 
           let pool: CurrEntry[];
@@ -548,6 +559,7 @@ export async function POST(req: NextRequest) {
       timetableId: timetable.id,
       day: e.day as Parameters<typeof db.timetableEntry.create>[0]['data']['day'],
     })),
+    skipDuplicates: true,
   });
 
   return ok({
