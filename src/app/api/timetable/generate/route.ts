@@ -14,6 +14,19 @@ function strHash(s: string): number {
   return h >>> 0;
 }
 
+/** Fisher-Yates shuffle with a 32-bit seed — same seed always gives same result */
+function seededShuffle<T>(arr: T[], seed: number): T[] {
+  const result = [...arr];
+  let s = seed >>> 0;
+  for (let i = result.length - 1; i > 0; i--) {
+    s = Math.imul(s ^ (s >>> 15), 0x1 | s) ^ ((s & 0xffff0000) + Math.imul(s & 0xffff, 0x9f3d));
+    s = s >>> 0;
+    const j = s % (i + 1);
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
 function addMinutes(time: string, mins: number): string {
   const [h, m] = time.split(':').map(Number);
   const total = h * 60 + m + mins;
@@ -332,7 +345,16 @@ export async function POST(req: NextRequest) {
                    ?? halfDayConfigs.find(hd => !hd.gradeGroupId             && hd.dayOfWeek.toUpperCase() === dayUpper);
       const activePeriodSlots = halfDay ? periodSlots.slice(0, halfDay.periodsPerDay) : periodSlots;
 
-      for (let slotIndex = 0; slotIndex < activePeriodSlots.length; slotIndex++) {
+      // Shuffle which slot is visited first so empty slots land at varied positions
+      // throughout the day instead of always clustering at the tail. Seed is stable
+      // per (day) so all sections share the same visit order — teacher conflict
+      // prevention (usedSlots) still works correctly across sections.
+      const slotVisitOrder = seededShuffle(
+        activePeriodSlots.map((_, i) => i),
+        strHash(`visit-${day}`)
+      );
+
+      for (const slotIndex of slotVisitOrder) {
         const slot = activePeriodSlots[slotIndex];
 
         for (const state of sectionStates) {

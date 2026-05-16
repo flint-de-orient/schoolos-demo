@@ -21,7 +21,8 @@ type Grade      = { id: string; name: string; displayOrder: number; sections: Se
 type GridCell   = { subject: string; colorHex: string; teacher: string; room: string | null; teacherId: string };
 type Grid       = Record<string, Record<number, GridCell>>; // day → periodNo → cell
 type TimetableConfig = { workingDays: string[]; schoolStartTime: string };
-type GradeGroupMeta  = { mainBreakAfterPeriod: number; shortBreakEnabled: boolean; shortBreakAfterPeriod: number | null; fillerTypes: string[] };
+type GradeGroupMeta  = { id: string; mainBreakAfterPeriod: number; shortBreakEnabled: boolean; shortBreakAfterPeriod: number | null; fillerTypes: string[] };
+type HalfDayRule     = { gradeGroupId: string | null; dayOfWeek: string; periodsPerDay: number };
 
 type SubCandidate = { id: string; name: string; proficiency: string };
 type SubSuggestion = { periodNo: number; startTime: string; endTime: string; subject: { name: string }; section: string; timetableEntryId: string; candidates: SubCandidate[] };
@@ -90,14 +91,23 @@ const FILLER_LABELS: Record<string, string> = {
   SPORTS: 'Sports', REPEAT_COMPULSORY: 'Revision', LEAVE_EMPTY: '',
 };
 
-function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, shortBreakAfterPeriod, fillerTypes }: {
+function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, shortBreakAfterPeriod, fillerTypes, halfDayRules, gradeGroupId }: {
   grid: Grid;
   periodSlots: PeriodSlot[];
   workingDays: string[];
   mainBreakAfterPeriod?: number;
   shortBreakAfterPeriod?: number | null;
   fillerTypes?: string[];
+  halfDayRules?: HalfDayRule[];
+  gradeGroupId?: string | null;
 }) {
+  // Look up the half-day period limit for a given day
+  function halfDayLimit(day: string): number | null {
+    if (!halfDayRules?.length) return null;
+    const rule = halfDayRules.find(r => r.gradeGroupId === gradeGroupId && r.dayOfWeek === day)
+              ?? halfDayRules.find(r => !r.gradeGroupId && r.dayOfWeek === day);
+    return rule?.periodsPerDay ?? null;
+  }
   const days = DAYS_ORDER.filter(d => workingDays.includes(d));
   const subjectIndexMap: Record<string, number> = {};
   let subjectCounter = 0;
@@ -129,13 +139,22 @@ function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, s
                     {days.map((day, dayIdx) => {
                       const cell = grid[day]?.[slot.periodNo];
                       if (!cell) {
+                        // If this slot is beyond the half-day limit, show a muted indicator
+                        const limit = halfDayLimit(day);
+                        if (limit !== null && slot.periodNo > limit) {
+                          return (
+                            <td key={day} className="px-2 py-2 bg-gray-50/60">
+                              <div className="text-center text-[9px] text-gray-300 font-dm-sans italic">half day</div>
+                            </td>
+                          );
+                        }
                         // Cycle through selected filler types by day index
                         const types = fillerTypes?.length ? fillerTypes : ['STUDY_PERIOD'];
                         const fillerLabel = FILLER_LABELS[types[dayIdx % types.length]] ?? '';
                         return (
                           <td key={day} className="px-2 py-2">
                             {fillerLabel ? (
-                              <div className="rounded-lg border border-gray-100 bg-gray-50 px-2 py-1.5 text-center">
+                              <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50/80 px-2 py-1.5 text-center">
                                 <div className="text-[10px] text-gray-400 font-dm-sans">{fillerLabel}</div>
                               </div>
                             ) : (
@@ -196,6 +215,7 @@ export default function TimetablePage() {
   const [periodSlots, setPeriodSlots]   = useState<PeriodSlot[]>([]);
   const [ttConfig, setTtConfig]         = useState<TimetableConfig>({ workingDays: ['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'], schoolStartTime: '08:00' });
   const [groupMeta, setGroupMeta]       = useState<GradeGroupMeta | null>(null);
+  const [halfDayRules, setHalfDayRules] = useState<HalfDayRule[]>([]);
   const [grid, setGrid]                 = useState<Grid>({});
   const [timetableLabel, setTimetableLabel] = useState('');
   const [ttLoading, setTtLoading]       = useState(false);
@@ -226,7 +246,9 @@ export default function TimetablePage() {
     Promise.all([
       fetch('/api/timetable/config').then(r => r.json()),
       fetch('/api/grades').then(r => r.json()),
-    ]).then(([cfgData, gradeData]) => {
+      fetch('/api/timetable/half-day-config').then(r => r.json()),
+    ]).then(([cfgData, gradeData, hdData]) => {
+      setHalfDayRules(hdData.configs ?? []);
       const config = cfgData.data?.config ?? cfgData.config;
       if (config) setTtConfig({ workingDays: config.workingDays, schoolStartTime: config.schoolStartTime });
 
@@ -261,7 +283,7 @@ export default function TimetablePage() {
         const freshSlots: PeriodSlot[] = psRes.data?.periodSlots ?? psRes.periodSlots ?? [];
         setPeriodSlots(freshSlots.sort((a: PeriodSlot, b: PeriodSlot) => a.periodNo - b.periodNo));
         const g = psRes.data?.group ?? psRes.group;
-        if (g) setGroupMeta({ mainBreakAfterPeriod: g.mainBreakAfterPeriod, shortBreakEnabled: g.shortBreakEnabled, shortBreakAfterPeriod: g.shortBreakAfterPeriod, fillerTypes: g.fillerTypes ?? ['STUDY_PERIOD'] });
+        if (g) setGroupMeta({ id: g.id, mainBreakAfterPeriod: g.mainBreakAfterPeriod, shortBreakEnabled: g.shortBreakEnabled, shortBreakAfterPeriod: g.shortBreakAfterPeriod, fillerTypes: g.fillerTypes ?? ['STUDY_PERIOD'] });
         else setGroupMeta(null);
       }
 
@@ -538,6 +560,8 @@ export default function TimetablePage() {
               mainBreakAfterPeriod={groupMeta?.mainBreakAfterPeriod}
               shortBreakAfterPeriod={groupMeta?.shortBreakEnabled ? groupMeta.shortBreakAfterPeriod : null}
               fillerTypes={groupMeta?.fillerTypes}
+              halfDayRules={halfDayRules}
+              gradeGroupId={groupMeta?.id ?? null}
             />
           )}
 
