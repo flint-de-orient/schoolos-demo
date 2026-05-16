@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
           ...(teacherId && { teacherId }),
         },
         include: {
-          subject: { select: { id: true, name: true, colorHex: true } },
+          subject: { select: { id: true, name: true, colorHex: true, partLabel: true, isSubPart: true } },
           teacher: { select: { id: true, name: true } },
           section: { include: { grade: { select: { name: true, gradeGroupId: true, gradeGroup: { select: { id: true, name: true, fillerTypes: true, fillerActivityIds: true, mainBreakAfterPeriod: true, shortBreakEnabled: true, shortBreakAfterPeriod: true } } } } } },
           periodSlot: true,

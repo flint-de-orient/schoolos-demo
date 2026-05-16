@@ -6,6 +6,7 @@ import AIBadge from '@/components/shared/AIBadge';
 import ClassSubjectsTab from '@/components/timetable/ClassSubjectsTab';
 import GradeGroupsSetup from '@/components/timetable/GradeGroupsSetup';
 import HalfDaySetup from '@/components/timetable/HalfDaySetup';
+import SubjectPartsManager from '@/components/timetable/SubjectPartsManager';
 import { toast } from 'sonner';
 import {
   AlertCircle, CheckCircle2, Sparkles, LayoutGrid, Zap, RotateCcw,
@@ -20,7 +21,8 @@ type Section    = { id: string; name: string };
 type Grade      = { id: string; name: string; displayOrder: number; sections: Section[] };
 type GridCell   = {
   subject: string; colorHex: string; teacher: string; room: string | null; teacherId: string;
-  entryId: string; subjectId: string;  // Phase 4: drag-and-drop identifiers
+  entryId: string; subjectId: string;
+  partLabel: string | null;
 };
 type Grid       = Record<string, Record<number, GridCell>>; // day → periodNo → cell
 type TimetableConfig = { workingDays: string[]; schoolStartTime: string };
@@ -316,7 +318,12 @@ function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, s
                                     : `${colorClass} hover:shadow-sm ${editMode && !copyMode && !placeMode ? 'cursor-grab active:cursor-grabbing' : ''} ${copyMode ? 'cursor-pointer' : ''} ${placeMode && placeReady ? 'cursor-pointer ring-1 ring-purple-300' : ''}`
                             }`}
                           >
-                            <div className="text-[11px] font-semibold leading-tight truncate">{cell.subject}</div>
+                            <div className="text-[11px] font-semibold leading-tight truncate">
+                              {cell.partLabel ?? cell.subject}
+                            </div>
+                            {cell.partLabel && (
+                              <div className="text-[9px] opacity-50 leading-tight truncate">{cell.subject}</div>
+                            )}
                             <div className="text-[9px] opacity-70 truncate mt-0.5">{cell.teacher.split(' ').slice(-1)[0]}</div>
                             {cell.room && <div className="text-[9px] opacity-60">{cell.room}</div>}
                             {editMode && !copyMode && !placeMode && <div className="text-[8px] opacity-40 mt-0.5">⠿ drag</div>}
@@ -474,6 +481,7 @@ export default function TimetablePage() {
           teacherId: e.teacher.id,
           entryId: e.id,
           subjectId: e.subject.id,
+          partLabel: e.subject.partLabel ?? null,
         };
       }
       setGrid(newGrid);
@@ -571,6 +579,7 @@ export default function TimetablePage() {
           teacherId: placeTeacherId2,
           entryId: entry.id,
           subjectId: entry.subject.id,
+          partLabel: entry.subject.partLabel ?? null,
         };
         setGrid(newGrid);
         toast.success(replaced ? `Replaced with ${placeSubjectName}` : `${placeSubjectName} placed`);
@@ -607,6 +616,7 @@ export default function TimetablePage() {
         subject: entry.subject.name, colorHex: entry.subject.colorHex ?? '#1E2761',
         teacher: teacher?.name ?? '', room: null,
         teacherId: copyTeacherId, entryId: entry.id, subjectId: entry.subject.id,
+        partLabel: entry.subject.partLabel ?? null,
       };
       setGrid(newGrid);
       toast.success(replaced ? `${copySrc.subjectName} replaced existing period` : `${copySrc.subjectName} added to slot`);
@@ -1524,6 +1534,19 @@ export default function TimetablePage() {
           {/* Half-day rules */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
             <HalfDaySetup />
+          </div>
+
+          {/* Subject parts — optional split of subjects into schedulable components */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+            <div className="flex items-center gap-2 mb-1">
+              <BookOpen className="w-5 h-5 text-navy" />
+              <h2 className="text-base font-sora font-semibold text-navy">Subject Parts</h2>
+              <span className="text-xs text-gray-400 font-dm-sans ml-1">— optional</span>
+            </div>
+            <p className="text-xs text-gray-400 font-dm-sans mb-5">
+              Split subjects like English into Literature, Grammar &amp; Comprehension — each scheduled independently with its own teacher.
+            </p>
+            <SubjectPartsManager />
           </div>
 
           {setupExisting && (

@@ -26,6 +26,7 @@ export async function GET(_req: NextRequest) {
       select: {
         id: true, name: true, code: true, subjectCategory: true,
         isElective: true, isLanguage: true, isPractical: true,
+        isSubPart: true, parentSubjectId: true, partLabel: true,
         teacherSubjects: {
           select: { teacher: { select: { id: true, name: true } } },
         },
@@ -77,6 +78,9 @@ export async function GET(_req: NextRequest) {
       isElective: s.isElective,
       isLanguage: s.isLanguage,
       isPractical: s.isPractical,
+      isSubPart: s.isSubPart,
+      parentSubjectId: s.parentSubjectId ?? null,
+      partLabel: s.partLabel ?? null,
       teachers: s.teacherSubjects.map(ts => ts.teacher),
     })),
     categories: SUBJECT_CATEGORIES,

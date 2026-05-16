@@ -13,6 +13,7 @@ import {
 type CurrSubject = {
   id: string; name: string; code: string | null; subjectCategory: string;
   isLanguage: boolean; isElective: boolean; isPractical: boolean;
+  isSubPart: boolean; parentSubjectId: string | null; partLabel: string | null;
   teachers: { id: string; name: string }[];
 };
 
@@ -177,6 +178,9 @@ function SubjectRow({ subject, entry, onChange, langLevels, schedSlots }: {
           <div className="flex items-center gap-2 flex-wrap">
             <span className={`text-sm font-semibold font-dm-sans ${entry.included ? '' : 'text-gray-500'}`}>{subject.name}</span>
             {subject.code && <span className="text-[10px] text-gray-400 font-mono">{subject.code}</span>}
+            {subject.partLabel && (
+              <span className="text-[9px] bg-navy/10 text-navy px-1.5 py-0.5 rounded-full font-bold">{subject.partLabel}</span>
+            )}
             {isLang && entry.included && entry.languageLevel && (
               <span className="text-[9px] bg-green-700 text-white px-1.5 py-0.5 rounded-full font-bold">{entry.languageLevel}</span>
             )}
@@ -482,20 +486,59 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
   const draft         = useMemo(() => drafts[selectedGradeId] ?? {}, [drafts, selectedGradeId]);
   const selectedGrade = grades.find(g => g.id === selectedGradeId);
 
-  const withTeachers    = useMemo(() => subjects.filter(s => s.teachers.length > 0), [subjects]);
-  const withoutTeachers = useMemo(() => subjects.filter(s => s.teachers.length === 0), [subjects]);
+  // Build a map: parentSubjectId → array of sub-part subjects that have teachers
+  const subPartsMap = useMemo(() => {
+    const map = new Map<string, CurrSubject[]>();
+    for (const s of subjects) {
+      if (s.isSubPart && s.parentSubjectId) {
+        if (!map.has(s.parentSubjectId)) map.set(s.parentSubjectId, []);
+        map.get(s.parentSubjectId)!.push(s);
+      }
+    }
+    return map;
+  }, [subjects]);
+
+  // Subjects that are schedulable (either root without parts, or sub-parts)
+  // Root subjects that have sub-parts are section headers — not directly schedulable
+  const schedulableSubjects = useMemo(() =>
+    subjects.filter(s => {
+      if (s.isSubPart) return true;          // sub-parts are always schedulable
+      return !subPartsMap.has(s.id);          // root subjects are schedulable only if they have NO parts
+    }),
+  [subjects, subPartsMap]);
+
+  const withTeachers    = useMemo(() => schedulableSubjects.filter(s => s.teachers.length > 0), [schedulableSubjects]);
+  const withoutTeachers = useMemo(() => schedulableSubjects.filter(s => s.teachers.length === 0), [schedulableSubjects]);
+
+  // Root subjects that have sub-parts (shown as section headers within their category)
+  const parentsWithParts = useMemo(() => {
+    const ids = new Set(subPartsMap.keys());
+    return subjects.filter(s => !s.isSubPart && ids.has(s.id));
+  }, [subjects, subPartsMap]);
 
   const includedCount   = Object.values(draft).filter(e => e.included).length;
   const totalPeriods    = Object.values(draft).filter(e => e.included).reduce((s, e) => {
     return s + e.periodsPerWeek + (e.hasLabSession ? e.labPeriodsPerWeek : 0);
   }, 0);
 
-  const subjectsByCategory = useMemo(() =>
-    categories.map(cat => ({
-      cat,
-      subjects: withTeachers.filter(s => s.subjectCategory === cat.value),
-    })).filter(g => g.subjects.length > 0),
-  [categories, withTeachers]);
+  // Build category groups: each entry has root subjects (standalone) + parent headers with their sub-parts
+  const subjectsByCategory = useMemo(() => {
+    return categories.map(cat => {
+      const catVal = cat.value;
+      // Standalone schedulable subjects in this category (with teachers, not sub-parts of a parent)
+      const standalone = withTeachers.filter(s => s.subjectCategory === catVal && !s.isSubPart);
+      // Parents with parts in this category
+      const parents = parentsWithParts.filter(p => p.subjectCategory === catVal);
+      // Sub-parts for each parent (that have teachers)
+      const parentGroups = parents.map(p => ({
+        parent: p,
+        parts: (subPartsMap.get(p.id) ?? []).filter(sp => sp.teachers.length > 0),
+      }));
+      // Only include category if there's something to show
+      const hasContent = standalone.length > 0 || parentGroups.some(pg => pg.parts.length > 0);
+      return { cat, standalone, parentGroups, hasContent };
+    }).filter(g => g.hasContent);
+  }, [categories, withTeachers, parentsWithParts, subPartsMap]);
 
   const langSubjects = withTeachers.filter(s => s.subjectCategory === 'LANGUAGE');
   const langSummary  = ['L1', 'L2', 'L3', 'L4'].map(level => ({
@@ -663,10 +706,14 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
               )}
 
               {/* Subjects grouped by category */}
-              {subjectsByCategory.map(({ cat, subjects: catSubjects }) => {
+              {subjectsByCategory.map(({ cat, standalone, parentGroups }) => {
                 const isCollapsed   = collapsedCats.has(cat.value);
-                const includedInCat = catSubjects.filter(s => draft[s.id]?.included).length;
-                const labInCat      = catSubjects.filter(s => draft[s.id]?.included && draft[s.id]?.hasLabSession).length;
+                const allSchedulable = [
+                  ...standalone,
+                  ...parentGroups.flatMap(pg => pg.parts),
+                ];
+                const includedInCat = allSchedulable.filter(s => draft[s.id]?.included).length;
+                const labInCat      = allSchedulable.filter(s => draft[s.id]?.included && draft[s.id]?.hasLabSession).length;
                 const headerBg      = CAT_HEADER[cat.value] ?? 'bg-gray-600';
                 return (
                   <div key={cat.value} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
@@ -685,7 +732,7 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
                       <div className="flex items-center gap-2">
                         {includedInCat > 0 && (
                           <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold">
-                            {includedInCat}/{catSubjects.length}
+                            {includedInCat}/{allSchedulable.length}
                           </span>
                         )}
                         {labInCat > 0 && (
@@ -699,15 +746,34 @@ export default function ClassSubjectsTab({ onGoToGenerator }: { onGoToGenerator:
 
                     {!isCollapsed && (
                       <div className="p-3 space-y-2">
-                        {catSubjects.map(subject => (
-                          <SubjectRow
-                            key={subject.id}
-                            subject={subject}
+                        {/* Standalone subjects (no parts) */}
+                        {standalone.map(subject => (
+                          <SubjectRow key={subject.id} subject={subject}
                             entry={draft[subject.id] ?? defaultDraft(subject)}
                             onChange={patch => updateEntry(selectedGradeId, subject.id, patch)}
-                            langLevels={langLevels}
-                            schedSlots={schedSlots}
-                          />
+                            langLevels={langLevels} schedSlots={schedSlots} />
+                        ))}
+                        {/* Parent subjects with their parts */}
+                        {parentGroups.map(({ parent, parts }) => (
+                          <div key={parent.id} className="border border-gray-100 rounded-xl overflow-hidden">
+                            {/* Parent header — not schedulable directly */}
+                            <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 border-b border-gray-100">
+                              <BookMarked className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                              <span className="text-xs font-semibold text-gray-600 font-sora">{parent.name}</span>
+                              <span className="text-[9px] text-gray-400 ml-1">— split into {parts.length} part{parts.length !== 1 ? 's' : ''}</span>
+                            </div>
+                            {/* Sub-part rows indented */}
+                            <div className="p-2 pl-6 space-y-1.5 bg-white">
+                              {parts.length === 0 ? (
+                                <p className="text-xs text-gray-400 py-1 italic">No parts have teachers assigned yet.</p>
+                              ) : parts.map(part => (
+                                <SubjectRow key={part.id} subject={part}
+                                  entry={draft[part.id] ?? defaultDraft(part)}
+                                  onChange={patch => updateEntry(selectedGradeId, part.id, patch)}
+                                  langLevels={langLevels} schedSlots={schedSlots} />
+                              ))}
+                            </div>
+                          </div>
                         ))}
                       </div>
                     )}
