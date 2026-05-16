@@ -21,7 +21,7 @@ type Grade      = { id: string; name: string; displayOrder: number; sections: Se
 type GridCell   = { subject: string; colorHex: string; teacher: string; room: string | null; teacherId: string };
 type Grid       = Record<string, Record<number, GridCell>>; // day → periodNo → cell
 type TimetableConfig = { workingDays: string[]; schoolStartTime: string };
-type GradeGroupMeta  = { mainBreakAfterPeriod: number; shortBreakEnabled: boolean; shortBreakAfterPeriod: number | null; fillerType: string };
+type GradeGroupMeta  = { mainBreakAfterPeriod: number; shortBreakEnabled: boolean; shortBreakAfterPeriod: number | null; fillerTypes: string[] };
 
 type SubCandidate = { id: string; name: string; proficiency: string };
 type SubSuggestion = { periodNo: number; startTime: string; endTime: string; subject: { name: string }; section: string; timetableEntryId: string; candidates: SubCandidate[] };
@@ -85,13 +85,18 @@ const GEN_STEPS = [
 
 // ── TimetableGrid ────────────────────────────────────────────────────────────
 
-function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, shortBreakAfterPeriod, fillerType }: {
+const FILLER_LABELS: Record<string, string> = {
+  STUDY_PERIOD: 'Study Period', REVISION: 'Revision',
+  SPORTS: 'Sports', REPEAT_COMPULSORY: 'Revision', LEAVE_EMPTY: '',
+};
+
+function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, shortBreakAfterPeriod, fillerTypes }: {
   grid: Grid;
   periodSlots: PeriodSlot[];
   workingDays: string[];
   mainBreakAfterPeriod?: number;
   shortBreakAfterPeriod?: number | null;
-  fillerType?: string;
+  fillerTypes?: string[];
 }) {
   const days = DAYS_ORDER.filter(d => workingDays.includes(d));
   const subjectIndexMap: Record<string, number> = {};
@@ -114,7 +119,6 @@ function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, s
               const showMainBreak  = mainBreakAfterPeriod === slot.periodNo;
               const showShortBreak = shortBreakAfterPeriod === slot.periodNo;
               const showBreak = showMainBreak || showShortBreak;
-              const fillerLabel = fillerType === 'STUDY_PERIOD' ? 'Study Period' : fillerType === 'REVISION' ? 'Revision' : null;
               return (
                 <>
                   <tr key={slot.id} className={`border-b border-gray-100 ${pIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
@@ -122,19 +126,24 @@ function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, s
                       <div className="text-xs font-sora font-bold text-navy">P{slot.periodNo}</div>
                       <div className="text-[10px] text-gray-400">{slot.startTime}–{slot.endTime}</div>
                     </td>
-                    {days.map(day => {
+                    {days.map((day, dayIdx) => {
                       const cell = grid[day]?.[slot.periodNo];
-                      if (!cell) return (
-                        <td key={day} className="px-2 py-2">
-                          {fillerLabel ? (
-                            <div className="rounded-lg border border-gray-100 bg-gray-50 px-2 py-1.5 text-center">
-                              <div className="text-[10px] text-gray-400 font-dm-sans">{fillerLabel}</div>
-                            </div>
-                          ) : (
-                            <div className="text-center text-xs text-gray-200">—</div>
-                          )}
-                        </td>
-                      );
+                      if (!cell) {
+                        // Cycle through selected filler types by day index
+                        const types = fillerTypes?.length ? fillerTypes : ['STUDY_PERIOD'];
+                        const fillerLabel = FILLER_LABELS[types[dayIdx % types.length]] ?? '';
+                        return (
+                          <td key={day} className="px-2 py-2">
+                            {fillerLabel ? (
+                              <div className="rounded-lg border border-gray-100 bg-gray-50 px-2 py-1.5 text-center">
+                                <div className="text-[10px] text-gray-400 font-dm-sans">{fillerLabel}</div>
+                              </div>
+                            ) : (
+                              <div className="text-center text-xs text-gray-200">—</div>
+                            )}
+                          </td>
+                        );
+                      }
                       if (!(cell.subject in subjectIndexMap)) {
                         subjectIndexMap[cell.subject] = subjectCounter++;
                       }
@@ -252,7 +261,7 @@ export default function TimetablePage() {
         const freshSlots: PeriodSlot[] = psRes.data?.periodSlots ?? psRes.periodSlots ?? [];
         setPeriodSlots(freshSlots.sort((a: PeriodSlot, b: PeriodSlot) => a.periodNo - b.periodNo));
         const g = psRes.data?.group ?? psRes.group;
-        if (g) setGroupMeta({ mainBreakAfterPeriod: g.mainBreakAfterPeriod, shortBreakEnabled: g.shortBreakEnabled, shortBreakAfterPeriod: g.shortBreakAfterPeriod, fillerType: g.fillerType });
+        if (g) setGroupMeta({ mainBreakAfterPeriod: g.mainBreakAfterPeriod, shortBreakEnabled: g.shortBreakEnabled, shortBreakAfterPeriod: g.shortBreakAfterPeriod, fillerTypes: g.fillerTypes ?? ['STUDY_PERIOD'] });
         else setGroupMeta(null);
       }
 
@@ -528,7 +537,7 @@ export default function TimetablePage() {
               workingDays={ttConfig.workingDays}
               mainBreakAfterPeriod={groupMeta?.mainBreakAfterPeriod}
               shortBreakAfterPeriod={groupMeta?.shortBreakEnabled ? groupMeta.shortBreakAfterPeriod : null}
-              fillerType={groupMeta?.fillerType}
+              fillerTypes={groupMeta?.fillerTypes}
             />
           )}
 

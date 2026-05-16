@@ -297,6 +297,7 @@ enum PTMBookingStatus {
 enum FillerType {
   STUDY_PERIOD
   REVISION
+  SPORTS
   REPEAT_COMPULSORY
   LEAVE_EMPTY
 }
@@ -976,7 +977,7 @@ model GradeGroup {
   shortBreakDuration    Int        @default(10)
   mainBreakAfterPeriod  Int        @default(4)
   mainBreakDuration     Int        @default(30)
-  fillerType            FillerType @default(STUDY_PERIOD)
+  fillerTypes           FillerType[] @default([STUDY_PERIOD])
   grades                Grade[]
   periodSlots           PeriodSlot[]
   halfDayConfigs        HalfDayConfig[]

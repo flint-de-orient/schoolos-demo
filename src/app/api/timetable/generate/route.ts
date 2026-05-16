@@ -251,7 +251,7 @@ export async function POST(req: NextRequest) {
   }[] = [];
 
   // Track per-group slot info for the response (filler display metadata)
-  const groupSlotMeta: Record<string, { periodsPerDay: number; fillerType: string; groupName: string }> = {};
+  const groupSlotMeta: Record<string, { periodsPerDay: number; fillerTypes: string[]; groupName: string }> = {};
 
   for (const [groupId, { group, sectionIds: groupSectionIds }] of groupToSections) {
     // Build slot definitions for this group
@@ -276,7 +276,7 @@ export async function POST(req: NextRequest) {
 
     groupSlotMeta[groupId] = {
       periodsPerDay: group.periodsPerDay,
-      fillerType: group.fillerType,
+      fillerTypes: group.fillerTypes as string[],
       groupName: group.name,
     };
 
@@ -325,14 +325,15 @@ export async function POST(req: NextRequest) {
         sectionStates.map(s => [s.sectionId, new Set<string>()])
       );
 
-      // Apply half-day config: group-specific rule takes priority over school-wide
-      const halfDay = halfDayConfigs.find(hd => hd.gradeGroupId === groupId && hd.dayOfWeek === day.toUpperCase())
-                   ?? halfDayConfigs.find(hd => hd.gradeGroupId === null    && hd.dayOfWeek === day.toUpperCase());
+      // Apply half-day config: group-specific rule takes priority over school-wide.
+      // Use loose comparison (.toUpperCase() on both sides, !hd.gradeGroupId for null/undefined).
+      const dayUpper = day.toUpperCase();
+      const halfDay = halfDayConfigs.find(hd => hd.gradeGroupId === groupId && hd.dayOfWeek.toUpperCase() === dayUpper)
+                   ?? halfDayConfigs.find(hd => !hd.gradeGroupId             && hd.dayOfWeek.toUpperCase() === dayUpper);
       const activePeriodSlots = halfDay ? periodSlots.slice(0, halfDay.periodsPerDay) : periodSlots;
 
       for (let slotIndex = 0; slotIndex < activePeriodSlots.length; slotIndex++) {
         const slot = activePeriodSlots[slotIndex];
-        const isLastPeriod = slot.id === activePeriodSlots[activePeriodSlots.length - 1]?.id;
 
         for (const state of sectionStates) {
           const usedSubjectsToday = dayUsed.get(state.sectionId)!;
@@ -340,14 +341,12 @@ export async function POST(req: NextRequest) {
           let pool: CurrEntry[];
           if (isWeekend) {
             pool = state.weekendPool;
-          } else if (isLastPeriod && state.activityPool.length > 0) {
-            const avail = state.activityPool.filter(e =>
-              !usedSubjectsToday.has(e.subjectId) &&
-              (state.weeklyCount.get(e.subjectId) ?? 0) < e.periodsPerWeek
-            );
-            pool = avail.length > 0 ? avail : state.regularPool;
-          } else {
+          } else if (slotIndex === 0) {
+            // Never open the day with an activity subject (PE, Sports etc.)
             pool = state.regularPool;
+          } else {
+            // Activity subjects can appear at any non-first slot; rotation handles distribution
+            pool = [...state.regularPool, ...state.activityPool];
           }
 
           const eligible = pool.filter(e =>

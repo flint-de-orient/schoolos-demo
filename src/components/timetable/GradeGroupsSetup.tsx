@@ -15,14 +15,15 @@ type GradeGroup = {
   periodsPerDay: number; periodDuration: number;
   shortBreakEnabled: boolean; shortBreakAfterPeriod: number | null; shortBreakDuration: number;
   mainBreakAfterPeriod: number; mainBreakDuration: number;
-  fillerType: string;
+  fillerTypes: string[];
   grades: GradeRef[];
 };
 
 const FILLER_OPTIONS = [
   { value: 'STUDY_PERIOD',      label: 'Study Period' },
-  { value: 'REVISION',          label: 'Revision Class' },
-  { value: 'REPEAT_COMPULSORY', label: 'Repeat Compulsory Subject' },
+  { value: 'REVISION',          label: 'Revision' },
+  { value: 'SPORTS',            label: 'Sports / Activity' },
+  { value: 'REPEAT_COMPULSORY', label: 'Repeat Compulsory' },
   { value: 'LEAVE_EMPTY',       label: 'Leave Empty' },
 ];
 
@@ -101,7 +102,7 @@ export default function GradeGroupsSetup() {
         shortBreakDuration: m.shortBreakDuration,
         mainBreakAfterPeriod: m.mainBreakAfterPeriod,
         mainBreakDuration: m.mainBreakDuration,
-        fillerType: m.fillerType,
+        fillerTypes: m.fillerTypes,
         gradeIds,
         applyToAll,
       }),
@@ -316,25 +317,41 @@ export default function GradeGroupsSetup() {
                   )}
                 </div>
 
-                {/* Filler type */}
+                {/* Filler types — multi-select, cycles through selected types by day */}
                 <div>
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
-                    Empty Slot Filler
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <select value={m.fillerType}
-                      onChange={e => setDraft(g.id, { fillerType: e.target.value })}
-                      className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-navy/20 font-dm-sans">
-                      {FILLER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      Empty Slot Filler
+                    </label>
                     <button
-                      onClick={() => handleSave(g, ['fillerType'])}
-                      title="Apply filler type to all groups"
-                      className="p-2 text-gray-400 hover:text-navy border border-gray-200 rounded-lg hover:border-navy/30 transition-colors">
-                      <Copy className="w-3.5 h-3.5" />
+                      onClick={() => handleSave(g, ['fillerTypes'])}
+                      title="Apply to all groups"
+                      className="p-1.5 text-gray-400 hover:text-navy border border-gray-200 rounded-lg hover:border-navy/30 transition-colors">
+                      <Copy className="w-3 h-3" />
                     </button>
                   </div>
-                  <p className="text-[10px] text-gray-400 mt-1">What to show when all subjects are scheduled but slots remain</p>
+                  <div className="flex flex-wrap gap-2">
+                    {FILLER_OPTIONS.map(o => {
+                      const selected = (m.fillerTypes ?? ['STUDY_PERIOD']).includes(o.value);
+                      return (
+                        <button key={o.value}
+                          onClick={() => {
+                            const current = m.fillerTypes ?? ['STUDY_PERIOD'];
+                            const next = selected
+                              ? current.filter(v => v !== o.value)
+                              : [...current, o.value];
+                            if (next.length === 0) return; // must keep at least one
+                            setDraft(g.id, { fillerTypes: next });
+                          }}
+                          className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors ${selected ? 'bg-navy text-white border-navy' : 'bg-white text-gray-500 border-gray-200 hover:border-navy/40'}`}>
+                          {o.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1.5">
+                    Select one or more — rotates by day (Mon = first, Tue = second…)
+                  </p>
                 </div>
 
                 {/* Save button */}

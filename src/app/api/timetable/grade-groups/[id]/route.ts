@@ -22,7 +22,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     shortBreakDuration?: number;
     mainBreakAfterPeriod?: number;
     mainBreakDuration?: number;
-    fillerType?: string;
+    fillerTypes?: string[];
     gradeIds?: string[];      // full replacement list of grades for this group
     applyToAll?: string[];    // field names to copy to all other groups
   };
@@ -38,7 +38,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (body.shortBreakDuration !== undefined) data.shortBreakDuration = body.shortBreakDuration;
   if (body.mainBreakAfterPeriod !== undefined) data.mainBreakAfterPeriod = body.mainBreakAfterPeriod;
   if (body.mainBreakDuration !== undefined) data.mainBreakDuration = body.mainBreakDuration;
-  if (body.fillerType !== undefined) data.fillerType = body.fillerType as import('@prisma/client').FillerType;
+  if (body.fillerTypes !== undefined) data.fillerTypes = body.fillerTypes as import('@prisma/client').FillerType[];
 
   await db.gradeGroup.update({ where: { id: params.id }, data });
 
@@ -57,7 +57,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const allFieldData: Parameters<typeof db.gradeGroup.update>[0]['data'] = {};
     const allowedApplyFields = [
       'periodDuration', 'shortBreakEnabled', 'shortBreakAfterPeriod',
-      'shortBreakDuration', 'mainBreakAfterPeriod', 'mainBreakDuration', 'fillerType',
+      'shortBreakDuration', 'mainBreakAfterPeriod', 'mainBreakDuration', 'fillerTypes',
     ] as const;
     for (const field of body.applyToAll) {
       if (allowedApplyFields.includes(field as typeof allowedApplyFields[number]) && field in data) {

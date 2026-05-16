@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     shortBreakDuration?: number;
     mainBreakAfterPeriod?: number;
     mainBreakDuration?: number;
-    fillerType?: string;
+    fillerTypes?: string[];
     gradeIds?: string[];
   };
 
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       shortBreakDuration: body.shortBreakDuration ?? 10,
       mainBreakAfterPeriod: body.mainBreakAfterPeriod ?? 4,
       mainBreakDuration: body.mainBreakDuration ?? 30,
-      fillerType: (body.fillerType ?? 'STUDY_PERIOD') as import('@prisma/client').FillerType,
+      fillerTypes: (body.fillerTypes ?? ['STUDY_PERIOD']) as import('@prisma/client').FillerType[],
     },
   });
 
