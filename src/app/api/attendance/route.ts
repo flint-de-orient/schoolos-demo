@@ -220,5 +220,11 @@ export async function POST(req: NextRequest) {
     ).catch(() => { /* non-blocking */ });
   }
 
+  // Expire the AI insights cache so next load regenerates with fresh data
+  db.attendanceInsight.updateMany({
+    where: { tenantId: session.user.tenantId },
+    data: { expiresAt: new Date() },
+  }).catch(() => {});
+
   return ok({ sessionId: attendanceSession.id, recorded: records.length });
 }

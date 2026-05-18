@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import {
   Users, CheckCircle, XCircle, Percent, CalendarDays,
   ChevronDown, RefreshCw, Clock, AlertTriangle, Check, X,
-  Bell, BellOff, Download, Plus, Trash2, FileText,
+  Bell, BellOff, Download, Plus, Trash2, FileText, Sparkles, TrendingDown, School,
 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -17,6 +17,25 @@ import AIBadge from '@/components/shared/AIBadge';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'HALF_DAY';
+
+interface AttendanceAlert {
+  severity: 'high' | 'medium' | 'low';
+  type: 'chronic_absence' | 'consecutive_absence' | 'class_anomaly' | 'threshold_risk' | 'declining_trend';
+  message: string;
+  studentIds: string[];
+  studentNames: string[];
+  actionHint: string;
+}
+
+interface InsightsData {
+  summary: string;
+  alerts: AttendanceAlert[];
+  generatedAt: string;
+  cached: boolean;
+  stale?: boolean;
+  inputTokens: number;
+  outputTokens: number;
+}
 
 interface SectionRow {
   sectionId: string;
@@ -100,12 +119,28 @@ export default function AttendancePage() {
   const [reportMonth, setReportMonth] = useState(new Date().getMonth() + 1);
   const [reportYear, setReportYear] = useState(new Date().getFullYear());
   const [reportLoading, setReportLoading] = useState(false);
+  const [insights, setInsights] = useState<InsightsData | null>(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insightsError, setInsightsError] = useState<string | null>(null);
 
   const loadHolidays = useCallback(() => {
     const year = new Date().getFullYear();
     fetch(`/api/attendance/holidays?year=${year}`)
       .then(r => r.json())
       .then(d => setHolidays(Array.isArray(d) ? d : []));
+  }, []);
+
+  const loadInsights = useCallback((force = false) => {
+    setInsightsLoading(true);
+    setInsightsError(null);
+    fetch(`/api/attendance/insights${force ? '?force=true' : ''}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) { setInsightsError(d.error); setInsights(null); }
+        else setInsights(d);
+      })
+      .catch(() => setInsightsError('Failed to load insights'))
+      .finally(() => setInsightsLoading(false));
   }, []);
 
   // Load grades (for mapping sections we haven't marked yet)
@@ -117,7 +152,8 @@ export default function AttendancePage() {
       .then(r => r.json())
       .then(d => setTrend(Array.isArray(d) ? d : []));
     loadHolidays();
-  }, [loadHolidays]);
+    loadInsights();
+  }, [loadHolidays, loadInsights]);
 
   const loadAttendance = useCallback(() => {
     setLoading(true);
@@ -516,23 +552,107 @@ export default function AttendancePage() {
 
         {/* Right panel */}
         <div className="space-y-5">
-          {/* AI Alert */}
-          <div className="bg-white rounded-xl shadow-sm border border-amber/20 p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <AlertTriangle className="w-4 h-4 text-amber" />
-              <h3 className="font-sora font-semibold text-navy text-base">AI Alert</h3>
-              <AIBadge />
-            </div>
-            {absentees.length === 0 ? (
-              <p className="text-xs text-gray-400 italic">No alerts today.</p>
-            ) : (
-              <div className="bg-amber/8 border border-amber/20 rounded-lg p-3 text-xs text-gray-700 leading-relaxed">
-                <strong>{absentees.length} student{absentees.length > 1 ? 's' : ''}</strong> absent today.
-                {absentees.filter(a => !a.reason).length > 0 && (
-                  <span className="ml-1">Reason unknown for {absentees.filter(a => !a.reason).length} — recommend parent contact.</span>
-                )}
+          {/* AI Attendance Insights */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 bg-gradient-to-r from-navy/3 to-transparent">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-navy" />
+                <h3 className="font-sora font-semibold text-navy text-sm">AI Attendance Insights</h3>
+                <AIBadge />
               </div>
-            )}
+              <button
+                onClick={() => loadInsights(true)}
+                disabled={insightsLoading}
+                title="Regenerate insights"
+                className="text-gray-400 hover:text-navy transition-colors disabled:opacity-40 p-1 rounded"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${insightsLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+
+            <div className="p-4">
+              {insightsLoading && !insights && (
+                <div className="space-y-2.5">
+                  <div className="h-3 bg-gray-100 rounded animate-pulse w-full" />
+                  <div className="h-10 bg-gray-100 rounded-lg animate-pulse" />
+                  <div className="h-10 bg-gray-100 rounded-lg animate-pulse w-5/6" />
+                  <div className="h-10 bg-gray-100 rounded-lg animate-pulse w-4/6" />
+                </div>
+              )}
+
+              {insightsError && (
+                <div className="text-center py-4">
+                  <AlertTriangle className="w-6 h-6 text-amber mx-auto mb-1.5" />
+                  <p className="text-xs text-gray-500">{insightsError}</p>
+                  <button onClick={() => loadInsights(true)} className="text-xs text-navy underline mt-1">Try again</button>
+                </div>
+              )}
+
+              {insights && !insightsError && (
+                <div className="space-y-2.5">
+                  {/* Summary */}
+                  {insights.summary && (
+                    <p className="text-xs text-gray-600 leading-relaxed border-b border-gray-50 pb-2.5">
+                      {insights.summary}
+                    </p>
+                  )}
+
+                  {/* Alerts */}
+                  {insights.alerts.length === 0 ? (
+                    <div className="flex items-center gap-2 py-2">
+                      <CheckCircle className="w-4 h-4 text-green flex-shrink-0" />
+                      <p className="text-xs text-gray-500">No significant attendance concerns detected.</p>
+                    </div>
+                  ) : (
+                    insights.alerts.map((alert, i) => {
+                      const severityStyles = {
+                        high:   { bar: 'bg-coral',  badge: 'bg-coral/10 text-coral border-coral/20',   icon: AlertTriangle },
+                        medium: { bar: 'bg-amber',  badge: 'bg-amber/10 text-amber border-amber/20',   icon: TrendingDown },
+                        low:    { bar: 'bg-teal',   badge: 'bg-teal/10 text-teal border-teal/20',     icon: School },
+                      }[alert.severity];
+                      const Icon = severityStyles.icon;
+                      const typeLabel: Record<string, string> = {
+                        chronic_absence:    'Chronic Absence',
+                        consecutive_absence:'Consecutive Absence',
+                        class_anomaly:      'Class Anomaly',
+                        threshold_risk:     'Threshold Risk',
+                        declining_trend:    'Declining Trend',
+                      };
+                      return (
+                        <div key={i} className="flex gap-2.5 rounded-xl border border-gray-100 p-3 hover:border-gray-200 transition-colors">
+                          <div className={`w-1 rounded-full flex-shrink-0 self-stretch ${severityStyles.bar}`} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <Icon className="w-3 h-3 flex-shrink-0 opacity-60" style={{ color: 'inherit' }} />
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${severityStyles.badge}`}>
+                                {typeLabel[alert.type] ?? alert.type}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-700 leading-snug">{alert.message}</p>
+                            {alert.actionHint && (
+                              <p className="text-[10px] text-gray-400 mt-1 italic">{alert.actionHint}</p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-between pt-1">
+                    <p className="text-[10px] text-gray-300">
+                      {insights.stale ? 'Stale · ' : insights.cached ? 'Cached · ' : 'Live · '}
+                      {new Date(insights.generatedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                      {insightsLoading && <span className="ml-1 text-navy animate-pulse">· Updating…</span>}
+                    </p>
+                    <p className="text-[10px] text-gray-300">
+                      {insights.inputTokens + insights.outputTokens} tokens
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Absentees */}

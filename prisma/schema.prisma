@@ -3117,6 +3117,19 @@ model InterviewBlockedDate {
   @@index([configId])
 }
 
+model AttendanceInsight {
+  id           String   @id @default(cuid())
+  tenantId     String   @unique
+  generatedAt  DateTime @default(now())
+  expiresAt    DateTime
+  alerts       Json     @default("[]")
+  summary      String   @db.Text @default("")
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+
+  @@index([tenantId])
+}
+
 model Holiday {
   id        String   @id @default(cuid())
   tenantId  String
