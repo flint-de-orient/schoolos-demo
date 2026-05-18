@@ -9,10 +9,11 @@ export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const sectionId = searchParams.get('sectionId') ?? undefined;
   const teacherId = searchParams.get('teacherId') ?? undefined;
+  const draft     = searchParams.get('draft') === 'true';
 
-  // Get the active timetable for this tenant
+  // Get the active (or draft-preview) timetable for this tenant
   const timetable = await db.timetable.findFirst({
-    where: { tenantId: session.user.tenantId, status: 'ACTIVE' },
+    where: { tenantId: session.user.tenantId, status: draft ? 'DRAFT' : 'ACTIVE' },
     include: {
       entries: {
         where: {
@@ -54,7 +55,14 @@ export async function GET(req: NextRequest) {
     },
   });
 
-  return ok({ timetable, substitutions, activityMap });
+  // Also surface any pending DRAFT so the UI can show a banner
+  const pendingDraft = await db.timetable.findFirst({
+    where: { tenantId: session.user.tenantId, status: 'DRAFT' },
+    select: { id: true, label: true, generatedAt: true, qualityScore: true, conflictCount: true },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  return ok({ timetable, substitutions, activityMap, pendingDraft: pendingDraft ?? null });
 }
 
 export async function POST(req: NextRequest) {

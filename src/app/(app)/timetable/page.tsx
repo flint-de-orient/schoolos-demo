@@ -409,6 +409,13 @@ export default function TimetablePage() {
   const [parentPublishedAt, setParentPublishedAt]       = useState<string | null>(null);
   const [publishing, setPublishing]                     = useState(false);
 
+  // ── Draft / active management ─────────────────────────────────────────────
+  type DraftMeta = { id: string; label: string; generatedAt: string | null; qualityScore: number | null; conflictCount: number };
+  const [pendingDraft, setPendingDraft]   = useState<DraftMeta | null>(null);
+  const [activating, setActivating]       = useState(false);
+  const [deleting, setDeleting]           = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
   // ── Workload report ───────────────────────────────────────────────────────
   type WorkloadSubject = { subjectId: string; subjectName: string; periodsPerWeek: number; sections: string[] };
   type WorkloadRow     = { teacherId: string; teacherName: string; subjects: WorkloadSubject[]; totalPeriods: number };
@@ -462,12 +469,15 @@ export default function TimetablePage() {
   }, []);
 
   // ── Load timetable when section changes ──────────────────────────────────
-  const loadTimetable = useCallback((sectionId: string, teacherId?: string) => {
+  const [previewingDraft, setPreviewingDraft] = useState(false);
+
+  const loadTimetable = useCallback((sectionId: string, teacherId?: string, isDraft = false) => {
     if (!sectionId && !teacherId) return;
     setTtLoading(true);
+    const draftParam = isDraft ? '&draft=true' : '';
     const url = teacherId
-      ? `/api/timetable?teacherId=${teacherId}`
-      : `/api/timetable?sectionId=${sectionId}`;
+      ? `/api/timetable?teacherId=${teacherId}${draftParam}`
+      : `/api/timetable?sectionId=${sectionId}${draftParam}`;
 
     const slotUrl = sectionId ? `/api/timetable/period-slots?sectionId=${sectionId}` : null;
 
@@ -486,12 +496,15 @@ export default function TimetablePage() {
 
       const tt = res.data?.timetable ?? res.timetable;
       const subs = res.data?.substitutions ?? res.substitutions ?? [];
+      const draft = res.data?.pendingDraft ?? res.pendingDraft ?? null;
       setSubstitutions(subs);
+      setPendingDraft(draft);
       if (!tt) { setGrid({}); setTimetableLabel(''); setTimetableId(null); setIsPublishedToParents(false); setParentPublishedAt(null); return; }
       setTimetableLabel(tt.label ?? '');
       setTimetableId(tt.id ?? null);
       setIsPublishedToParents(tt.isPublishedToParents ?? false);
       setParentPublishedAt(tt.parentPublishedAt ?? null);
+      setPreviewingDraft(tt.status === 'DRAFT');
       const newGrid: Grid = {};
       for (const e of tt.entries ?? []) {
         if (!newGrid[e.day]) newGrid[e.day] = {};
@@ -736,18 +749,17 @@ export default function TimetablePage() {
       .then(r => r.json())
       .then(d => {
         if (d.error) { setGenError(d.error); setGenState('error'); return; }
-        setGenResult(d.data ?? d);
+        const result = d.data ?? d;
+        setGenResult(result);
         setGenState('complete');
-
-        // Reload timetable for the first section — loadTimetable now also
-        // fetches fresh period slots per section's grade group
-        const firstSection = [...selectedGenSections][0];
-        if (firstSection) {
-          setSelectedSectionId(firstSection);
-          const found = (preflight?.sections ?? []).find(s => s.id === firstSection);
-          setSelectedSectionLabel(found?.label ?? '');
-          loadTimetable(firstSection);
-        }
+        // Surface the new draft in the timetable tab banner
+        setPendingDraft({
+          id: result.timetableId,
+          label: result.label,
+          generatedAt: new Date().toISOString(),
+          qualityScore: null,
+          conflictCount: result.stats?.conflictsFound ?? 0,
+        });
       })
       .catch(() => { setGenError('Network error — please try again.'); setGenState('error'); });
   }
@@ -809,6 +821,44 @@ export default function TimetablePage() {
     finally { setPublishing(false); }
   }
 
+  async function handleActivateDraft(draftId: string) {
+    setActivating(true);
+    try {
+      const res = await fetch(`/api/timetable/${draftId}`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok || data.error) { toast.error(data.error ?? 'Failed to activate'); return; }
+      setPendingDraft(null);
+      toast.success('Timetable activated — it is now live.');
+      // Reload timetable view
+      if (selectedSectionId) loadTimetable(selectedSectionId);
+      setActiveTab('timetable');
+    } catch { toast.error('Network error'); }
+    finally { setActivating(false); }
+  }
+
+  async function handleDeleteTimetable(id: string, isDraft: boolean) {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/timetable/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok || data.error) { toast.error(data.error ?? 'Failed to delete'); return; }
+      if (isDraft) {
+        setPendingDraft(null);
+        setGenState('idle');
+        setGenResult(null);
+        toast.success('Draft deleted.');
+      } else {
+        setGrid({});
+        setTimetableId(null);
+        setTimetableLabel('');
+        setIsPublishedToParents(false);
+        setParentPublishedAt(null);
+        toast.success('Timetable deleted.');
+      }
+    } catch { toast.error('Network error'); }
+    finally { setDeleting(false); setConfirmDelete(false); }
+  }
+
   async function loadWorkload() {
     setWorkloadLoading(true);
     try {
@@ -855,6 +905,11 @@ export default function TimetablePage() {
         <div className="flex items-center gap-2 no-print">
           <AIBadge label="AI Powered" />
           {timetableLabel && <span className="text-xs text-gray-400 font-dm-sans">{timetableLabel}</span>}
+          {previewingDraft && (
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-300">
+              DRAFT PREVIEW
+            </span>
+          )}
           {timetableId && activeTab === 'timetable' && Object.keys(grid).length > 0 && (
             <>
               <button
@@ -969,9 +1024,53 @@ export default function TimetablePage() {
                   <BarChart2 className="w-3.5 h-3.5" />
                   {showWorkload ? 'Hide Workload' : 'Workload Report'}
                 </button>
+                {/* Delete active timetable */}
+                {!confirmDelete ? (
+                  <button onClick={() => setConfirmDelete(true)}
+                    className="flex items-center gap-1.5 text-sm border border-red-200 rounded-lg px-3 py-2 font-semibold font-dm-sans text-red-500 hover:bg-red-50 transition-colors shadow-sm">
+                    🗑 Delete
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2 bg-red-50 border border-red-300 rounded-lg px-3 py-1.5">
+                    <span className="text-xs text-red-700 font-semibold font-dm-sans">Delete timetable?</span>
+                    <button onClick={() => timetableId && handleDeleteTimetable(timetableId, false)}
+                      disabled={deleting}
+                      className="text-xs bg-red-600 text-white px-2.5 py-1 rounded-md font-semibold hover:bg-red-700 disabled:opacity-50">
+                      {deleting ? '…' : 'Confirm'}
+                    </button>
+                    <button onClick={() => setConfirmDelete(false)} className="text-xs text-gray-500 hover:text-gray-700">Cancel</button>
+                  </div>
+                )}
               </>
             )}
           </div>
+
+          {/* Draft pending banner */}
+          {pendingDraft && (
+            <div className="no-print bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-3">
+              <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-amber-800 font-dm-sans">
+                  Draft ready: <span className="font-normal">{pendingDraft.label}</span>
+                </p>
+                <p className="text-xs text-amber-600 font-dm-sans mt-0.5">
+                  This draft is not live. Review it then activate to replace the current timetable.
+                </p>
+              </div>
+              <button
+                onClick={() => handleActivateDraft(pendingDraft.id)}
+                disabled={activating}
+                className="flex items-center gap-1.5 bg-navy text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-navyMid disabled:opacity-50 transition-colors whitespace-nowrap">
+                {activating ? <RefreshCw className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
+                {activating ? 'Activating…' : 'Activate Now'}
+              </button>
+              <button
+                onClick={() => { setActiveTab('generator'); }}
+                className="text-xs text-amber-700 font-semibold underline hover:no-underline whitespace-nowrap">
+                Review Draft →
+              </button>
+            </div>
+          )}
 
           {/* Print-only header */}
           <div className="hidden print:block mb-4">
@@ -1516,10 +1615,11 @@ export default function TimetablePage() {
                 {genState === 'complete' && genResult && (
                   <div className="space-y-4">
                     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-                      <div className="flex items-center gap-2 mb-4">
+                      <div className="flex items-center gap-2 mb-1">
                         <CheckCircle2 className="w-5 h-5 text-green-500" />
-                        <h3 className="text-sm font-sora font-semibold text-navy">Timetable Generated Successfully</h3>
+                        <h3 className="text-sm font-sora font-semibold text-navy">Draft Timetable Ready</h3>
                         <AIBadge label="AI" />
+                        <span className="ml-auto text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">DRAFT — not live yet</span>
                       </div>
                       <p className="text-xs text-gray-400 font-dm-sans mb-4">{genResult.label}</p>
 
@@ -1559,17 +1659,35 @@ export default function TimetablePage() {
                       </div>
                     </div>
 
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 flex-wrap">
                       <button
-                        onClick={() => { setActiveTab('timetable'); toast.success('Timetable is now active — viewing generated schedule.'); }}
+                        onClick={() => pendingDraft && handleActivateDraft(pendingDraft.id)}
+                        disabled={activating || !pendingDraft}
+                        className="flex items-center gap-2 bg-navy text-white font-sora font-semibold rounded-xl px-5 py-2.5 hover:bg-navyMid disabled:opacity-50 transition-colors text-sm">
+                        {activating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                        {activating ? 'Activating…' : 'Activate — Go Live'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setActiveTab('timetable');
+                          if (selectedSectionId) loadTimetable(selectedSectionId, undefined, true);
+                        }}
                         className="flex items-center gap-2 bg-gold text-navy font-sora font-semibold rounded-xl px-5 py-2.5 hover:bg-gold/90 transition-colors text-sm">
-                        <CheckCircle2 className="w-4 h-4" /> View Timetable
+                        <CheckCircle2 className="w-4 h-4" /> Preview Draft
                       </button>
                       <button
                         onClick={() => { setGenState('idle'); setGenResult(null); }}
                         className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 font-semibold rounded-xl px-4 py-2.5 hover:border-navy/30 transition-colors text-sm">
                         <RotateCcw className="w-4 h-4" /> Regenerate
                       </button>
+                      {pendingDraft && (
+                        <button
+                          onClick={() => handleDeleteTimetable(pendingDraft.id, true)}
+                          disabled={deleting}
+                          className="flex items-center gap-2 bg-white border border-red-200 text-red-600 font-semibold rounded-xl px-4 py-2.5 hover:bg-red-50 transition-colors text-sm ml-auto">
+                          🗑 Discard Draft
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}

@@ -27,7 +27,7 @@ export async function PATCH(
   const entryA = await db.timetableEntry.findFirst({
     where: {
       id: entryId,
-      timetable: { tenantId, status: 'ACTIVE' },
+      timetable: { tenantId, status: { in: ['ACTIVE', 'DRAFT'] } },
     },
     include: { timetable: true },
   });

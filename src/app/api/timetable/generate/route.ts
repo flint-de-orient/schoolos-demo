@@ -247,11 +247,15 @@ export async function POST(req: NextRequest) {
     return err('No sections could be processed — assign grade groups to the selected classes first.', 400);
   }
 
-  // ── Archive existing active timetable ────────────────────────────────────────
-  await db.timetable.updateMany({
-    where: { tenantId, status: 'ACTIVE' },
-    data: { status: 'ARCHIVED' },
+  // ── Remove any existing DRAFT for this tenant (only one draft at a time) ────
+  const existingDraft = await db.timetable.findFirst({
+    where: { tenantId, status: 'DRAFT' },
+    select: { id: true },
   });
+  if (existingDraft) {
+    await db.timetableEntry.deleteMany({ where: { timetableId: existingDraft.id } });
+    await db.timetable.delete({ where: { id: existingDraft.id } });
+  }
 
   // ── Per-group: generate slots, then schedule sections ────────────────────────
   // Only SUNDAY is treated as a non-working weekend day; Saturday is a regular
@@ -544,10 +548,9 @@ export async function POST(req: NextRequest) {
       tenantId,
       academicYearId: academicYear.id,
       label,
-      status: 'ACTIVE',
+      status: 'DRAFT',
       generatedByAI: true,
       generatedAt: new Date(),
-      publishedAt: new Date(),
       qualityScore: actualQuality,
       conflictCount: 0,
     },
