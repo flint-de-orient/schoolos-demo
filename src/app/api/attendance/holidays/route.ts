@@ -2,19 +2,20 @@ import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { requireSession, ok, err } from '@/lib/api-auth';
 
+function fmt(d: Date) { return d.toISOString().split('T')[0]; }
+
 export async function GET(req: NextRequest) {
   const { session, error } = await requireSession();
   if (error) return error;
 
   const { searchParams } = req.nextUrl;
   const year = searchParams.get('year');
-
   const tenantId = session.user.tenantId;
 
   const where = year
     ? {
         tenantId,
-        date: {
+        startDate: {
           gte: new Date(`${year}-01-01`),
           lte: new Date(`${year}-12-31`),
         },
@@ -23,10 +24,10 @@ export async function GET(req: NextRequest) {
 
   const holidays = await db.holiday.findMany({
     where,
-    orderBy: { date: 'asc' },
+    orderBy: { startDate: 'asc' },
   });
 
-  return ok(holidays);
+  return ok(holidays.map(h => ({ ...h, startDate: fmt(h.startDate), endDate: fmt(h.endDate) })));
 }
 
 export async function POST(req: NextRequest) {
@@ -34,21 +35,23 @@ export async function POST(req: NextRequest) {
   if (error) return error;
 
   const body = await req.json();
-  const { date, name, type } = body;
+  const { startDate, endDate, name, type } = body;
 
-  if (!date || !name) return err('date and name are required');
+  if (!startDate || !name) return err('startDate and name are required');
+
+  const start = new Date(startDate);
+  const end   = endDate ? new Date(endDate) : new Date(startDate);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+
+  if (end < start) return err('endDate cannot be before startDate', 400);
 
   const tenantId = session.user.tenantId;
-  const targetDate = new Date(date);
-  targetDate.setHours(0, 0, 0, 0);
-
-  const holiday = await db.holiday.upsert({
-    where: { tenantId_date: { tenantId, date: targetDate } },
-    update: { name, type: type ?? 'PUBLIC' },
-    create: { tenantId, date: targetDate, name, type: type ?? 'PUBLIC' },
+  const holiday = await db.holiday.create({
+    data: { tenantId, startDate: start, endDate: end, name, type: type ?? 'PUBLIC' },
   });
 
-  return ok(holiday, 201);
+  return ok({ ...holiday, startDate: fmt(holiday.startDate), endDate: fmt(holiday.endDate) }, 201);
 }
 
 export async function DELETE(req: NextRequest) {

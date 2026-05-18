@@ -3120,13 +3120,14 @@ model InterviewBlockedDate {
 model Holiday {
   id        String   @id @default(cuid())
   tenantId  String
-  date      DateTime @db.Date
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
   name      String
-  type      String   @default("PUBLIC") // PUBLIC | LOCAL | OPTIONAL
+  type      String   @default("PUBLIC") // PUBLIC | LOCAL | OPTIONAL | VACATION | FESTIVAL | STUDY_LEAVE
   createdAt DateTime @default(now())
 
-  @@unique([tenantId, date])
   @@index([tenantId])
+  @@index([tenantId, startDate])
 }
 
 // Per-tenant API integration credentials (Zoom, Google Meet, SMS, WhatsApp)

@@ -35,12 +35,20 @@ export async function GET(req: NextRequest) {
   // Unique working days
   const workingDays = sessions.map(s => s.date.toISOString().split('T')[0]);
 
-  // Holidays in range
-  const holidays = await db.holiday.findMany({
-    where: { tenantId, date: { gte: from, lte: to } },
-    select: { date: true, name: true },
+  // Holidays overlapping this month — expand ranges into individual dates
+  const holidayRanges = await db.holiday.findMany({
+    where: { tenantId, startDate: { lte: to }, endDate: { gte: from } },
+    select: { startDate: true, endDate: true, name: true },
   });
-  const holidayDates = new Set(holidays.map(h => h.date.toISOString().split('T')[0]));
+  const holidayDates = new Set<string>();
+  for (const h of holidayRanges) {
+    const cur = new Date(h.startDate);
+    const fin = new Date(h.endDate);
+    while (cur <= fin) {
+      holidayDates.add(cur.toISOString().split('T')[0]);
+      cur.setDate(cur.getDate() + 1);
+    }
+  }
 
   // Build student map: studentId → { name, rollNo, days: { date: status } }
   const studentMap: Record<string, {
@@ -82,7 +90,11 @@ export async function GET(req: NextRequest) {
     sectionId,
     totalWorkingDays,
     workingDays,
-    holidays: holidays.map(h => ({ date: h.date.toISOString().split('T')[0], name: h.name })),
+    holidays: holidayRanges.map(h => ({
+      startDate: h.startDate.toISOString().split('T')[0],
+      endDate: h.endDate.toISOString().split('T')[0],
+      name: h.name,
+    })),
     students,
   });
 }

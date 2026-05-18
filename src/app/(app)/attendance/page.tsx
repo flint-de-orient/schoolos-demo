@@ -43,7 +43,8 @@ interface Absentee {
 
 interface Holiday {
   id: string;
-  date: string;
+  startDate: string;
+  endDate: string;
   name: string;
   type: string;
 }
@@ -92,7 +93,8 @@ export default function AttendancePage() {
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [notifying, setNotifying] = useState<string | null>(null);
   const [showHolidayForm, setShowHolidayForm] = useState(false);
-  const [holidayForm, setHolidayForm] = useState({ date: today(), name: '', type: 'PUBLIC' });
+  const [holidayForm, setHolidayForm] = useState({ startDate: today(), endDate: today(), name: '', type: 'PUBLIC' });
+  const [holidayIsRange, setHolidayIsRange] = useState(false);
   const [savingHoliday, setSavingHoliday] = useState(false);
   const [reportSection, setReportSection] = useState('');
   const [reportMonth, setReportMonth] = useState(new Date().getMonth() + 1);
@@ -220,24 +222,32 @@ export default function AttendancePage() {
   }
 
   async function handleAddHoliday() {
-    if (!holidayForm.name.trim() || !holidayForm.date) {
+    if (!holidayForm.name.trim() || !holidayForm.startDate) {
       toast.error('Date and name are required');
       return;
     }
     setSavingHoliday(true);
     try {
+      const payload = {
+        startDate: holidayForm.startDate,
+        endDate: holidayIsRange ? holidayForm.endDate : holidayForm.startDate,
+        name: holidayForm.name,
+        type: holidayForm.type,
+      };
       const res = await fetch('/api/attendance/holidays', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(holidayForm),
+        body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error('Failed to save holiday');
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error ?? 'Failed to save holiday');
       toast.success('Holiday added');
       setShowHolidayForm(false);
-      setHolidayForm({ date: today(), name: '', type: 'PUBLIC' });
+      setHolidayIsRange(false);
+      setHolidayForm({ startDate: today(), endDate: today(), name: '', type: 'PUBLIC' });
       loadHolidays();
-    } catch {
-      toast.error('Failed to save holiday');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to save holiday');
     } finally {
       setSavingHoliday(false);
     }
@@ -587,17 +597,54 @@ export default function AttendancePage() {
 
             {showHolidayForm && (
               <div className="mb-3 p-3 bg-gray-50 rounded-xl space-y-2 border border-gray-100">
+                {/* Range toggle */}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <div
+                    onClick={() => {
+                      setHolidayIsRange(v => !v);
+                      if (!holidayIsRange) setHolidayForm(f => ({ ...f, endDate: f.startDate }));
+                    }}
+                    className={`relative w-8 h-4 rounded-full transition-colors ${holidayIsRange ? 'bg-navy' : 'bg-gray-300'}`}
+                  >
+                    <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${holidayIsRange ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                  </div>
+                  <span className="text-[11px] text-gray-600">Vacation / multi-day range</span>
+                </label>
+
+                {/* Date inputs */}
+                <div className={`grid gap-1.5 ${holidayIsRange ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                  <div>
+                    {holidayIsRange && <p className="text-[10px] text-gray-400 mb-0.5">From</p>}
+                    <input
+                      type="date"
+                      value={holidayForm.startDate}
+                      onChange={e => setHolidayForm(f => ({
+                        ...f,
+                        startDate: e.target.value,
+                        endDate: !holidayIsRange || f.endDate < e.target.value ? e.target.value : f.endDate,
+                      }))}
+                      className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none bg-white"
+                    />
+                  </div>
+                  {holidayIsRange && (
+                    <div>
+                      <p className="text-[10px] text-gray-400 mb-0.5">To</p>
+                      <input
+                        type="date"
+                        value={holidayForm.endDate}
+                        min={holidayForm.startDate}
+                        onChange={e => setHolidayForm(f => ({ ...f, endDate: e.target.value }))}
+                        className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none bg-white"
+                      />
+                    </div>
+                  )}
+                </div>
+
                 <input
-                  type="date"
-                  value={holidayForm.date}
-                  onChange={e => setHolidayForm(f => ({ ...f, date: e.target.value }))}
-                  className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none"
-                />
-                <input
-                  placeholder="Holiday name…"
+                  placeholder="e.g. Summer Vacation, Eid, Republic Day…"
                   value={holidayForm.name}
                   onChange={e => setHolidayForm(f => ({ ...f, name: e.target.value }))}
-                  className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none"
+                  className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none bg-white"
                 />
                 <select
                   value={holidayForm.type}
@@ -605,8 +652,11 @@ export default function AttendancePage() {
                   className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none bg-white"
                 >
                   <option value="PUBLIC">Public Holiday</option>
+                  <option value="FESTIVAL">Festival Holiday</option>
                   <option value="LOCAL">Local Holiday</option>
-                  <option value="OPTIONAL">Optional</option>
+                  <option value="VACATION">School Vacation</option>
+                  <option value="STUDY_LEAVE">Study Leave</option>
+                  <option value="OPTIONAL">Optional Holiday</option>
                 </select>
                 <div className="flex gap-2">
                   <button
@@ -617,7 +667,7 @@ export default function AttendancePage() {
                     {savingHoliday ? 'Saving…' : 'Save'}
                   </button>
                   <button
-                    onClick={() => setShowHolidayForm(false)}
+                    onClick={() => { setShowHolidayForm(false); setHolidayIsRange(false); }}
                     className="text-xs py-1.5 px-3 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100"
                   >
                     Cancel
@@ -630,26 +680,38 @@ export default function AttendancePage() {
               <p className="text-xs text-gray-400 text-center py-3">No holidays added for this year.</p>
             ) : (
               <div className="space-y-1 max-h-52 overflow-y-auto">
-                {holidays.map(h => (
-                  <div key={h.id} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
-                    <div>
-                      <p className="text-xs font-semibold text-gray-700">{h.name}</p>
-                      <p className="text-[10px] text-gray-400">
-                        {new Date(h.date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                        <span className={`ml-2 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
-                          h.type === 'PUBLIC' ? 'bg-navy/10 text-navy' :
-                          h.type === 'LOCAL' ? 'bg-teal/10 text-teal' : 'bg-gray-100 text-gray-500'
-                        }`}>{h.type}</span>
-                      </p>
+                {holidays.map(h => {
+                  const isRange = h.startDate !== h.endDate;
+                  const typeColor: Record<string, string> = {
+                    PUBLIC:      'bg-navy/10 text-navy',
+                    FESTIVAL:    'bg-purple/10 text-purple',
+                    LOCAL:       'bg-teal/10 text-teal',
+                    VACATION:    'bg-amber/10 text-amber',
+                    STUDY_LEAVE: 'bg-green/10 text-green',
+                    OPTIONAL:    'bg-gray-100 text-gray-500',
+                  };
+                  const fmtDate = (s: string) =>
+                    new Date(s).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+                  return (
+                    <div key={h.id} className="flex items-start justify-between py-1.5 border-b border-gray-50 last:border-0">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-gray-700 truncate">{h.name}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">
+                          {isRange ? `${fmtDate(h.startDate)} – ${fmtDate(h.endDate)}` : fmtDate(h.startDate)}
+                        </p>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full mt-0.5 inline-block ${typeColor[h.type] ?? 'bg-gray-100 text-gray-500'}`}>
+                          {h.type.replace('_', ' ')}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteHoliday(h.id)}
+                        className="text-gray-300 hover:text-coral transition-colors p-1 flex-shrink-0"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => handleDeleteHoliday(h.id)}
-                      className="text-gray-300 hover:text-coral transition-colors p-1"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
