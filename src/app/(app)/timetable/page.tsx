@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import PageWrapper from '@/components/layout/PageWrapper';
+import { useTenant } from '@/context/TenantContext';
 import AIBadge from '@/components/shared/AIBadge';
 import ClassSubjectsTab from '@/components/timetable/ClassSubjectsTab';
 import GradeGroupsSetup from '@/components/timetable/GradeGroupsSetup';
@@ -369,6 +370,7 @@ function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, s
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function TimetablePage() {
+  const tenant = useTenant();
   const [activeTab, setActiveTab]       = useState<'timetable' | 'generator' | 'substitution' | 'classsubjects' | 'setup'>('timetable');
   const [targetGradeId, setTargetGradeId] = useState<string | null>(null);
   const [grades, setGrades]             = useState<Grade[]>([]);
@@ -933,7 +935,7 @@ export default function TimetablePage() {
 
           {/* Print-only header */}
           <div className="hidden print:block mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Sundarban Academy — Timetable</h2>
+            <h2 className="text-lg font-semibold text-gray-900">{tenant.name} — Timetable</h2>
             <p className="text-sm text-gray-600">{selectedSectionLabel} · {timetableLabel}</p>
           </div>
 
