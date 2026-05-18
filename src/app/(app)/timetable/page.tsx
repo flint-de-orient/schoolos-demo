@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import {
   AlertCircle, CheckCircle2, Sparkles, LayoutGrid, Zap, RotateCcw,
   Brain, TrendingUp, User, Timer, Shield, RefreshCw, ChevronDown, BookOpen,
-  Settings2, Clock, GraduationCap, Pencil, X, Download, Send, CheckCircle,
+  Settings2, Clock, GraduationCap, Pencil, X, Download, Send, CheckCircle, BarChart2,
 } from 'lucide-react';
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -409,6 +409,13 @@ export default function TimetablePage() {
   const [parentPublishedAt, setParentPublishedAt]       = useState<string | null>(null);
   const [publishing, setPublishing]                     = useState(false);
 
+  // ── Workload report ───────────────────────────────────────────────────────
+  type WorkloadSubject = { subjectId: string; subjectName: string; periodsPerWeek: number; sections: string[] };
+  type WorkloadRow     = { teacherId: string; teacherName: string; subjects: WorkloadSubject[]; totalPeriods: number };
+  const [showWorkload, setShowWorkload]   = useState(false);
+  const [workloadRows, setWorkloadRows]   = useState<WorkloadRow[]>([]);
+  const [workloadLoading, setWorkloadLoading] = useState(false);
+
   const [viewMode, setViewMode]         = useState<'class' | 'teacher'>('class');
   const [teachers, setTeachers]         = useState<{ id: string; name: string }[]>([]);
   const [selectedTeacherId, setSelectedTeacherId] = useState('');
@@ -791,14 +798,30 @@ export default function TimetablePage() {
       });
       const data = await res.json();
       if (!res.ok || data.error) { toast.error(data.error ?? 'Failed to publish'); return; }
-      const { notificationsSent, notificationsFailed, totalParents } = data.data ?? data;
+      const { notificationsSent, notificationsFailed, totalStudents } = data.data ?? data;
       setIsPublishedToParents(true);
       setParentPublishedAt(new Date().toISOString());
+      const verb = isPublishedToParents ? 'Re-published' : 'Published';
       toast.success(
-        `Timetable published! WhatsApp sent to ${notificationsSent}/${totalParents} parents.${notificationsFailed > 0 ? ` (${notificationsFailed} failed)` : ''}`
+        `${verb}! WhatsApp sent to ${notificationsSent}/${totalStudents} parents.${notificationsFailed > 0 ? ` (${notificationsFailed} failed)` : ''}`
       );
     } catch { toast.error('Network error — could not publish'); }
     finally { setPublishing(false); }
+  }
+
+  async function loadWorkload() {
+    setWorkloadLoading(true);
+    try {
+      const res = await fetch('/api/timetable/workload');
+      const data = await res.json();
+      setWorkloadRows((data.data ?? data).rows ?? []);
+    } catch { toast.error('Failed to load workload data'); }
+    finally { setWorkloadLoading(false); }
+  }
+
+  function handleToggleWorkload() {
+    if (!showWorkload && workloadRows.length === 0) loadWorkload();
+    setShowWorkload(w => !w);
   }
 
   function handleDownload() {
@@ -841,23 +864,29 @@ export default function TimetablePage() {
                 <Download className="w-3.5 h-3.5" />
                 Download PDF
               </button>
-              {isPublishedToParents ? (
-                <div className="flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5">
-                  <CheckCircle className="w-3.5 h-3.5 text-green-600" />
-                  <span className="text-xs font-semibold text-green-700 font-dm-sans">
-                    Published to Parents{parentPublishedAt ? ` · ${new Date(parentPublishedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
-                  </span>
-                </div>
-              ) : (
+              <div className="flex flex-col items-end gap-0.5">
                 <button
                   onClick={handlePublish}
                   disabled={publishing}
-                  className="flex items-center gap-1.5 text-sm bg-navy text-white rounded-lg px-3 py-1.5 font-semibold font-dm-sans hover:bg-navyMid disabled:opacity-50 transition-colors shadow-sm"
+                  className={`flex items-center gap-1.5 text-sm rounded-lg px-3 py-1.5 font-semibold font-dm-sans transition-colors shadow-sm disabled:opacity-50 ${
+                    isPublishedToParents
+                      ? 'bg-white border border-green-300 text-green-700 hover:bg-green-50'
+                      : 'bg-navy text-white hover:bg-navyMid'
+                  }`}
                 >
-                  {publishing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                  {publishing ? 'Publishing…' : 'Publish to Parents'}
+                  {publishing
+                    ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    : isPublishedToParents
+                      ? <><CheckCircle className="w-3.5 h-3.5" /></>
+                      : <Send className="w-3.5 h-3.5" />}
+                  {publishing ? 'Sending…' : isPublishedToParents ? 'Re-notify Parents' : 'Publish to Parents'}
                 </button>
-              )}
+                {isPublishedToParents && parentPublishedAt && (
+                  <span className="text-[10px] text-gray-400 font-dm-sans">
+                    Last sent {new Date(parentPublishedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -930,6 +959,15 @@ export default function TimetablePage() {
                       : 'bg-white border-gray-200 text-gray-600 hover:border-purple-400 hover:text-purple-700'
                   }`}>
                   {placeMode ? <><X className="w-3.5 h-3.5" /> Exit Place</> : <>＋ Place Period</>}
+                </button>
+                <button onClick={handleToggleWorkload}
+                  className={`flex items-center gap-2 text-sm border rounded-lg px-4 py-2 font-semibold font-dm-sans transition-colors shadow-sm ${
+                    showWorkload
+                      ? 'bg-indigo-500 border-indigo-500 text-white hover:bg-indigo-600'
+                      : 'bg-white border-gray-200 text-gray-600 hover:border-indigo-400 hover:text-indigo-700'
+                  }`}>
+                  <BarChart2 className="w-3.5 h-3.5" />
+                  {showWorkload ? 'Hide Workload' : 'Workload Report'}
                 </button>
               </>
             )}
@@ -1109,6 +1147,80 @@ export default function TimetablePage() {
               onCopyCellClick={handleCopyCellClick}
               onPlaceCellClick={handlePlaceCellClick}
             />
+          )}
+
+          {/* Teacher Workload Report */}
+          {showWorkload && Object.keys(grid).length > 0 && (
+            <div className="no-print bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <BarChart2 className="w-4 h-4 text-indigo-600" />
+                  <h3 className="text-sm font-sora font-semibold text-navy">Teacher Workload Report</h3>
+                  <span className="text-xs text-gray-400 font-dm-sans">— periods per week across all sections</span>
+                </div>
+                {workloadLoading && <RefreshCw className="w-3.5 h-3.5 text-gray-300 animate-spin" />}
+              </div>
+              {!workloadLoading && workloadRows.length === 0 ? (
+                <div className="p-8 text-center text-sm text-gray-400 font-dm-sans">No data available</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm font-dm-sans">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-100">
+                        <th className="text-left px-5 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide w-48">Teacher</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Subjects &amp; Sections</th>
+                        <th className="text-right px-5 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide w-28">Total Periods/wk</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {workloadRows.map((row, i) => {
+                        const pct = Math.min(100, Math.round((row.totalPeriods / 40) * 100));
+                        const loadColor = row.totalPeriods > 30 ? 'text-red-600 bg-red-50' : row.totalPeriods > 22 ? 'text-amber-600 bg-amber-50' : 'text-green-700 bg-green-50';
+                        return (
+                          <tr key={row.teacherId} className={`border-b border-gray-50 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                            <td className="px-5 py-3">
+                              <div className="font-semibold text-navy text-sm">{row.teacherName}</div>
+                              <div className="mt-1.5 h-1.5 bg-gray-100 rounded-full w-32 overflow-hidden">
+                                <div className={`h-full rounded-full ${row.totalPeriods > 30 ? 'bg-red-400' : row.totalPeriods > 22 ? 'bg-amber-400' : 'bg-green-400'}`}
+                                  style={{ width: `${pct}%` }} />
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex flex-wrap gap-1.5">
+                                {row.subjects.map(s => (
+                                  <span key={s.subjectId} className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 text-xs px-2 py-0.5 rounded-full">
+                                    <span className="font-semibold">{s.subjectName}</span>
+                                    <span className="text-gray-400">·</span>
+                                    <span>{s.periodsPerWeek}p</span>
+                                    <span className="text-gray-400">·</span>
+                                    <span className="text-gray-500">{s.sections.join(', ')}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            </td>
+                            <td className="px-5 py-3 text-right">
+                              <span className={`text-sm font-bold px-2.5 py-1 rounded-lg ${loadColor}`}>
+                                {row.totalPeriods}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-gray-50 border-t border-gray-200">
+                        <td colSpan={2} className="px-5 py-2.5 text-xs text-gray-400 font-dm-sans">
+                          Load guide: <span className="text-green-600 font-semibold">≤22 Normal</span> · <span className="text-amber-600 font-semibold">23–30 Heavy</span> · <span className="text-red-600 font-semibold">&gt;30 Overloaded</span>
+                        </td>
+                        <td className="px-5 py-2.5 text-right text-xs text-gray-500 font-semibold">
+                          {workloadRows.reduce((s, r) => s + r.totalPeriods, 0)} total
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Health Score */}
