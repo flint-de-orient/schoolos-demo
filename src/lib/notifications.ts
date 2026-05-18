@@ -113,6 +113,26 @@ export async function notifyFeeConfirmed(
   );
 }
 
+// Template: attendance_low_warning
+export async function notifyLowAttendance(
+  tenantId: string,
+  parentPhone: string,
+  parentName: string,
+  studentName: string,
+  className: string,
+  percent: number
+) {
+  const tenant = await getTenantInfo(tenantId);
+  if (!tenant) return;
+
+  await sendWhatsAppTemplate(
+    tenantId, parentPhone, 'attendance_low_warning',
+    [parentName, studentName, className, String(percent), tenant.name, tenant.phone ?? 'the school office'],
+    undefined,
+    parentName
+  );
+}
+
 // Gate entry/exit notification
 export async function notifyGateEvent(
   tenantId: string,

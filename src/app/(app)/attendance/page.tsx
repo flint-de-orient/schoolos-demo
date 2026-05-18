@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import {
   Users, CheckCircle, XCircle, Percent, CalendarDays,
   ChevronDown, RefreshCw, Clock, AlertTriangle, Check, X,
+  Bell, BellOff, Download, Plus, Trash2, FileText,
 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -33,9 +34,18 @@ interface SectionRow {
 
 interface Absentee {
   studentId: string;
+  sessionId: string;
   name: string;
   className: string;
   reason: string | null;
+  parentNotified: boolean;
+}
+
+interface Holiday {
+  id: string;
+  date: string;
+  name: string;
+  type: string;
 }
 
 interface GradeSection {
@@ -79,6 +89,22 @@ export default function AttendancePage() {
   const [loading, setLoading] = useState(true);
   const [sheetSection, setSheetSection] = useState<{ id: string; name: string; gradeName: string } | null>(null);
   const [grades, setGrades] = useState<GradeSection[]>([]);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [notifying, setNotifying] = useState<string | null>(null);
+  const [showHolidayForm, setShowHolidayForm] = useState(false);
+  const [holidayForm, setHolidayForm] = useState({ date: today(), name: '', type: 'PUBLIC' });
+  const [savingHoliday, setSavingHoliday] = useState(false);
+  const [reportSection, setReportSection] = useState('');
+  const [reportMonth, setReportMonth] = useState(new Date().getMonth() + 1);
+  const [reportYear, setReportYear] = useState(new Date().getFullYear());
+  const [reportLoading, setReportLoading] = useState(false);
+
+  const loadHolidays = useCallback(() => {
+    const year = new Date().getFullYear();
+    fetch(`/api/attendance/holidays?year=${year}`)
+      .then(r => r.json())
+      .then(d => setHolidays(Array.isArray(d) ? d : []));
+  }, []);
 
   // Load grades (for mapping sections we haven't marked yet)
   useEffect(() => {
@@ -88,7 +114,8 @@ export default function AttendancePage() {
     fetch('/api/attendance/monthly')
       .then(r => r.json())
       .then(d => setTrend(Array.isArray(d) ? d : []));
-  }, []);
+    loadHolidays();
+  }, [loadHolidays]);
 
   const loadAttendance = useCallback(() => {
     setLoading(true);
@@ -148,16 +175,19 @@ export default function AttendancePage() {
         // Build absentees
         const abs: Absentee[] = [];
         (data.sessions ?? []).forEach((s: {
+          id: string;
           section: { name: string; grade: { name: string } };
-          records: { status: string; student: { id: string; name: string }; reason: string | null }[];
+          records: { status: string; student: { id: string; name: string }; reason: string | null; parentNotified?: boolean }[];
         }) => {
           s.records.forEach(r => {
             if (r.status === 'ABSENT') {
               abs.push({
                 studentId: r.student.id,
+                sessionId: s.id,
                 name: r.student.name,
                 className: `${s.section.grade.name}-${s.section.name}`,
                 reason: r.reason,
+                parentNotified: r.parentNotified ?? false,
               });
             }
           });
@@ -169,6 +199,102 @@ export default function AttendancePage() {
   }, [date, grades]);
 
   useEffect(() => { loadAttendance(); }, [loadAttendance]);
+
+  async function handleResendNotification(a: Absentee) {
+    setNotifying(a.studentId);
+    try {
+      const res = await fetch('/api/attendance/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: a.sessionId, studentId: a.studentId }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error ?? 'Failed');
+      toast.success(`WhatsApp sent to ${a.name}'s parent`);
+      setAbsentees(prev => prev.map(x => x.studentId === a.studentId ? { ...x, parentNotified: true } : x));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Notification failed');
+    } finally {
+      setNotifying(null);
+    }
+  }
+
+  async function handleAddHoliday() {
+    if (!holidayForm.name.trim() || !holidayForm.date) {
+      toast.error('Date and name are required');
+      return;
+    }
+    setSavingHoliday(true);
+    try {
+      const res = await fetch('/api/attendance/holidays', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(holidayForm),
+      });
+      if (!res.ok) throw new Error('Failed to save holiday');
+      toast.success('Holiday added');
+      setShowHolidayForm(false);
+      setHolidayForm({ date: today(), name: '', type: 'PUBLIC' });
+      loadHolidays();
+    } catch {
+      toast.error('Failed to save holiday');
+    } finally {
+      setSavingHoliday(false);
+    }
+  }
+
+  async function handleDeleteHoliday(id: string) {
+    try {
+      const res = await fetch(`/api/attendance/holidays?id=${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed');
+      toast.success('Holiday removed');
+      loadHolidays();
+    } catch {
+      toast.error('Failed to remove holiday');
+    }
+  }
+
+  async function handleDownloadReport() {
+    if (!reportSection) { toast.error('Please select a class/section'); return; }
+    setReportLoading(true);
+    try {
+      const res = await fetch(`/api/attendance/report?sectionId=${reportSection}&month=${reportMonth}&year=${reportYear}`);
+      if (!res.ok) throw new Error('Failed to generate report');
+      const data = await res.json();
+
+      // Build CSV
+      const days = data.workingDays as string[];
+      const headerRow = ['Roll No', 'Name', ...days, 'Present', 'Absent', 'Late', '%'].join(',');
+      const dataRows = (data.students as {
+        rollNo: string | null; admissionNo: string; name: string;
+        days: Record<string, string>; present: number; absent: number; late: number;
+      }[]).map(s => {
+        const pct = data.totalWorkingDays > 0
+          ? Math.round(((s.present + s.late) / data.totalWorkingDays) * 100) : 0;
+        const dayCols = days.map(d => {
+          const st = s.days[d];
+          if (!st) return 'H'; // holiday / no session
+          return st === 'PRESENT' ? 'P' : st === 'ABSENT' ? 'A' : st === 'LATE' ? 'L' : st[0];
+        });
+        return [s.rollNo ?? s.admissionNo, `"${s.name}"`, ...dayCols, s.present, s.absent, s.late, `${pct}%`].join(',');
+      });
+
+      const csv = [headerRow, ...dataRows].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const monthName = new Date(reportYear, reportMonth - 1).toLocaleString('en-IN', { month: 'long' });
+      a.download = `attendance-report-${monthName}-${reportYear}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Report downloaded');
+    } catch {
+      toast.error('Failed to generate report');
+    } finally {
+      setReportLoading(false);
+    }
+  }
 
   if (loading && rows.length === 0) {
     return (
@@ -231,6 +357,47 @@ export default function AttendancePage() {
         <span className="ml-auto text-xs text-gray-400">
           {rows.filter(r => r.sessionId).length} of {rows.length} sections marked
         </span>
+
+        {/* Monthly Report Download */}
+        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm">
+          <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          <select
+            value={reportSection}
+            onChange={e => setReportSection(e.target.value)}
+            className="text-xs text-gray-700 focus:outline-none bg-transparent min-w-[120px]"
+          >
+            <option value="">Select class…</option>
+            {grades.map(g => g.sections.map(sec => (
+              <option key={sec.id} value={sec.id}>{g.name} – {sec.name}</option>
+            )))}
+          </select>
+          <select
+            value={reportMonth}
+            onChange={e => setReportMonth(Number(e.target.value))}
+            className="text-xs text-gray-700 focus:outline-none bg-transparent"
+          >
+            {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m,i) => (
+              <option key={m} value={i+1}>{m}</option>
+            ))}
+          </select>
+          <select
+            value={reportYear}
+            onChange={e => setReportYear(Number(e.target.value))}
+            className="text-xs text-gray-700 focus:outline-none bg-transparent"
+          >
+            {[reportYear - 1, reportYear, reportYear + 1].map(y => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+          <button
+            onClick={handleDownloadReport}
+            disabled={reportLoading}
+            className="flex items-center gap-1 text-xs font-semibold text-navy hover:text-navyMid disabled:opacity-50 px-2 py-1 rounded-lg bg-iceLight"
+          >
+            <Download className="w-3.5 h-3.5" />
+            {reportLoading ? 'Generating…' : 'CSV'}
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-5">
@@ -372,13 +539,115 @@ export default function AttendancePage() {
               <div className="space-y-2 max-h-80 overflow-y-auto">
                 {absentees.map(a => (
                   <div key={a.studentId} className="border border-gray-100 rounded-xl p-3">
-                    <p className="text-sm font-semibold text-gray-800">{a.name}</p>
-                    <p className="text-xs text-gray-400">{a.className}</p>
-                    {a.reason && (
-                      <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full mt-1 inline-block">
-                        {a.reason}
-                      </span>
-                    )}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 truncate">{a.name}</p>
+                        <p className="text-xs text-gray-400">{a.className}</p>
+                        {a.reason && (
+                          <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full mt-1 inline-block">
+                            {a.reason}
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => handleResendNotification(a)}
+                        disabled={notifying === a.studentId}
+                        title={a.parentNotified ? 'Resend notification' : 'Send notification'}
+                        className={`flex-shrink-0 flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg transition-colors ${
+                          a.parentNotified
+                            ? 'bg-green/10 text-green hover:bg-green/20'
+                            : 'bg-amber/10 text-amber hover:bg-amber/20'
+                        } disabled:opacity-50`}
+                      >
+                        {notifying === a.studentId
+                          ? <RefreshCw className="w-3 h-3 animate-spin" />
+                          : a.parentNotified
+                            ? <><Bell className="w-3 h-3" /> Sent</>
+                            : <><BellOff className="w-3 h-3" /> Notify</>
+                        }
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Holiday Calendar */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-sora font-semibold text-navy text-sm">Holiday Calendar</h3>
+              <button
+                onClick={() => setShowHolidayForm(v => !v)}
+                className="flex items-center gap-1 text-[11px] font-semibold text-navy bg-iceLight px-2 py-1 rounded-lg hover:bg-ice/50"
+              >
+                <Plus className="w-3 h-3" /> Add
+              </button>
+            </div>
+
+            {showHolidayForm && (
+              <div className="mb-3 p-3 bg-gray-50 rounded-xl space-y-2 border border-gray-100">
+                <input
+                  type="date"
+                  value={holidayForm.date}
+                  onChange={e => setHolidayForm(f => ({ ...f, date: e.target.value }))}
+                  className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none"
+                />
+                <input
+                  placeholder="Holiday name…"
+                  value={holidayForm.name}
+                  onChange={e => setHolidayForm(f => ({ ...f, name: e.target.value }))}
+                  className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none"
+                />
+                <select
+                  value={holidayForm.type}
+                  onChange={e => setHolidayForm(f => ({ ...f, type: e.target.value }))}
+                  className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none bg-white"
+                >
+                  <option value="PUBLIC">Public Holiday</option>
+                  <option value="LOCAL">Local Holiday</option>
+                  <option value="OPTIONAL">Optional</option>
+                </select>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleAddHoliday}
+                    disabled={savingHoliday}
+                    className="flex-1 text-xs font-semibold py-1.5 rounded-lg bg-navy text-white hover:bg-navyMid disabled:opacity-50"
+                  >
+                    {savingHoliday ? 'Saving…' : 'Save'}
+                  </button>
+                  <button
+                    onClick={() => setShowHolidayForm(false)}
+                    className="text-xs py-1.5 px-3 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {holidays.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-3">No holidays added for this year.</p>
+            ) : (
+              <div className="space-y-1 max-h-52 overflow-y-auto">
+                {holidays.map(h => (
+                  <div key={h.id} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
+                    <div>
+                      <p className="text-xs font-semibold text-gray-700">{h.name}</p>
+                      <p className="text-[10px] text-gray-400">
+                        {new Date(h.date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        <span className={`ml-2 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
+                          h.type === 'PUBLIC' ? 'bg-navy/10 text-navy' :
+                          h.type === 'LOCAL' ? 'bg-teal/10 text-teal' : 'bg-gray-100 text-gray-500'
+                        }`}>{h.type}</span>
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteHoliday(h.id)}
+                      className="text-gray-300 hover:text-coral transition-colors p-1"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
                   </div>
                 ))}
               </div>

@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { requireSession, ok, err } from '@/lib/api-auth';
 import { AttendanceStatus } from '@prisma/client';
-import { notifyAbsent } from '@/lib/notifications';
+import { notifyAbsent, notifyLowAttendance } from '@/lib/notifications';
 
 export async function GET(req: NextRequest) {
   const { session, error } = await requireSession();
@@ -23,7 +23,14 @@ export async function GET(req: NextRequest) {
     include: {
       section: { include: { grade: { select: { name: true, displayOrder: true } } } },
       records: {
-        include: {
+        select: {
+          id: true,
+          studentId: true,
+          status: true,
+          source: true,
+          reason: true,
+          parentNotified: true,
+          markedAt: true,
           student: { select: { id: true, name: true, rollNo: true, admissionNo: true } },
         },
         orderBy: { markedAt: 'asc' },
@@ -48,7 +55,14 @@ export async function GET(req: NextRequest) {
         include: {
           section: { include: { grade: { select: { name: true, displayOrder: true } } } },
           records: {
-            include: {
+            select: {
+              id: true,
+              studentId: true,
+              status: true,
+              source: true,
+              reason: true,
+              parentNotified: true,
+              markedAt: true,
               student: { select: { id: true, name: true, rollNo: true, admissionNo: true } },
             },
             orderBy: { markedAt: 'asc' },
@@ -126,18 +140,36 @@ export async function POST(req: NextRequest) {
   await db.$transaction(ops);
 
   const studentIds = records.map((r: { studentId: string }) => r.studentId);
-  await Promise.all(
+
+  // Capture previous percentages before update (for threshold detection)
+  const prevStudents = await db.student.findMany({
+    where: { id: { in: studentIds } },
+    select: { id: true, attendancePercent: true },
+  });
+  const prevPctMap = Object.fromEntries(prevStudents.map(s => [s.id, s.attendancePercent ?? 100]));
+
+  const updatedStudents = await Promise.all(
     studentIds.map(async (studentId: string) => {
       const total = await db.attendanceRecord.count({ where: { studentId } });
       const present = await db.attendanceRecord.count({
         where: { studentId, status: { in: ['PRESENT', 'LATE'] } },
       });
+      const newPct = total > 0 ? Math.round((present / total) * 100) : 100;
       await db.student.update({
         where: { id: studentId },
-        data: { attendancePercent: total > 0 ? Math.round((present / total) * 100) : 100 },
+        data: { attendancePercent: newPct },
       });
+      return { studentId, newPct };
     })
   );
+  const newPctMap = Object.fromEntries(updatedStudents.map(s => [s.studentId, s.newPct]));
+
+  // Build record-id map for parentNotified updates
+  const sessionRecords = await db.attendanceRecord.findMany({
+    where: { sessionId: attendanceSession.id },
+    select: { id: true, studentId: true },
+  });
+  const recordIdMap = Object.fromEntries(sessionRecords.map(r => [r.studentId, r.id]));
 
   // Fire WhatsApp notifications for absent students (non-blocking)
   const absentRecords = records.filter((r: { studentId: string; status: string }) => r.status === 'ABSENT');
@@ -162,16 +194,30 @@ export async function POST(req: NextRequest) {
         const p = sp.parent;
         const parentName = p.fatherName ?? p.motherName ?? p.guardianName ?? 'Parent';
         const className = `${student.section.grade.name} - ${student.section.name}`;
-        await notifyAbsent(
-          session.user.tenantId,
-          sp.parent.phone,
-          parentName,
-          student.name,
-          className,
-          dateStr
-        );
+
+        try {
+          await notifyAbsent(session.user.tenantId, sp.parent.phone, parentName, student.name, className, dateStr);
+          // Mark notification sent
+          const recordId = recordIdMap[r.studentId];
+          if (recordId) {
+            await db.attendanceRecord.update({ where: { id: recordId }, data: { parentNotified: true } });
+          }
+        } catch {
+          // Notification failure — do not fail the request
+        }
+
+        // 75% threshold alert: only fire when student crosses below threshold this save
+        const prevPct = prevPctMap[r.studentId] ?? 100;
+        const newPct  = newPctMap[r.studentId]  ?? 100;
+        if (prevPct > 75 && newPct <= 75) {
+          try {
+            await notifyLowAttendance(session.user.tenantId, sp.parent.phone, parentName, student.name, className, newPct);
+          } catch {
+            // non-blocking
+          }
+        }
       })
-    ).catch(() => { /* non-blocking — never fail the main response */ });
+    ).catch(() => { /* non-blocking */ });
   }
 
   return ok({ sessionId: attendanceSession.id, recorded: records.length });

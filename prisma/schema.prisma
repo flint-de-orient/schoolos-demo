@@ -3117,6 +3117,18 @@ model InterviewBlockedDate {
   @@index([configId])
 }
 
+model Holiday {
+  id        String   @id @default(cuid())
+  tenantId  String
+  date      DateTime @db.Date
+  name      String
+  type      String   @default("PUBLIC") // PUBLIC | LOCAL | OPTIONAL
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, date])
+  @@index([tenantId])
+}
+
 // Per-tenant API integration credentials (Zoom, Google Meet, SMS, WhatsApp)
 // Sensitive fields (secrets, private keys) are stored in the `secrets` JSON column
 // and are NEVER returned to the client — only masked status is shown.
