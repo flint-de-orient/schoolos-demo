@@ -84,34 +84,50 @@
 }
 
 @media print {
-  /* Hide everything except the timetable grid */
-  .no-print,
-  nav,
+  /* Strip sidebar, topbar, chatbot and any no-print elements */
   aside,
   header,
-  [class*="Sidebar"],
-  [class*="Topbar"] {
+  .no-print {
     display: none !important;
   }
 
+  /* Remove layout offsets forced by sidebar/topbar */
   body {
     background: white !important;
-    font-size: 11px;
   }
 
-  /* Ensure table fits on page */
+  main {
+    margin-left: 0 !important;
+    padding-top: 0 !important;
+    background: white !important;
+  }
+
+  /* Remove PageWrapper padding */
+  main > div {
+    padding: 16px !important;
+  }
+
+  /* Page setup: landscape for more columns */
+  @page {
+    size: A4 landscape;
+    margin: 12mm;
+  }
+
+  /* Timetable grid — full width, compact */
   table {
     width: 100% !important;
     border-collapse: collapse !important;
-    page-break-inside: avoid;
+    font-size: 10px !important;
+    table-layout: fixed !important;
   }
 
   th, td {
     border: 1px solid #d1d5db !important;
-    padding: 4px 6px !important;
+    padding: 3px 5px !important;
+    word-break: break-word !important;
   }
 
-  /* Restore cell background colors lost during print */
+  /* Keep subject colors in print */
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;

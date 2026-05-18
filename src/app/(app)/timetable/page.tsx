@@ -213,15 +213,15 @@ function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, s
   let subjectCounter = 0;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden print:shadow-none print:border-0 print:rounded-none">
       {saving && (
-        <div className="px-4 py-2 bg-amber-50 border-b border-amber-100 flex items-center gap-2">
+        <div className="no-print px-4 py-2 bg-amber-50 border-b border-amber-100 flex items-center gap-2">
           <RefreshCw className="w-3.5 h-3.5 text-amber-600 animate-spin" />
           <span className="text-xs text-amber-700 font-dm-sans font-semibold">Saving change…</span>
         </div>
       )}
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[900px]">
+      <div className="overflow-x-auto print:overflow-visible">
+        <table className="w-full min-w-[900px] print:min-w-0">
           <thead>
             <tr className="bg-navy text-white">
               <th className="text-left px-5 py-3 text-xs font-sora font-semibold w-28">Period</th>
@@ -331,7 +331,7 @@ function TimetableGrid({ grid, periodSlots, workingDays, mainBreakAfterPeriod, s
                             )}
                             <div className="text-[9px] opacity-70 truncate mt-0.5">{cell.teacher.split(' ').slice(-1)[0]}</div>
                             {cell.room && <div className="text-[9px] opacity-60">{cell.room}</div>}
-                            {editMode && !copyMode && !placeMode && <div className="text-[8px] opacity-40 mt-0.5">⠿ drag</div>}
+                            {editMode && !copyMode && !placeMode && <div className="no-print text-[8px] opacity-40 mt-0.5">⠿ drag</div>}
                             {copyMode && !isCopySrc && copySrc && <div className="text-[9px] text-amber-500 mt-0.5">click to replace</div>}
                             {isCopySrc && <div className="text-[9px] text-amber-600 font-semibold mt-0.5">✓ selected</div>}
                             {placeMode && placeReady && <div className="text-[9px] text-purple-600 mt-0.5">click to replace</div>}
@@ -820,7 +820,7 @@ export default function TimetablePage() {
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <PageWrapper>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 no-print">
         <div>
           <h1 className="text-2xl font-sora font-semibold text-navy">Smart Timetable</h1>
           <p className="text-sm text-gray-500 font-dm-sans mt-0.5">AI-powered scheduling, conflict resolution &amp; substitution management</p>
@@ -968,7 +968,7 @@ export default function TimetablePage() {
 
           {/* Copy mode banner + teacher picker tray */}
           {copyMode && (
-            <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 space-y-3">
+            <div className="no-print bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 space-y-3">
               <div className="flex items-center gap-3">
                 <span className="text-base leading-none">⧉</span>
                 <p className="text-sm text-teal-800 font-dm-sans flex-1">
@@ -1014,7 +1014,7 @@ export default function TimetablePage() {
             const filtered = placeSubjects.filter(s => placeCatFilter === 'ALL' || s.subjectCategory === placeCatFilter);
             const placeReady = !!placeSubjectId && !!placeTeacherId2;
             return (
-              <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-3 space-y-3">
+              <div className="no-print bg-purple-50 border border-purple-200 rounded-xl px-4 py-3 space-y-3">
                 <div className="flex items-center gap-3">
                   <span className="text-base leading-none">＋</span>
                   <p className="text-sm text-purple-800 font-dm-sans flex-1 font-semibold">
