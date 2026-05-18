@@ -1085,7 +1085,9 @@ model Timetable {
   generatedByAI  Boolean         @default(false)
   aiJobId        String?
   generatedAt    DateTime?
-  publishedAt    DateTime?
+  publishedAt              DateTime?
+  isPublishedToParents     Boolean   @default(false)
+  parentPublishedAt        DateTime?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 

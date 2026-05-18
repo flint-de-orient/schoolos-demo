@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import {
   AlertCircle, CheckCircle2, Sparkles, LayoutGrid, Zap, RotateCcw,
   Brain, TrendingUp, User, Timer, Shield, RefreshCw, ChevronDown, BookOpen,
-  Settings2, Clock, GraduationCap, Pencil, X,
+  Settings2, Clock, GraduationCap, Pencil, X, Download, Send, CheckCircle,
 } from 'lucide-react';
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -401,6 +401,10 @@ export default function TimetablePage() {
   const [placeCatFilter, setPlaceCatFilter]     = useState('ALL');
   const [placeApplying, setPlaceApplying]       = useState(false);
 
+  const [isPublishedToParents, setIsPublishedToParents] = useState(false);
+  const [parentPublishedAt, setParentPublishedAt]       = useState<string | null>(null);
+  const [publishing, setPublishing]                     = useState(false);
+
   const [viewMode, setViewMode]         = useState<'class' | 'teacher'>('class');
   const [teachers, setTeachers]         = useState<{ id: string; name: string }[]>([]);
   const [selectedTeacherId, setSelectedTeacherId] = useState('');
@@ -472,9 +476,11 @@ export default function TimetablePage() {
       const tt = res.data?.timetable ?? res.timetable;
       const subs = res.data?.substitutions ?? res.substitutions ?? [];
       setSubstitutions(subs);
-      if (!tt) { setGrid({}); setTimetableLabel(''); setTimetableId(null); return; }
+      if (!tt) { setGrid({}); setTimetableLabel(''); setTimetableId(null); setIsPublishedToParents(false); setParentPublishedAt(null); return; }
       setTimetableLabel(tt.label ?? '');
       setTimetableId(tt.id ?? null);
+      setIsPublishedToParents(tt.isPublishedToParents ?? false);
+      setParentPublishedAt(tt.parentPublishedAt ?? null);
       const newGrid: Grid = {};
       for (const e of tt.entries ?? []) {
         if (!newGrid[e.day]) newGrid[e.day] = {};
@@ -770,6 +776,31 @@ export default function TimetablePage() {
       .finally(() => setSetupSaving(false));
   }
 
+  async function handlePublish() {
+    if (!timetableId || publishing) return;
+    setPublishing(true);
+    try {
+      const res = await fetch('/api/timetable/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ timetableId }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) { toast.error(data.error ?? 'Failed to publish'); return; }
+      const { notificationsSent, notificationsFailed, totalParents } = data.data ?? data;
+      setIsPublishedToParents(true);
+      setParentPublishedAt(new Date().toISOString());
+      toast.success(
+        `Timetable published! WhatsApp sent to ${notificationsSent}/${totalParents} parents.${notificationsFailed > 0 ? ` (${notificationsFailed} failed)` : ''}`
+      );
+    } catch { toast.error('Network error — could not publish'); }
+    finally { setPublishing(false); }
+  }
+
+  function handleDownload() {
+    window.print();
+  }
+
   function handleGoToGenerator(gradeId?: string) {
     if (gradeId) setTargetGradeId(gradeId);
     setPreflight(null); // force reload when switching to generator tab
@@ -794,13 +825,41 @@ export default function TimetablePage() {
           <h1 className="text-2xl font-sora font-semibold text-navy">Smart Timetable</h1>
           <p className="text-sm text-gray-500 font-dm-sans mt-0.5">AI-powered scheduling, conflict resolution &amp; substitution management</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 no-print">
           <AIBadge label="AI Powered" />
           {timetableLabel && <span className="text-xs text-gray-400 font-dm-sans">{timetableLabel}</span>}
+          {timetableId && activeTab === 'timetable' && Object.keys(grid).length > 0 && (
+            <>
+              <button
+                onClick={handleDownload}
+                className="flex items-center gap-1.5 text-sm bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-gray-600 hover:border-navy/30 hover:text-navy transition-colors font-dm-sans shadow-sm"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Download PDF
+              </button>
+              {isPublishedToParents ? (
+                <div className="flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5">
+                  <CheckCircle className="w-3.5 h-3.5 text-green-600" />
+                  <span className="text-xs font-semibold text-green-700 font-dm-sans">
+                    Published to Parents{parentPublishedAt ? ` · ${new Date(parentPublishedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
+                  </span>
+                </div>
+              ) : (
+                <button
+                  onClick={handlePublish}
+                  disabled={publishing}
+                  className="flex items-center gap-1.5 text-sm bg-navy text-white rounded-lg px-3 py-1.5 font-semibold font-dm-sans hover:bg-navyMid disabled:opacity-50 transition-colors shadow-sm"
+                >
+                  {publishing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  {publishing ? 'Publishing…' : 'Publish to Parents'}
+                </button>
+              )}
+            </>
+          )}
         </div>
       </div>
 
-      <div className="flex gap-1 bg-white border border-gray-100 rounded-xl p-1 shadow-sm mb-6 w-fit">
+      <div className="flex gap-1 bg-white border border-gray-100 rounded-xl p-1 shadow-sm mb-6 w-fit no-print">
         {tabs.map(tab => {
           const Icon = tab.icon;
           return (
@@ -818,7 +877,7 @@ export default function TimetablePage() {
       {activeTab === 'timetable' && (
         <div className="space-y-5">
           {/* Controls */}
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap no-print">
             {viewMode === 'class' ? (
               <select value={selectedSectionId} onChange={e => {
                 const found = allSections.find(s => s.id === e.target.value);
@@ -872,9 +931,15 @@ export default function TimetablePage() {
             )}
           </div>
 
+          {/* Print-only header */}
+          <div className="hidden print:block mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Sundarban Academy — Timetable</h2>
+            <p className="text-sm text-gray-600">{selectedSectionLabel} · {timetableLabel}</p>
+          </div>
+
           {/* Substitution alert from DB */}
           {substitutions.length > 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+            <div className="no-print bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
               <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
               <div>
                 <p className="text-sm text-gray-700 font-dm-sans">
@@ -890,7 +955,7 @@ export default function TimetablePage() {
 
           {/* Edit mode banner */}
           {editMode && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-3">
+            <div className="no-print bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-3">
               <Pencil className="w-4 h-4 text-amber-600 flex-shrink-0" />
               <p className="text-sm text-amber-800 font-dm-sans">
                 <strong>Edit mode:</strong> Drag any period cell to move it. Drop onto another cell to swap.
@@ -1041,7 +1106,7 @@ export default function TimetablePage() {
 
           {/* Health Score */}
           {Object.keys(grid).length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+            <div className="no-print bg-white rounded-xl shadow-sm border border-gray-100 p-5">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Shield className="w-4 h-4 text-navy" />
