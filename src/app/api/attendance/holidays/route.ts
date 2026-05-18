@@ -47,11 +47,15 @@ export async function POST(req: NextRequest) {
   if (end < start) return err('endDate cannot be before startDate', 400);
 
   const tenantId = session.user.tenantId;
-  const holiday = await db.holiday.create({
-    data: { tenantId, startDate: start, endDate: end, name, type: type ?? 'PUBLIC' },
-  });
-
-  return ok({ ...holiday, startDate: fmt(holiday.startDate), endDate: fmt(holiday.endDate) }, 201);
+  try {
+    const holiday = await db.holiday.create({
+      data: { tenantId, startDate: start, endDate: end, name, type: type ?? 'PUBLIC' },
+    });
+    return ok({ ...holiday, startDate: fmt(holiday.startDate), endDate: fmt(holiday.endDate) }, 201);
+  } catch (e) {
+    console.error('[holidays POST]', e);
+    return err('Failed to create holiday — check server logs', 500);
+  }
 }
 
 export async function DELETE(req: NextRequest) {

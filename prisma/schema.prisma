@@ -3122,7 +3122,7 @@ model Holiday {
   tenantId  String
   startDate DateTime @db.Date
   endDate   DateTime @db.Date
-  name      String
+  name      String   @db.Text
   type      String   @default("PUBLIC") // PUBLIC | LOCAL | OPTIONAL | VACATION | FESTIVAL | STUDY_LEAVE
   createdAt DateTime @default(now())
 

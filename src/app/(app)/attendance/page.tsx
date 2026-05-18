@@ -640,11 +640,16 @@ export default function AttendancePage() {
                   )}
                 </div>
 
-                <input
-                  placeholder="e.g. Summer Vacation, Eid, Republic Day…"
+                <textarea
+                  placeholder="e.g. Summer Vacation, Eid, Budha Purnima, Pt Raghunath Murmu Birthday…"
                   value={holidayForm.name}
-                  onChange={e => setHolidayForm(f => ({ ...f, name: e.target.value }))}
-                  className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none bg-white"
+                  rows={2}
+                  onChange={e => {
+                    setHolidayForm(f => ({ ...f, name: e.target.value }));
+                    e.target.style.height = 'auto';
+                    e.target.style.height = e.target.scrollHeight + 'px';
+                  }}
+                  className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none bg-white resize-none overflow-hidden leading-relaxed"
                 />
                 <select
                   value={holidayForm.type}
@@ -695,7 +700,7 @@ export default function AttendancePage() {
                   return (
                     <div key={h.id} className="flex items-start justify-between py-1.5 border-b border-gray-50 last:border-0">
                       <div className="min-w-0">
-                        <p className="text-xs font-semibold text-gray-700 truncate">{h.name}</p>
+                        <p className="text-xs font-semibold text-gray-700 break-words">{h.name}</p>
                         <p className="text-[10px] text-gray-400 mt-0.5">
                           {isRange ? `${fmtDate(h.startDate)} – ${fmtDate(h.endDate)}` : fmtDate(h.startDate)}
                         </p>
