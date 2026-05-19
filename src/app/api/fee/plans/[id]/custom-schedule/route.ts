@@ -33,7 +33,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const { name, percentage, dueDay, dueMonth } = body;
 
     if (!name?.trim()) return err('name is required');
-    if (percentage == null || Number(percentage) <= 0) return err('percentage must be positive');
+    const pct = Number(percentage);
+    if (!pct || pct <= 0) return err('percentage must be positive');
     if (!dueDay || dueDay < 1 || dueDay > 31) return err('dueDay must be 1–31');
     if (!dueMonth || dueMonth < 1 || dueMonth > 12) return err('dueMonth must be 1–12');
 
@@ -42,6 +43,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       if (!schedule) {
         schedule = await tx.feeCustomSchedule.create({ data: { planId: params.id } });
       }
+
+      // Validate that existing + new percentages don't exceed 100
+      const existing = await tx.feeCustomInstallment.findMany({
+        where: { scheduleId: schedule.id },
+        select: { percentage: true },
+      });
+      const existingTotal = existing.reduce((s, i) => s + Number(i.percentage), 0);
+      const newTotal = existingTotal + pct;
+      if (newTotal > 100 + 0.001) { // small epsilon for floating point
+        throw new Error(`Total percentage would be ${newTotal.toFixed(2)}% — must not exceed 100%. Currently ${existingTotal.toFixed(2)}% allocated.`);
+      }
+
       const maxOrder = await tx.feeCustomInstallment.aggregate({
         where: { scheduleId: schedule.id },
         _max: { displayOrder: true },
@@ -50,7 +63,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         data: {
           scheduleId: schedule.id,
           name: name.trim(),
-          percentage: Number(percentage),
+          percentage: pct,
           dueDay: Number(dueDay),
           dueMonth: Number(dueMonth),
           displayOrder: (maxOrder._max.displayOrder ?? -1) + 1,
@@ -61,8 +74,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     return ok(result, 201);
   } catch (e) {
+    const msg = (e as Error).message ?? 'Internal server error';
+    // Surface percentage validation errors as 400
+    if (msg.includes('exceed 100%')) return err(msg, 400);
     console.error('[POST /api/fee/plans/[id]/custom-schedule]', e);
-    return err((e as Error).message ?? 'Internal server error', 500);
+    return err(msg, 500);
   }
 }
 

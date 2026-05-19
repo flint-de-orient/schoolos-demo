@@ -92,9 +92,17 @@ export async function POST(req: NextRequest) {
   });
   if (!account) return err('Fee account not found', 404);
 
-  const receiptNo = `RCP${Date.now()}`;
-
   const transaction = await db.$transaction(async (tx) => {
+    // Atomically increment tenant receipt counter — collision-proof
+    const tenant = await tx.tenant.update({
+      where: { id: session.user.tenantId },
+      data: { receiptCounter: { increment: 1 } },
+      select: { receiptCounter: true, shortName: true },
+    });
+    const year = new Date().getFullYear().toString().slice(-2);
+    const prefix = (tenant.shortName ?? 'RCP').toUpperCase().replace(/\s+/g, '').slice(0, 3);
+    const receiptNo = `${prefix}${year}-${String(tenant.receiptCounter).padStart(5, '0')}`;
+
     const t = await tx.feeTransaction.create({
       data: {
         tenantId: session.user.tenantId,
@@ -123,7 +131,6 @@ export async function POST(req: NextRequest) {
 
     // Recompute account totals from installments (ground truth).
     // balance = only unpaid raised installments (dueDate ≤ today).
-    // Future months exist in DB for scheduling but are not yet demanded.
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -176,7 +183,7 @@ export async function POST(req: NextRequest) {
       Number(amount),
       fullAccount!.student.name,
       paidDate,
-      receiptNo
+      transaction.receiptNo,
     ).catch(() => {});
   }
 

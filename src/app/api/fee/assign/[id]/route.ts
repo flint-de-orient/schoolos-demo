@@ -3,6 +3,11 @@ import { db } from '@/lib/db';
 import { requireSession, ok, err } from '@/lib/api-auth';
 import { Decimal } from '@prisma/client/runtime/library';
 import { generateInstallments } from '@/lib/fee-installment-gen';
+import { computeDiscount, applyDiscountToInstallments } from '@/lib/fee-concession';
+
+const FREQ_COUNT: Record<string, number> = {
+  ONE_TIME: 1, ANNUAL: 1, HALF_YEARLY: 2, QUARTERLY: 4, BI_MONTHLY: 6, MONTHLY: 12,
+};
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -47,6 +52,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
             academicYear: true,
           },
         },
+        concessions: { include: { concessionTemplate: true } },
         feeAccount: true,
       },
     });
@@ -78,25 +84,37 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
       const plan = assignment.feePlan;
       const settings = await db.tenantFeeSettings.findUnique({ where: { tenantId: session.user.tenantId } });
-      const totalDue = plan.items.reduce((sum, item) => sum.add(item.amount), new Decimal(0));
+
+      // Correct gross total: sum(amount × frequency_count) for frequency plans,
+      // or sum(amount) for custom-schedule plans (custom schedule splits the total, not per-item)
+      const zero = new Decimal(0);
+      const grossTotal = plan.customSchedule?.installments?.length
+        ? plan.items.reduce((sum, item) => sum.add(item.amount), zero)
+        : plan.items.reduce((sum, item) => sum.add(item.amount.mul(FREQ_COUNT[item.frequency] ?? 1)), zero);
+
+      // Apply concessions from the current assignment
+      const templates = assignment.concessions.map((c) => c.concessionTemplate);
+      const discount = computeDiscount(grossTotal, templates);
+      const netTotal = grossTotal.sub(discount).toDecimalPlaces(2);
 
       const result = await db.$transaction(async (tx) => {
         await tx.feeInstallment.deleteMany({
           where: { feeAccountId: assignment.feeAccount!.id, status: 'PENDING' },
         });
 
-        const installments = generateInstallments(plan, settings, assignment.feeAccount!.id);
+        const rawInstallments = generateInstallments(plan, settings, assignment.feeAccount!.id);
+        const installments = applyDiscountToInstallments(rawInstallments, grossTotal, discount);
         if (installments.length > 0) {
           await tx.feeInstallment.createMany({ data: installments });
         }
 
-        const paidSoFar = assignment.feeAccount!.totalPaid;
-        const newBalance = totalDue.sub(paidSoFar).toDecimalPlaces(2);
+        const paidSoFar = new Decimal(assignment.feeAccount!.totalPaid);
+        const newBalance = netTotal.sub(paidSoFar).toDecimalPlaces(2);
         return tx.feeAccount.update({
           where: { id: assignment.feeAccount!.id },
           data: {
-            totalDue,
-            balance: newBalance,
+            totalDue: netTotal,
+            balance: newBalance.lt(0) ? zero : newBalance,
             status: newBalance.lte(0) ? 'PAID' : 'PENDING',
           },
           include: { installments: { orderBy: { dueDate: 'asc' } } },

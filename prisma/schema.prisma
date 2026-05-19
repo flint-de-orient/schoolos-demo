@@ -335,10 +335,11 @@ model Tenant {
   isActive    Boolean   @default(true)
   isOnboarded Boolean   @default(false)
   trialEndsAt DateTime?
-  plan        String    @default("growth")
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
+  plan           String    @default("growth")
+  receiptCounter Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
 
   modules               TenantModule[]
   users                 User[]

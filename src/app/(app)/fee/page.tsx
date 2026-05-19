@@ -22,6 +22,16 @@ import FeeSetupTab from '@/components/fee/FeeSetupTab';
 type FeeStatus = 'paid' | 'pending' | 'overdue' | 'partial';
 type Tab = 'overview' | 'records' | 'concessions' | 'reports' | 'setup';
 
+type InstallmentRow = {
+  id: string;
+  termLabel: string;
+  amount: number;
+  dueDate: string;
+  paidAmount: number;
+  status: string;
+  lateFee: number;
+};
+
 type FeeRecord = {
   id: string;           // feeAccount.id
   studentId: string;
@@ -38,6 +48,7 @@ type FeeRecord = {
   lastPaymentDate: string | null;
   lastPaymentMode: string | null;
   receiptNo: string | null;
+  installments: InstallmentRow[];
 };
 
 type ConcessionRow = {
@@ -83,7 +94,7 @@ const fmtDate = (d: string | null) =>
 const today   = () => new Date().toISOString().split('T')[0];
 
 function mapAccount(acc: any): FeeRecord {
-  const pending = acc.installments?.find((i: any) => i.status !== 'PAID');
+  const pending = acc.installments?.find((i: any) => i.status !== 'PAID' && i.status !== 'WAIVED');
   const lastTx  = acc.transactions?.[0];
   return {
     id: acc.id,
@@ -98,6 +109,15 @@ function mapAccount(acc: any): FeeRecord {
     status: (acc.status?.toLowerCase() ?? 'pending') as FeeStatus,
     nextInstallmentId: pending?.id,
     nextDueDate: pending?.dueDate?.split('T')[0] ?? null,
+    installments: (acc.installments ?? []).map((i: any) => ({
+      id: i.id,
+      termLabel: i.termLabel,
+      amount: Number(i.amount),
+      dueDate: i.dueDate?.split('T')[0] ?? '',
+      paidAmount: Number(i.paidAmount ?? 0),
+      status: i.status?.toLowerCase() ?? 'pending',
+      lateFee: Number(i.lateFee ?? 0),
+    })),
     lastPaymentDate: lastTx?.transactedAt?.split('T')[0] ?? null,
     lastPaymentMode: lastTx?.mode ? (MODE_FROM_DB[lastTx.mode] ?? lastTx.mode) : null,
     receiptNo: lastTx?.receiptNo ?? null,
@@ -337,6 +357,7 @@ export default function FeePage() {
             <FeeDrawer
               record={records.find(r => r.id === drawerRecord.id) ?? drawerRecord}
               onClose={() => setDrawerRecord(null)}
+              onRefresh={loadAll}
               onRecordPayment={() => setPaymentTarget(drawerRecord)}
               onRemind={() => sendReminder(drawerRecord)}
               onViewReceipt={() => setReceiptRecord(drawerRecord)}
@@ -381,7 +402,6 @@ export default function FeePage() {
         <ReceiptModal
           record={receiptRecord}
           onClose={() => setReceiptRecord(null)}
-          onPrint={() => { toast.success('Sent to printer'); setReceiptRecord(null); }}
         />
       )}
     </PageWrapper>
@@ -673,14 +693,46 @@ function RecordsTable({ records, allRecords, loading, search, setSearch, filterS
 
 // ─── Fee Drawer ───────────────────────────────────────────────────────────────
 
-function FeeDrawer({ record: r, onClose, onRecordPayment, onRemind, onViewReceipt }: {
-  record: FeeRecord; onClose: () => void;
+function FeeDrawer({ record: r, onClose, onRefresh, onRecordPayment, onRemind, onViewReceipt }: {
+  record: FeeRecord; onClose: () => void; onRefresh: () => void;
   onRecordPayment: () => void; onRemind: () => void; onViewReceipt: () => void;
 }) {
+  const [waiverLoading, setWaiverLoading] = useState<string | null>(null);
+
   const initials = r.studentName.split(' ').map(n => n[0]).join('').slice(0,2);
   const daysOverdue = r.status === 'overdue' && r.nextDueDate
     ? Math.floor((Date.now() - new Date(r.nextDueDate).getTime()) / 86400000)
     : 0;
+
+  const handleWaive = async (inst: InstallmentRow) => {
+    const action = inst.status === 'waived' ? 'unwaive' : 'waive';
+    setWaiverLoading(inst.id);
+    try {
+      const res = await fetch(`/api/fee/installments/${inst.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error ?? 'Failed to update installment');
+        return;
+      }
+      toast.success(action === 'waive' ? `Waived ${inst.termLabel}` : `Restored ${inst.termLabel}`);
+      onRefresh();
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setWaiverLoading(null);
+    }
+  };
+
+  const instStatusColor: Record<string, string> = {
+    paid:    'text-green-600 bg-green-50',
+    waived:  'text-purple-600 bg-purple-50',
+    overdue: 'text-red-600 bg-red-50',
+    pending: 'text-amber-600 bg-amber-50',
+  };
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-fit sticky top-20">
@@ -727,17 +779,58 @@ function FeeDrawer({ record: r, onClose, onRecordPayment, onRemind, onViewReceip
         <StatusPill status={r.status} />
 
         {[
-          { label: 'Fee Plan',       value: r.planName },
-          { label: 'Next Due',       value: fmtDate(r.nextDueDate) },
-          { label: 'Last Payment',   value: fmtDate(r.lastPaymentDate) },
-          { label: 'Payment Mode',   value: r.lastPaymentMode ?? '—' },
-          { label: 'Last Receipt',   value: r.receiptNo ?? '—' },
+          { label: 'Fee Plan',     value: r.planName },
+          { label: 'Next Due',     value: fmtDate(r.nextDueDate) },
+          { label: 'Last Payment', value: fmtDate(r.lastPaymentDate) },
+          { label: 'Payment Mode', value: r.lastPaymentMode ?? '—' },
+          { label: 'Last Receipt', value: r.receiptNo ?? '—' },
         ].map(row => (
           <div key={row.label} className="flex justify-between items-center py-1.5 border-b border-gray-50 last:border-0">
             <span className="text-xs text-gray-500">{row.label}</span>
             <span className="text-xs font-semibold text-gray-700">{row.value}</span>
           </div>
         ))}
+
+        {/* Installment schedule with waiver control */}
+        {r.installments.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Installment Schedule</p>
+            <div className="space-y-1.5">
+              {r.installments.map(inst => (
+                <div key={inst.id} className="flex items-center gap-2 p-2 rounded-lg bg-gray-50">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-semibold text-gray-700 truncate">{inst.termLabel}</span>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase ${instStatusColor[inst.status] ?? 'text-gray-500 bg-gray-100'}`}>
+                        {inst.status}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-400">{fmtAmt(inst.amount)} · Due {fmtDate(inst.dueDate)}</p>
+                  </div>
+                  {(inst.status === 'pending' || inst.status === 'overdue' || inst.status === 'waived') && (
+                    <button
+                      onClick={() => handleWaive(inst)}
+                      disabled={waiverLoading === inst.id}
+                      title={inst.status === 'waived' ? 'Undo waiver' : 'Waive this installment'}
+                      className={`p-1.5 rounded-lg text-xs font-semibold transition-colors flex-shrink-0 ${
+                        inst.status === 'waived'
+                          ? 'text-purple-600 bg-purple-50 hover:bg-purple-100'
+                          : 'text-gray-400 hover:text-purple-600 hover:bg-purple-50'
+                      } disabled:opacity-40`}
+                    >
+                      {waiverLoading === inst.id
+                        ? <RefreshCw className="w-3 h-3 animate-spin" />
+                        : inst.status === 'waived'
+                        ? <CheckCheck className="w-3 h-3" />
+                        : <Check className="w-3 h-3" />
+                      }
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="p-4 border-t border-gray-100 space-y-2">
@@ -1035,54 +1128,147 @@ function RecordPaymentModal({ record: r, onSave, onClose }: {
 
 // ─── Receipt Modal ────────────────────────────────────────────────────────────
 
-function ReceiptModal({ record: r, onClose, onPrint }: {
-  record: FeeRecord; onClose: () => void; onPrint: () => void;
+type ReceiptData = {
+  receiptNo: string;
+  amount: number;
+  mode: string;
+  transactedAt: string;
+  notes: string | null;
+  student: { name: string; admissionNo: string; grade: string };
+  feePlan: string;
+  school: { name: string; address: string; phone: string; email: string };
+};
+
+function ReceiptModal({ record: r, onClose }: {
+  record: FeeRecord; onClose: () => void;
 }) {
+  const [data, setData] = useState<ReceiptData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!r.receiptNo) { setLoading(false); return; }
+    fetch(`/api/fee/receipt/${encodeURIComponent(r.receiptNo)}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(d => { setData(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [r.receiptNo]);
+
+  const handlePrint = () => window.print();
+
+  const school = data?.school;
+  const student = data?.student ?? { name: r.studentName, admissionNo: r.admissionNo, grade: r.grade };
+
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
-        <div className="bg-navy p-5 rounded-t-2xl text-center text-white">
-          <p className="text-[10px] tracking-widest text-ice/60 uppercase mb-1">Sundarban Academy, Kolkata</p>
-          <h2 className="font-sora font-bold text-lg">Fee Receipt</h2>
-          <p className="text-ice/70 text-xs mt-0.5 font-mono">{r.receiptNo ?? '—'}</p>
-        </div>
+    <>
+      {/* Print-specific styles */}
+      <style>{`
+        @media print {
+          body > *:not(#fee-receipt-print) { display: none !important; }
+          #fee-receipt-print { display: block !important; position: fixed; inset: 0; background: white; z-index: 9999; padding: 32px; }
+          .no-print { display: none !important; }
+        }
+      `}</style>
 
-        <div className="p-5 space-y-3">
-          {[
-            { label: 'Student Name',  value: r.studentName },
-            { label: 'Class',         value: r.grade },
-            { label: 'Admission No',  value: r.admissionNo },
-            { label: 'Fee Plan',      value: r.planName },
-            { label: 'Payment Date',  value: fmtDate(r.lastPaymentDate) },
-            { label: 'Payment Mode',  value: r.lastPaymentMode ?? '—' },
-          ].map(row => (
-            <div key={row.label} className="flex justify-between py-1.5 border-b border-gray-50 last:border-0">
-              <span className="text-xs text-gray-500">{row.label}</span>
-              <span className="text-xs font-semibold text-gray-800">{row.value}</span>
-            </div>
-          ))}
-
-          <div className="bg-green-50 border border-green-200 rounded-xl p-4 mt-3 text-center">
-            <p className="text-xs text-green-600 font-semibold mb-1">Amount Paid</p>
-            <p className="text-3xl font-sora font-bold text-green-700">{fmtAmt(r.totalPaid)}</p>
-            <div className="flex items-center justify-center gap-1.5 mt-2">
-              <CheckCircle2 className="w-4 h-4 text-green-500" />
-              <span className="text-xs text-green-600 font-semibold">Payment Confirmed</span>
-            </div>
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 no-print" onClick={onClose}>
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+          <div className="bg-navy p-5 rounded-t-2xl text-center text-white">
+            <p className="text-[10px] tracking-widest text-ice/60 uppercase mb-1">
+              {school?.name ?? '—'}
+            </p>
+            <h2 className="font-sora font-bold text-lg">Fee Receipt</h2>
+            <p className="text-ice/70 text-xs mt-0.5 font-mono">{r.receiptNo ?? '—'}</p>
           </div>
 
-          <p className="text-[10px] text-gray-400 text-center mt-2">
-            Computer-generated receipt. No signature required.
-          </p>
+          <div className="p-5 space-y-3">
+            {loading ? (
+              <div className="space-y-2">{[1,2,3,4,5].map(i => (
+                <div key={i} className="h-6 bg-gray-100 rounded animate-pulse" />
+              ))}</div>
+            ) : (
+              <>
+                {[
+                  { label: 'Student Name', value: student.name },
+                  { label: 'Class',        value: student.grade },
+                  { label: 'Admission No', value: student.admissionNo },
+                  { label: 'Fee Plan',     value: data?.feePlan ?? r.planName },
+                  { label: 'Payment Date', value: fmtDate(data?.transactedAt?.split('T')[0] ?? r.lastPaymentDate) },
+                  { label: 'Payment Mode', value: data?.mode ?? r.lastPaymentMode ?? '—' },
+                  ...(data?.notes ? [{ label: 'Notes', value: data.notes }] : []),
+                ].map(row => (
+                  <div key={row.label} className="flex justify-between py-1.5 border-b border-gray-50 last:border-0">
+                    <span className="text-xs text-gray-500">{row.label}</span>
+                    <span className="text-xs font-semibold text-gray-800">{row.value}</span>
+                  </div>
+                ))}
 
-          <div className="flex gap-3 pt-2">
-            <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-colors">Close</button>
-            <button onClick={onPrint} className="flex-1 py-2.5 bg-navy text-white text-sm font-semibold rounded-xl hover:bg-navyMid transition-colors flex items-center justify-center gap-2">
-              <Printer className="w-4 h-4" />Print
-            </button>
+                <div className="bg-green-50 border border-green-200 rounded-xl p-4 mt-3 text-center">
+                  <p className="text-xs text-green-600 font-semibold mb-1">Amount Paid</p>
+                  <p className="text-3xl font-sora font-bold text-green-700">
+                    {fmtAmt(data?.amount ?? r.totalPaid)}
+                  </p>
+                  <div className="flex items-center justify-center gap-1.5 mt-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    <span className="text-xs text-green-600 font-semibold">Payment Confirmed</span>
+                  </div>
+                </div>
+
+                {school?.address && (
+                  <p className="text-[10px] text-gray-400 text-center">{school.address}</p>
+                )}
+                <p className="text-[10px] text-gray-400 text-center">
+                  Computer-generated receipt. No signature required.
+                </p>
+              </>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-colors">Close</button>
+              <button onClick={handlePrint} disabled={loading}
+                className="flex-1 py-2.5 bg-navy text-white text-sm font-semibold rounded-xl hover:bg-navyMid transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
+                <Printer className="w-4 h-4" />Print
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {/* Hidden print target — rendered outside the modal overlay */}
+      <div id="fee-receipt-print" style={{ display: 'none' }}>
+        <div style={{ maxWidth: 400, margin: '0 auto', fontFamily: 'sans-serif' }}>
+          <div style={{ textAlign: 'center', borderBottom: '2px solid #1E2761', paddingBottom: 12, marginBottom: 16 }}>
+            <p style={{ fontSize: 18, fontWeight: 700, color: '#1E2761' }}>{school?.name ?? ''}</p>
+            {school?.address && <p style={{ fontSize: 11, color: '#666' }}>{school.address}</p>}
+            {school?.phone && <p style={{ fontSize: 11, color: '#666' }}>Tel: {school.phone}</p>}
+            <p style={{ fontSize: 20, fontWeight: 700, marginTop: 8 }}>FEE RECEIPT</p>
+            <p style={{ fontSize: 12, color: '#666' }}>Receipt No: {r.receiptNo}</p>
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <tbody>
+              {[
+                ['Student Name', student.name],
+                ['Class', student.grade],
+                ['Admission No', student.admissionNo],
+                ['Fee Plan', data?.feePlan ?? r.planName],
+                ['Payment Date', fmtDate(data?.transactedAt?.split('T')[0] ?? r.lastPaymentDate)],
+                ['Payment Mode', data?.mode ?? r.lastPaymentMode ?? '—'],
+                ...(data?.notes ? [['Notes', data.notes]] : []),
+              ].map(([label, value]) => (
+                <tr key={label} style={{ borderBottom: '1px solid #eee' }}>
+                  <td style={{ padding: '6px 0', color: '#666', width: '45%' }}>{label}</td>
+                  <td style={{ padding: '6px 0', fontWeight: 600 }}>{value}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{ marginTop: 16, padding: 16, background: '#f0fdf4', borderRadius: 8, textAlign: 'center', border: '1px solid #bbf7d0' }}>
+            <p style={{ fontSize: 12, color: '#16a34a' }}>Amount Paid</p>
+            <p style={{ fontSize: 28, fontWeight: 700, color: '#15803d' }}>{fmtAmt(data?.amount ?? r.totalPaid)}</p>
+          </div>
+          <p style={{ marginTop: 16, fontSize: 10, color: '#9ca3af', textAlign: 'center' }}>
+            Computer-generated receipt. No signature required.
+          </p>
+        </div>
+      </div>
+    </>
   );
 }
