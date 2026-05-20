@@ -1,0 +1,1 @@
+ALTER TABLE "ExamSchedule" ADD COLUMN IF NOT EXISTS "semesterNo" INTEGER;

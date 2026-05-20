@@ -1227,6 +1227,7 @@ model ExamSchedule {
   gradeBands     String[]
   isPreBoard     Boolean  @default(false)
   isBoardExam    Boolean  @default(false)
+  semesterNo     Int?
   status         String   @default("SCHEDULED")
   createdAt      DateTime @default(now())
 
