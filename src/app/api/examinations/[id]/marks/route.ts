@@ -22,32 +22,44 @@ export async function GET(
   });
   if (!schedule) return err('Not found', 404);
 
-  // 1. Fetch ExamScheduleItems for this exam + gradeId → subject list with maxMarks
-  //    (ExamScheduleItem has no Prisma relation to Subject, so we join manually)
+  // 1. Subjects: from ExamScheduleItems if set, else fall back to GradeSubject curriculum
   const examItems = await db.examScheduleItem.findMany({
     where: { examScheduleId: params.id, gradeId },
     orderBy: { examDate: 'asc' },
   });
 
-  const subjectIds = [...new Set(examItems.map((i) => i.subjectId))];
-  const subjectRows = await db.subject.findMany({
-    where: { id: { in: subjectIds } },
-    select: { id: true, name: true },
-  });
-  const subjectMap = new Map(subjectRows.map((s) => [s.id, s]));
+  let subjects: { id: string; name: string; maxMarks: number }[];
 
-  // One entry per unique subject (use max maxMarks if duplicated across items)
-  const subjectMaxMarks = new Map<string, number>();
-  for (const item of examItems) {
-    const existing = subjectMaxMarks.get(item.subjectId) ?? 0;
-    if (item.maxMarks > existing) subjectMaxMarks.set(item.subjectId, item.maxMarks);
+  if (examItems.length > 0) {
+    const subjectIds = [...new Set(examItems.map((i) => i.subjectId))];
+    const subjectRows = await db.subject.findMany({
+      where: { id: { in: subjectIds } },
+      select: { id: true, name: true },
+    });
+    const subjectMap = new Map(subjectRows.map((s) => [s.id, s]));
+    const subjectMaxMarks = new Map<string, number>();
+    for (const item of examItems) {
+      const existing = subjectMaxMarks.get(item.subjectId) ?? 0;
+      if (item.maxMarks > existing) subjectMaxMarks.set(item.subjectId, item.maxMarks);
+    }
+    subjects = subjectIds.map((sid) => ({
+      id: sid,
+      name: subjectMap.get(sid)?.name ?? sid,
+      maxMarks: subjectMaxMarks.get(sid) ?? 100,
+    }));
+  } else {
+    // Fall back to GradeSubject curriculum — subjects assigned via timetable setup
+    const gradeSubjects = await db.gradeSubject.findMany({
+      where: { gradeId, sessionType: 'THEORY' },
+      include: { subject: { select: { id: true, name: true } } },
+      orderBy: { subject: { name: 'asc' } },
+    });
+    subjects = gradeSubjects.map((gs) => ({
+      id: gs.subject.id,
+      name: gs.subject.name,
+      maxMarks: gs.maxMarks,
+    }));
   }
-
-  const subjects = subjectIds.map((sid) => ({
-    id: sid,
-    name: subjectMap.get(sid)?.name ?? sid,
-    maxMarks: subjectMaxMarks.get(sid) ?? 100,
-  }));
 
   // 2. Fetch active students in that grade
   const studentRows = await db.student.findMany({

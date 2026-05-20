@@ -123,6 +123,22 @@ const SEMESTER_LABELS: Record<number, string> = {
   4: 'Sem 4 (Class XII – II Half)',
 };
 
+const BAND_GRADE_NAMES: Record<string, string[]> = {
+  'Nursery-UKG': ['Nursery', 'LKG', 'UKG'],
+  'Class I-IV': ['Class I', 'Class II', 'Class III', 'Class IV'],
+  'Class V-VII': ['Class V', 'Class VI', 'Class VII'],
+  'Class VIII-X': ['Class VIII', 'Class IX', 'Class X'],
+  'Class XI-XII': ['Class XI', 'Class XII'],
+};
+
+function gradeInBands(gradeName: string, bands: string[]): boolean {
+  if (bands.length === 0 || bands.includes('All Classes')) return true;
+  return bands.some((band) => {
+    const allowed = BAND_GRADE_NAMES[band];
+    return allowed ? allowed.some((n) => gradeName.startsWith(n)) : false;
+  });
+}
+
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
 function CreateExamModal({
@@ -938,6 +954,10 @@ export default function ExaminationsPage() {
 
   const selectedExam = exams.find((e) => e.id === selectedExamId) ?? null;
 
+  const filteredGrades = selectedExam
+    ? grades.filter((g) => gradeInBands(g.name, selectedExam.gradeBands))
+    : grades;
+
   // ─── Handlers ─────────────────────────────────────────────────────────────────
 
   function handleGoTab(tab: string, examId: string) {
@@ -1050,7 +1070,7 @@ export default function ExaminationsPage() {
           {activeTab === 'schedules' && (<div className="mt-5">
 
             {loadingExams ? (
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                 {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-56 rounded-xl" />)}
               </div>
             ) : exams.length === 0 ? (
@@ -1068,7 +1088,7 @@ export default function ExaminationsPage() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                 {exams.map((exam) => (
                   <ExamCard
                     key={exam.id}
@@ -1112,7 +1132,7 @@ export default function ExaminationsPage() {
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-navy/30 pr-8"
                     >
                       <option value="">Select grade…</option>
-                      {grades.map((g) => (
+                      {filteredGrades.map((g) => (
                         <option key={g.id} value={g.id}>{g.name}</option>
                       ))}
                     </select>
@@ -1224,7 +1244,7 @@ export default function ExaminationsPage() {
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 mb-2">Select Grades</label>
                       <div className="flex flex-wrap gap-2">
-                        {grades.map((g) => (
+                        {filteredGrades.map((g) => (
                           <button
                             key={g.id}
                             type="button"
@@ -1301,7 +1321,7 @@ export default function ExaminationsPage() {
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-navy/30 pr-8"
                     >
                       <option value="">Select grade…</option>
-                      {grades.map((g) => (
+                      {filteredGrades.map((g) => (
                         <option key={g.id} value={g.id}>{g.name}</option>
                       ))}
                     </select>
