@@ -27,6 +27,7 @@ type Staff = {
   subject: string | null; joiningDate: string; qualification: string; phone: string;
   email: string; salary: number; leaveBalance: number; status: 'active' | 'on-leave';
   employmentType: string; teachingCapacity: string[];
+  employeeCode: string;
   weeklyAvailability?: null; weeklyLoad?: { current: number; target: number };
   monthlyLoad?: number; annualLoad?: number;
   _sourceType: 'teacher' | 'staff';
@@ -123,7 +124,10 @@ function StaffDrawer({ staff, onClose, onSalaryUpdate }: { staff: Staff; onClose
     const val = Number(salaryInput);
     if (!val || val < 0) { toast.error('Enter a valid salary'); return; }
     setSavingSalary(true);
-    const res = await fetch(`/api/hr/staff/${staff.id}`, {
+    const endpoint = staff._sourceType === 'teacher'
+      ? `/api/hr/teachers/${staff.id}`
+      : `/api/hr/staff/${staff.id}`;
+    const res = await fetch(endpoint, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ salary: val }),
@@ -391,7 +395,26 @@ function StaffDrawer({ staff, onClose, onSalaryUpdate }: { staff: Staff; onClose
             <FileText className="w-4 h-4" /> View Payslip
           </button>
           <button
-            onClick={() => toast.success(`Profile of ${staff.name} exported`)}
+            onClick={() => {
+              const rows = [
+                ['Field', 'Value'],
+                ['Name', staff.name],
+                ['Employee Code', staff.employeeCode],
+                ['Designation', staff.designation],
+                ['Department', staff.department ?? ''],
+                ['Phone', staff.phone ?? ''],
+                ['Email', staff.email ?? ''],
+                ['Qualification', staff.qualification ?? ''],
+                ['Joining Date', staff.joiningDate],
+                ['Salary (Basic)', String(staff.salary ?? '')],
+                ['Status', staff.status],
+              ];
+              const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+              const a = document.createElement('a');
+              a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+              a.download = `${staff.name.replace(/\s+/g, '_')}_profile.csv`;
+              a.click();
+            }}
             className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
           >
             <Download className="w-4 h-4" /> Export Profile
@@ -453,11 +476,12 @@ function AddStaffModal({ onClose, onAdd }: { onClose: () => void; onAdd: (s: Sta
     onAdd({
       id: d.id ?? `STF${Date.now()}`,
       name: form.name.trim(), photo: null,
+      employeeCode: d.employeeCode ?? '',
       designation: form.designation.trim(), department: form.department,
       subject: form.subject || null, joiningDate: form.joiningDate,
       qualification: form.qualification || 'Not specified',
       phone: form.phone, email: form.email.trim(),
-      salary: Number(form.salary) || 45000, leaveBalance: 15,
+      salary: Number(form.salary) || 45000, leaveBalance: 0,
       status: 'active', employmentType: 'full-time',
       teachingCapacity: form.subject ? [form.subject] : [],
       _sourceType: form.isTeacher ? 'teacher' : 'staff',
@@ -1016,6 +1040,7 @@ function mapTeacher(t: any): Staff {
       : 'Academic';
   return {
     id: t.id, name: t.name, photo: null,
+    employeeCode: t.employeeCode ?? '',
     designation: t.designation ?? 'Teacher',
     department: dept,
     subject: subjectName,
@@ -1023,7 +1048,7 @@ function mapTeacher(t: any): Staff {
     qualification: t.qualification ?? 'B.Ed.',
     phone: t.phone ?? '', email: t.email ?? '',
     salary: Number(t.salary ?? 45000),
-    leaveBalance: 12 - (t.leaveRequests?.length ?? 0),
+    leaveBalance: t.approvedLeaveDays ?? 0,
     status: t.isActive ? 'active' : 'on-leave',
     employmentType: t.type === 'PART_TIME' ? 'part-time' : 'full-time',
     teachingCapacity: t.subjects?.map((s: any) => s.subject?.name).filter(Boolean) ?? [],
@@ -1034,6 +1059,7 @@ function mapTeacher(t: any): Staff {
 function mapStaff(s: any): Staff {
   return {
     id: s.id, name: s.name, photo: null,
+    employeeCode: s.employeeCode ?? '',
     designation: s.designation ?? 'Staff',
     department: s.department ?? 'Administration',
     subject: null,
@@ -1041,7 +1067,7 @@ function mapStaff(s: any): Staff {
     qualification: s.qualification ?? 'Graduate',
     phone: s.phone ?? '', email: s.email ?? '',
     salary: Number(s.salary ?? 35000),
-    leaveBalance: 12,
+    leaveBalance: s.approvedLeaveDays ?? 0,
     status: s.isActive ? 'active' : 'on-leave',
     employmentType: 'full-time',
     teachingCapacity: [],
@@ -1208,7 +1234,8 @@ export default function HRPage() {
     });
     setLeaveRequests(prev => prev.map(l => l.id === id ? { ...l, status: action } : l));
     if (action === 'Approved') {
-      setStaffList(prev => prev.map(s => s.id === req.staffId ? { ...s, leaveBalance: Math.max(0, s.leaveBalance - req.days) } : s));
+      // Reload staff so approvedLeaveDays reflects the newly approved leave
+      await loadStaff();
     }
     toast.success(`${req.name}'s leave ${action.toLowerCase()}`, {
       description: `${req.type} · ${req.days} day${req.days > 1 ? 's' : ''}`,
@@ -1559,7 +1586,18 @@ export default function HRPage() {
                   </table>
                   <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
                     <span className="text-xs text-gray-400">Showing {filteredStaff.length} of {staffList.length} staff</span>
-                    <button onClick={() => toast.success('Staff directory exported')} className="flex items-center gap-1.5 text-xs font-semibold text-navyMid hover:text-navy transition-colors">
+                    <button onClick={() => {
+                      const header = ['Name','Employee Code','Designation','Department','Phone','Email','Qualification','Joining Date','Salary','Status'];
+                      const rows = filteredStaff.map(s => [
+                        s.name, s.employeeCode, s.designation, s.department ?? '', s.phone ?? '',
+                        s.email ?? '', s.qualification ?? '', s.joiningDate, String(s.salary ?? ''), s.status,
+                      ]);
+                      const csv = [header, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+                      const a = document.createElement('a');
+                      a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+                      a.download = 'staff_directory.csv';
+                      a.click();
+                    }} className="flex items-center gap-1.5 text-xs font-semibold text-navyMid hover:text-navy transition-colors">
                       <Download className="w-3.5 h-3.5" /> Export CSV
                     </button>
                   </div>
@@ -1863,7 +1901,22 @@ export default function HRPage() {
                         <Banknote className="w-3.5 h-3.5" /> Process All
                       </button>
                     )}
-                    <button onClick={() => toast.success('Payroll report downloaded')}
+                    <button onClick={() => {
+                      const header = ['Name','Designation','Department','Role','Basic','Allowances','PF Deduction','TDS','Other Deductions','Net Pay','Status'];
+                      const rows = dbPayrolls.map(p => {
+                        const person = payrollPerson(p);
+                        return [
+                          person.name ?? '', person.designation ?? '', person.department ?? '', payrollRole(p),
+                          String(p.basic), String(p.allowances), String(p.pfDeduction), String(p.tdsDeduction),
+                          String(p.otherDeductions), String(p.netPay), p.status,
+                        ];
+                      });
+                      const csv = [header, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+                      const a = document.createElement('a');
+                      a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+                      a.download = `payroll_${payrollMonth.replace(/\s+/g, '_')}.csv`;
+                      a.click();
+                    }}
                       className="flex items-center gap-1.5 bg-white text-navyMid border border-gray-200 text-xs font-semibold px-3 py-2 rounded-xl hover:border-navy transition-colors">
                       <Download className="w-3.5 h-3.5" /> Export
                     </button>

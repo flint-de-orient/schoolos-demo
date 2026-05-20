@@ -10,11 +10,18 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = req.nextUrl;
   const search = searchParams.get('q') ?? '';
+  const tenantId = session.user.tenantId;
 
-  const [teachers, staff] = await Promise.all([
+  // Current academic session: April 1 of current/previous year → March 31 next year
+  const now = new Date();
+  const sessionYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+  const sessionStart = new Date(sessionYear, 3, 1);  // April 1
+  const sessionEnd   = new Date(sessionYear + 1, 3, 1); // April 1 next year (exclusive)
+
+  const [teachers, staff, approvedLeaves] = await Promise.all([
     db.teacher.findMany({
       where: {
-        tenantId: session.user.tenantId,
+        tenantId,
         isActive: true,
         ...(search && { name: { contains: search, mode: 'insensitive' } }),
       },
@@ -29,15 +36,43 @@ export async function GET(req: NextRequest) {
     }),
     db.staff.findMany({
       where: {
-        tenantId: session.user.tenantId,
+        tenantId,
         isActive: true,
         ...(search && { name: { contains: search, mode: 'insensitive' } }),
       },
       orderBy: { name: 'asc' },
     }),
+    // Approved leave days for this academic session — for real leave balance
+    db.leaveRequest.findMany({
+      where: {
+        tenantId,
+        status: 'APPROVED',
+        fromDate: { gte: sessionStart },
+        toDate:   { lt:  sessionEnd },
+      },
+      select: { teacherId: true, staffId: true, days: true },
+    }),
   ]);
 
-  return ok({ teachers, staff });
+  // Build approved-days maps
+  const teacherDays = new Map<string, number>();
+  const staffDays   = new Map<string, number>();
+  for (const l of approvedLeaves) {
+    if (l.teacherId) teacherDays.set(l.teacherId, (teacherDays.get(l.teacherId) ?? 0) + (l.days ?? 0));
+    if (l.staffId)   staffDays.set(l.staffId,     (staffDays.get(l.staffId)     ?? 0) + (l.days ?? 0));
+  }
+
+  // Attach approvedLeaveDays so client can compute real balance against policies
+  const teachersWithLeave = teachers.map(t => ({
+    ...t,
+    approvedLeaveDays: teacherDays.get(t.id) ?? 0,
+  }));
+  const staffWithLeave = staff.map(s => ({
+    ...s,
+    approvedLeaveDays: staffDays.get(s.id) ?? 0,
+  }));
+
+  return ok({ teachers: teachersWithLeave, staff: staffWithLeave });
 }
 
 export async function POST(req: NextRequest) {
