@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
     },
     include: {
       academicYear: { select: { id: true, label: true } },
+      _count: { select: { markEntries: true, hallTickets: true, items: true } },
     },
   });
 
