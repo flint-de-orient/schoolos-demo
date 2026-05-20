@@ -9,7 +9,6 @@ import {
   Plus, Trash2, MoreVertical, Ticket, FileText, Printer,
   ChevronDown, X, BookOpen, AlertCircle, Info,
 } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAcademicYearSafe } from '@/context/AcademicYearContext';
 
@@ -1025,25 +1024,31 @@ export default function ExaminationsPage() {
           <StatCard title="Results Declared" value={stats.declared} icon={CheckCircle2} iconBg="bg-green" />
         </div>
 
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="bg-gray-100 rounded-xl p-1 h-auto">
-            <TabsTrigger value="schedules" className="rounded-lg px-4 py-2 text-sm font-semibold data-[state=active]:bg-white data-[state=active]:text-navy data-[state=active]:shadow-sm">
-              Schedules
-            </TabsTrigger>
-            <TabsTrigger value="marks" className="rounded-lg px-4 py-2 text-sm font-semibold data-[state=active]:bg-white data-[state=active]:text-navy data-[state=active]:shadow-sm">
-              Mark Entry
-            </TabsTrigger>
-            <TabsTrigger value="tickets" className="rounded-lg px-4 py-2 text-sm font-semibold data-[state=active]:bg-white data-[state=active]:text-navy data-[state=active]:shadow-sm">
-              Hall Tickets
-            </TabsTrigger>
-            <TabsTrigger value="results" className="rounded-lg px-4 py-2 text-sm font-semibold data-[state=active]:bg-white data-[state=active]:text-navy data-[state=active]:shadow-sm">
-              Results
-            </TabsTrigger>
-          </TabsList>
+        {/* Tab bar */}
+        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+          {([
+            { id: 'schedules', label: 'Schedules' },
+            { id: 'marks', label: 'Mark Entry' },
+            { id: 'tickets', label: 'Hall Tickets' },
+            { id: 'results', label: 'Results' },
+          ] as const).map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                activeTab === t.id
+                  ? 'bg-white text-navy shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
 
           {/* ── Tab: Schedules ─────────────────────────────────────────────────── */}
-          <TabsContent value="schedules" className="mt-5">
+          {activeTab === 'schedules' && (<div className="mt-5">
+
             {loadingExams ? (
               <div className="grid grid-cols-3 gap-4">
                 {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-56 rounded-xl" />)}
@@ -1075,10 +1080,11 @@ export default function ExaminationsPage() {
                 ))}
               </div>
             )}
-          </TabsContent>
+          </div>)}
 
           {/* ── Tab: Mark Entry ────────────────────────────────────────────────── */}
-          <TabsContent value="marks" className="mt-5">
+          {activeTab === 'marks' && (<div className="mt-5">
+
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
               <div className="flex items-center gap-4 mb-5 flex-wrap">
                 <div className="flex-1 min-w-[220px]">
@@ -1124,10 +1130,11 @@ export default function ExaminationsPage() {
                 </div>
               )}
             </div>
-          </TabsContent>
+          </div>)}
 
           {/* ── Tab: Hall Tickets ──────────────────────────────────────────────── */}
-          <TabsContent value="tickets" className="mt-5">
+          {activeTab === 'tickets' && (<div className="mt-5">
+
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
               <div className="flex items-center gap-4 mb-5 flex-wrap">
                 <div className="flex-1 min-w-[220px]">
@@ -1262,10 +1269,11 @@ export default function ExaminationsPage() {
                 </div>
               </div>
             )}
-          </TabsContent>
+          </div>)}
 
           {/* ── Tab: Results ───────────────────────────────────────────────────── */}
-          <TabsContent value="results" className="mt-5">
+          {activeTab === 'results' && (<div className="mt-5">
+
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
               <div className="flex items-center gap-4 mb-5 flex-wrap">
                 <div className="flex-1 min-w-[220px]">
@@ -1315,8 +1323,7 @@ export default function ExaminationsPage() {
                 </div>
               )}
             </div>
-          </TabsContent>
-        </Tabs>
+          </div>)}
       </div>
 
       {/* Create Exam Modal */}
