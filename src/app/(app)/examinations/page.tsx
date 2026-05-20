@@ -1183,7 +1183,7 @@ export default function ExaminationsPage() {
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <FileText className="w-10 h-10 text-gray-300 mb-3" />
                   <p className="text-sm text-gray-500 font-semibold mb-1">No hall tickets generated yet</p>
-                  <p className="text-xs text-gray-400">Click "Generate Hall Tickets" to create tickets for selected grades</p>
+                  <p className="text-xs text-gray-400">Click &ldquo;Generate Hall Tickets&rdquo; to create tickets for selected grades</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-4 print:grid-cols-1">
