@@ -35,6 +35,15 @@ export async function GET(
       behaviourLogs: { orderBy: { loggedAt: 'desc' }, take: 5 },
       learningPlans: { where: { isActive: true }, take: 1 },
       boardPredictions: { orderBy: { generatedAt: 'desc' }, take: 1 },
+      markEntries: {
+        where: { isAbsent: false, marksObtained: { not: null } },
+        include: { subject: { select: { name: true } } },
+        orderBy: { enteredAt: 'desc' },
+        take: 50,
+      },
+      vaccinations: {
+        orderBy: { date: 'desc' },
+      },
     },
   });
 

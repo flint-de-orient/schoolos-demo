@@ -573,6 +573,8 @@ export default function StudentsPage() {
   const [students, setStudents] = useState<ApiStudent[]>([]);
   const [grades, setGrades] = useState<ApiGrade[]>([]);
   const [total, setTotal] = useState(0);
+  const [totalActive, setTotalActive] = useState(0);
+  const [totalOverdue, setTotalOverdue] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState('');
@@ -602,16 +604,18 @@ export default function StudentsPage() {
       if (filterSectionId) params.set('sectionId', filterSectionId);
       if (viewingYearId) params.set('academicYearId', viewingYearId);
       if (includeInactive) params.set('includeInactive', 'true');
+      if (filterFee) params.set('feeStatus', filterFee);
       params.set('page', String(page));
       params.set('limit', String(LIMIT));
 
       const res = await fetch(`/api/students?${params}`);
       if (!res.ok) return;
       const data = await res.json();
-      let list: ApiStudent[] = data.data ?? [];
-      if (filterFee) list = list.filter(s => s.feeAccount?.status === filterFee);
+      const list: ApiStudent[] = data.data ?? [];
       setStudents(list);
       setTotal(data.total ?? 0);
+      setTotalActive(data.totalActive ?? 0);
+      setTotalOverdue(data.totalOverdue ?? 0);
     } finally {
       setLoading(false);
     }
@@ -650,8 +654,6 @@ export default function StudentsPage() {
     } catch { toast.error('Network error'); }
   };
 
-  const totalActive = students.filter(s => s.isActive).length;
-  const feeOverdue = students.filter(s => s.feeAccount?.status === 'OVERDUE').length;
   const sectionOptions = grades.find(g => g.id === filterGradeId)?.sections ?? [];
 
   return (
@@ -674,7 +676,32 @@ export default function StudentsPage() {
             className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
-          <button className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+          <button
+            onClick={() => {
+              const header = ['Admission No','Name','Gender','Class','Section','Roll No','House','Fee Status','Fee Balance','Father','Mother','Phone','Status'];
+              const rows = students.map(s => [
+                s.admissionNo,
+                s.name,
+                s.gender ?? '',
+                s.grade?.name ?? '',
+                s.section?.name ?? '',
+                s.rollNo ?? '',
+                s.house ?? '',
+                s.feeAccount?.status ?? '',
+                String(s.feeAccount?.balance ?? ''),
+                s.parents[0]?.parent.fatherName ?? '',
+                s.parents[0]?.parent.motherName ?? '',
+                s.parents[0]?.parent.phone ?? '',
+                s.isActive ? 'Active' : 'Inactive',
+              ]);
+              const csv = [header, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+              const a = document.createElement('a');
+              a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+              a.download = 'students.csv';
+              a.click();
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+          >
             <Download className="w-4 h-4" /> Export
           </button>
           <button onClick={() => setShowAdd(true)}
@@ -690,7 +717,7 @@ export default function StudentsPage() {
           { label: 'Total Students', value: total, icon: Users, color: 'text-navy', bg: 'bg-navy/8' },
           { label: 'Active', value: totalActive, icon: UserCheck, color: 'text-green', bg: 'bg-green/8' },
           { label: 'Inactive', value: total - totalActive, icon: UserX, color: 'text-amber', bg: 'bg-amber/8' },
-          { label: 'Fee Overdue', value: feeOverdue, icon: AlertTriangle, color: 'text-coral', bg: 'bg-coral/8' },
+          { label: 'Fee Overdue', value: totalOverdue, icon: AlertTriangle, color: 'text-coral', bg: 'bg-coral/8' },
         ].map(({ label, value, icon: Icon, color, bg }) => (
           <div key={label} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm flex items-center gap-4">
             <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center flex-shrink-0`}>

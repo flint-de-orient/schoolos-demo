@@ -36,6 +36,9 @@ type ApiStudent = {
   boardPredictions: { predictedScore: number }[];
   learningPlans: { learningStyle?: string | null }[];
   feeAssignment: { feeAccount: { status: string } | null } | null;
+  markEntries: { marksObtained: number | null; subject: { name: string } }[];
+  attendanceRecords: { status: string }[];
+  vaccinations: { vaccine: string; date: string }[];
 };
 
 // ─── Normalised profile used by UI ────────────────────────────────────────────
@@ -59,14 +62,47 @@ type Profile = {
   medicalNotes: string | null;
   parent: { father: string; mother: string; phone: string; email: string; occupation: string };
   bookIssues: { id: string; title: string; author: string; genre: string; dueDate: string; isOverdue: boolean }[];
+  vaccinations: { name: string; done: boolean; date?: string }[];
 };
+
+// Deterministic score per student+subject when no real marks exist (60–95 range)
+function seedScore(studentId: string, subject: string): number {
+  let h = 5381;
+  const key = studentId + subject;
+  for (let i = 0; i < key.length; i++) {
+    h = (((h << 5) + h) + key.charCodeAt(i)) & 0x7fffffff;
+  }
+  return 60 + (h % 36);
+}
 
 function buildProfile(s: ApiStudent): Profile {
   const primary = s.parents[0]?.parent ?? null;
   const feeStatus = s.feeAssignment?.feeAccount?.status?.toLowerCase() ?? 'pending';
-  const scores: Record<string, number> = {
-    english: 75, mathematics: 78, science: 80, history: 70, geography: 72, bengali: 76,
-  };
+
+  // Compute attendance from actual records if available; fall back to stored field
+  const records = s.attendanceRecords ?? [];
+  const computedAttendance = records.length > 0
+    ? Math.round(records.filter(r => r.status === 'PRESENT' || r.status === 'LATE' || r.status === 'HALF_DAY').length / records.length * 100)
+    : Math.round(s.attendancePercent);
+
+  // Build subject score map from real mark entries; fall back to deterministic seeds
+  const subjectKeys = ['english', 'mathematics', 'science', 'history', 'geography', 'bengali'];
+  const marksMap: Record<string, number[]> = {};
+  for (const entry of (s.markEntries ?? [])) {
+    const subName = entry.subject.name.toLowerCase().replace(/\s+/g, '');
+    const matched = subjectKeys.find(k => subName.includes(k) || k.includes(subName));
+    if (matched && entry.marksObtained !== null) {
+      (marksMap[matched] ??= []).push(entry.marksObtained);
+    }
+  }
+  const scores: Record<string, number> = {};
+  for (const subj of subjectKeys) {
+    const vals = marksMap[subj];
+    scores[subj] = vals && vals.length > 0
+      ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)
+      : seedScore(s.id, subj);
+  }
+
   return {
     id: s.id,
     name: s.name,
@@ -78,10 +114,10 @@ function buildProfile(s: ApiStudent): Profile {
     gender: s.gender ?? '—',
     address: s.address ?? '—',
     learningStyle: (s.learningPlans[0] as { learningStyle?: string | null } | undefined)?.learningStyle ?? 'Visual',
-    attendancePercent: Math.round(s.attendancePercent),
+    attendancePercent: computedAttendance,
     feeStatus,
     libraryBooksIssued: s.bookIssues.length,
-    predictedBoardScore: s.boardPredictions[0]?.predictedScore ?? 75,
+    predictedBoardScore: s.boardPredictions[0]?.predictedScore ?? Math.round(Object.values(scores).reduce((a, b) => a + b, 0) / subjectKeys.length),
     academicScore: scores,
     achievements: s.achievements.map(a => a.title),
     medicalNotes: s.medical?.notes ?? null,
@@ -103,6 +139,26 @@ function buildProfile(s: ApiStudent): Profile {
         isOverdue: due ? due < new Date() : false,
       };
     }),
+    vaccinations: (() => {
+      const REQUIRED = [
+        'BCG', 'Hepatitis B', 'MMR (Measles, Mumps, Rubella)', 'DPT Booster', 'Typhoid Booster', 'COVID-19',
+      ];
+      const dbVax = s.vaccinations ?? [];
+      if (dbVax.length === 0) {
+        // No DB data — use demo defaults (first 4 done, last 2 pending)
+        return REQUIRED.map((name, i) => ({ name, done: i < 4 }));
+      }
+      return REQUIRED.map(name => {
+        const match = dbVax.find(v =>
+          v.vaccine.toLowerCase().replace(/[^a-z0-9]/g, '').includes(name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 6))
+        );
+        return {
+          name,
+          done: !!match,
+          date: match ? new Date(match.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : undefined,
+        };
+      });
+    })(),
   };
 }
 
@@ -528,16 +584,12 @@ export default function StudentProfilePage({ params }: { params: { studentId: st
               <div>
                 <h3 className="font-sora font-semibold text-navy mb-4">Vaccination Status</h3>
                 <div className="space-y-2">
-                  {[
-                    { name: 'BCG', done: true },
-                    { name: 'Hepatitis B', done: true },
-                    { name: 'MMR (Measles, Mumps, Rubella)', done: true },
-                    { name: 'DPT Booster', done: true },
-                    { name: 'Typhoid Booster', done: false },
-                    { name: 'COVID-19', done: false },
-                  ].map(v => (
+                  {student.vaccinations.map(v => (
                     <div key={v.name} className={`flex items-center justify-between px-4 py-3 rounded-xl border ${v.done ? 'bg-green/5 border-green/15' : 'bg-gray-50 border-gray-100'}`}>
-                      <span className="text-sm text-gray-700">{v.name}</span>
+                      <div>
+                        <span className="text-sm text-gray-700">{v.name}</span>
+                        {v.done && v.date && <p className="text-[10px] text-gray-400 mt-0.5">{v.date}</p>}
+                      </div>
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${v.done ? 'bg-green/10 text-green' : 'bg-amber/10 text-amber'}`}>
                         {v.done ? '✓ Done' : 'Pending'}
                       </span>

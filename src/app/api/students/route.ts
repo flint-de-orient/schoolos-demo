@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { requireSession, ok, err } from '@/lib/api-auth';
-import { Gender, BloodGroup } from '@prisma/client';
+import { Gender, BloodGroup, FeeStatus } from '@prisma/client';
 import { autoAssignFeePlan } from '@/lib/fee-auto-assign';
 
 export async function GET(req: NextRequest) {
@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
   const sectionId = searchParams.get('sectionId') ?? undefined;
   const academicYearId = searchParams.get('academicYearId') ?? undefined;
   const includeInactive = searchParams.get('includeInactive') === 'true';
+  const feeStatus = searchParams.get('feeStatus') ?? undefined;
   const page = Math.max(1, Number(searchParams.get('page') ?? 1));
   const limit = Math.min(100, Number(searchParams.get('limit') ?? 50));
 
@@ -41,9 +42,10 @@ export async function GET(req: NextRequest) {
         { rollNo: { contains: search, mode: 'insensitive' as const } },
       ],
     }),
+    ...(feeStatus && { feeAccount: { is: { status: feeStatus as FeeStatus } } }),
   };
 
-  const [total, students] = await Promise.all([
+  const [total, students, totalActive, totalOverdue] = await Promise.all([
     db.student.count({ where }),
     db.student.findMany({
       where,
@@ -61,9 +63,11 @@ export async function GET(req: NextRequest) {
       skip: (page - 1) * limit,
       take: limit,
     }),
+    db.student.count({ where: { tenantId: session.user.tenantId, deletedAt: null, isActive: true, ...(resolvedYearId && { grade: { academicYearId: resolvedYearId } }) } }),
+    db.student.count({ where: { tenantId: session.user.tenantId, deletedAt: null, isActive: true, feeAccount: { is: { status: FeeStatus.OVERDUE } }, ...(resolvedYearId && { grade: { academicYearId: resolvedYearId } }) } }),
   ]);
 
-  return ok({ data: students, total, page, limit });
+  return ok({ data: students, total, page, limit, totalActive, totalOverdue });
 }
 
 export async function POST(req: NextRequest) {
