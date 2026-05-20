@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
   if (error) return error;
 
   const body = await req.json();
-  const { name, designation, department, phone, email, qualification, salary, joiningDate, isTeacher } = body;
+  const { name, designation, department, phone, email, qualification, salary, joiningDate, isTeacher, employmentType } = body;
 
   if (!name || !designation) return err('name and designation are required');
 
@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
         email: email ?? null,
         qualification: qualification ?? null,
         joiningDate: joiningDate ? new Date(joiningDate) : null,
-        type: TeacherType.FULL_TIME,
+        type: employmentType === 'PART_TIME' ? TeacherType.PART_TIME : TeacherType.FULL_TIME,
         isActive: true,
       },
     });

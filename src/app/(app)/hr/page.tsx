@@ -439,7 +439,7 @@ function FieldWrapper({ label, error, children }: { label: string; error?: strin
 
 function AddStaffModal({ onClose, onAdd }: { onClose: () => void; onAdd: (s: Staff) => void }) {
   const depts = Object.keys(deptConfig);
-  const [form, setForm] = useState({ name: '', designation: '', department: '', subject: '', phone: '', email: '', qualification: '', salary: '', joiningDate: '', isTeacher: false });
+  const [form, setForm] = useState({ name: '', designation: '', department: '', subject: '', phone: '', email: '', qualification: '', salary: '', joiningDate: '', isTeacher: false, employmentType: 'FULL_TIME' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
@@ -468,6 +468,7 @@ function AddStaffModal({ onClose, onAdd }: { onClose: () => void; onAdd: (s: Sta
         qualification: form.qualification || null,
         salary: form.isTeacher ? null : Number(form.salary),
         joiningDate: form.joiningDate, isTeacher: form.isTeacher,
+        employmentType: form.isTeacher ? form.employmentType : undefined,
       }),
     });
     setSaving(false);
@@ -482,7 +483,7 @@ function AddStaffModal({ onClose, onAdd }: { onClose: () => void; onAdd: (s: Sta
       qualification: form.qualification || 'Not specified',
       phone: form.phone, email: form.email.trim(),
       salary: Number(form.salary) || 45000, leaveBalance: 0,
-      status: 'active', employmentType: 'full-time',
+      status: 'active', employmentType: form.employmentType === 'PART_TIME' ? 'part-time' : 'full-time',
       teachingCapacity: form.subject ? [form.subject] : [],
       _sourceType: form.isTeacher ? 'teacher' : 'staff',
     });
@@ -530,6 +531,17 @@ function AddStaffModal({ onClose, onAdd }: { onClose: () => void; onAdd: (s: Sta
           </div>
           {form.isTeacher && (
             <FieldWrapper label="Subject"><input type="text" placeholder="e.g. Mathematics" value={form.subject} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20" /></FieldWrapper>
+          )}
+          {form.isTeacher && (
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+              <span className="text-xs font-semibold text-gray-600">Employment:</span>
+              {[{ v: 'FULL_TIME', l: 'Full-Time' }, { v: 'PART_TIME', l: 'Part-Time' }].map(opt => (
+                <button key={opt.v} onClick={() => setForm(f => ({ ...f, employmentType: opt.v }))}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${form.employmentType === opt.v ? 'bg-navy text-white' : 'text-gray-500 hover:text-gray-700'}`}>
+                  {opt.l}
+                </button>
+              ))}
+            </div>
           )}
           <div className="grid grid-cols-2 gap-3">
             <FieldWrapper label="Phone *" error={errors.phone}>{inp('phone', '10-digit mobile')}</FieldWrapper>
