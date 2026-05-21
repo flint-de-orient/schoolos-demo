@@ -53,18 +53,29 @@ export async function POST(req: NextRequest) {
   try {
     const message = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 4096,
+      max_tokens: 8192,
       messages: [{ role: 'user', content: prompt }],
     });
 
     const rawText = message.content[0].type === 'text' ? message.content[0].text : '';
+
+    // Detect truncation before attempting parse
+    if (message.stop_reason === 'max_tokens') {
+      return err('Too many subjects across selected classes — try selecting fewer grades at once.');
+    }
 
     // Extract JSON — try code-fenced block first, then bare object
     const fenced = rawText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
     const jsonStr = fenced ? fenced[1] : rawText.match(/(\{[\s\S]*\})/)?.[1];
     if (!jsonStr) return err('AI returned an unexpected format. Please try again.');
 
-    const scheme = JSON.parse(jsonStr);
+    let scheme;
+    try {
+      scheme = JSON.parse(jsonStr);
+    } catch (parseErr) {
+      console.error('[ai/exam-setup] JSON parse failed:', parseErr, '\nRaw:', rawText.slice(-500));
+      return err('AI response was malformed. Please try again or select fewer grades.');
+    }
 
     // Validate that all subjectIds in scheme exist in our subjects list
     const validIds = new Set(subjects.map((s) => s.id));
