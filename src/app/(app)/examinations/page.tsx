@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAcademicYearSafe } from '@/context/AcademicYearContext';
+import { AssessmentPlansTab } from '@/components/examinations/AssessmentPlansTab';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -1051,6 +1052,7 @@ export default function ExaminationsPage() {
             { id: 'marks', label: 'Mark Entry' },
             { id: 'tickets', label: 'Hall Tickets' },
             { id: 'results', label: 'Results' },
+            { id: 'assessment', label: 'Assessment Plans' },
           ] as const).map((t) => (
             <button
               key={t.id}
@@ -1289,6 +1291,15 @@ export default function ExaminationsPage() {
                 </div>
               </div>
             )}
+          </div>)}
+
+          {/* ── Tab: Assessment Plans ──────────────────────────────────────── */}
+          {activeTab === 'assessment' && (<div className="mt-5">
+            <AssessmentPlansTab
+              grades={grades}
+              academicYears={academicYears}
+              exams={exams}
+            />
           </div>)}
 
           {/* ── Tab: Results ───────────────────────────────────────────────────── */}

@@ -157,10 +157,11 @@ export async function POST(
     entries.map((entry) =>
       db.markEntry.upsert({
         where: {
-          examScheduleId_studentId_subjectId: {
+          examScheduleId_studentId_subjectId_componentName: {
             examScheduleId: params.id,
             studentId: entry.studentId,
             subjectId: entry.subjectId,
+            componentName: 'Theory',
           },
         },
         create: {
@@ -168,6 +169,7 @@ export async function POST(
           examScheduleId: params.id,
           studentId: entry.studentId,
           subjectId: entry.subjectId,
+          componentName: 'Theory',
           marksObtained: entry.marksObtained ?? null,
           isAbsent: entry.isAbsent ?? false,
           enteredAt: now,

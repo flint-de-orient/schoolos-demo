@@ -384,6 +384,7 @@ model Tenant {
   salaryGrades          SalaryGrade[]
   staffAttendances      StaffAttendance[]
   activityTypes         ActivityType[]
+  assessmentSchemes     AssessmentScheme[]
 }
 
 model TenantModule {
@@ -477,14 +478,15 @@ model AcademicYear {
   isCurrent Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  tenant         Tenant                 @relation(fields: [tenantId], references: [id])
-  grades         Grade[]
-  sections       Section[]
-  feePlans       FeePlan[]
-  feeAssignments StudentFeeAssignment[]
-  timetables     Timetable[]
-  examSchedules  ExamSchedule[]
-  reportCards    ReportCard[]
+  tenant            Tenant                 @relation(fields: [tenantId], references: [id])
+  grades            Grade[]
+  sections          Section[]
+  feePlans          FeePlan[]
+  feeAssignments    StudentFeeAssignment[]
+  timetables        Timetable[]
+  examSchedules     ExamSchedule[]
+  reportCards       ReportCard[]
+  assessmentSchemes AssessmentScheme[]
 
   @@unique([tenantId, label])
   @@index([tenantId])
@@ -570,6 +572,8 @@ model Subject {
   homework         Homework[]
   parent           Subject?         @relation("SubjectParts", fields: [parentSubjectId], references: [id])
   parts            Subject[]        @relation("SubjectParts")
+  subjectPatterns  SubjectPattern[]
+  termOverrides    TermSubjectOverride[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -1231,11 +1235,12 @@ model ExamSchedule {
   status         String   @default("SCHEDULED")
   createdAt      DateTime @default(now())
 
-  academicYear AcademicYear       @relation(fields: [academicYearId], references: [id])
-  items        ExamScheduleItem[]
-  hallTickets  HallTicket[]
-  markEntries  MarkEntry[]
-  reportCards  ReportCard[]
+  academicYear     AcademicYear       @relation(fields: [academicYearId], references: [id])
+  items            ExamScheduleItem[]
+  hallTickets      HallTicket[]
+  markEntries      MarkEntry[]
+  reportCards      ReportCard[]
+  assessmentTerms  AssessmentTerm[]
 
   @@index([tenantId])
 }
@@ -1293,6 +1298,7 @@ model MarkEntry {
   examScheduleId String
   studentId      String
   subjectId      String
+  componentName  String   @default("Theory")
   marksObtained  Float?
   grade          String?
   remarks        String?
@@ -1306,7 +1312,7 @@ model MarkEntry {
   student      Student      @relation(fields: [studentId], references: [id])
   subject      Subject      @relation(fields: [subjectId], references: [id])
 
-  @@unique([examScheduleId, studentId, subjectId])
+  @@unique([examScheduleId, studentId, subjectId, componentName])
   @@index([studentId])
 }
 
@@ -3164,4 +3170,74 @@ model TenantIntegrationConfig {
 
   @@unique([tenantId, provider])
   @@index([tenantId])
+}
+
+// ─────────────────────────────────────────────
+// SECTION 31 — ASSESSMENT SCHEMES
+// ─────────────────────────────────────────────
+
+model AssessmentScheme {
+  id              String   @id @default(cuid())
+  tenantId        String
+  academicYearId  String
+  name            String
+  description     String?
+  appliedGradeIds String[]
+  gradingConfig   Json     @default("[]")
+  passCriteria    Json     @default("{\"perSubject\":33,\"aggregate\":35}")
+  isPublished     Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  academicYear    AcademicYear     @relation(fields: [academicYearId], references: [id])
+  terms           AssessmentTerm[]
+  subjectPatterns SubjectPattern[]
+
+  @@index([tenantId])
+  @@index([academicYearId])
+}
+
+model AssessmentTerm {
+  id               String   @id @default(cuid())
+  schemeId         String
+  sequence         Int
+  name             String
+  type             String   @default("UNIT_TEST")
+  weightPct        Float
+  isBoardConducted Boolean  @default(false)
+  examScheduleId   String?
+  createdAt        DateTime @default(now())
+
+  scheme       AssessmentScheme      @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  examSchedule ExamSchedule?         @relation(fields: [examScheduleId], references: [id])
+  overrides    TermSubjectOverride[]
+
+  @@index([schemeId])
+}
+
+model SubjectPattern {
+  id         String  @id @default(cuid())
+  schemeId   String
+  subjectId  String?
+  components Json    @default("[]")
+
+  scheme  AssessmentScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  subject Subject?         @relation(fields: [subjectId], references: [id])
+
+  @@unique([schemeId, subjectId])
+  @@index([schemeId])
+}
+
+model TermSubjectOverride {
+  id         String @id @default(cuid())
+  termId     String
+  subjectId  String
+  components Json   @default("[]")
+
+  term    AssessmentTerm @relation(fields: [termId], references: [id], onDelete: Cascade)
+  subject Subject        @relation(fields: [subjectId], references: [id])
+
+  @@unique([termId, subjectId])
+  @@index([termId])
 }
