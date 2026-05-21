@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import {
   Plus, Trash2, Save, BookOpen, CheckCircle2,
-  X, Settings, Layers, ChevronDown, ChevronUp,
+  X, Settings, Layers, ChevronDown, ChevronUp, Sparkles,
 } from 'lucide-react';
+import { ExamSetupWizard } from './ExamSetupWizard';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -882,6 +883,7 @@ export function AssessmentPlansTab({ grades, academicYears, exams }: {
   const [detail, setDetail] = useState<SchemeDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
   const [subjects, setSubjects] = useState<Subject[]>([]);
 
   const fetchSchemes = useCallback(async () => {
@@ -935,10 +937,16 @@ export function AssessmentPlansTab({ grades, academicYears, exams }: {
       <div className="w-72 flex-shrink-0 flex flex-col">
         <div className="flex items-center justify-between mb-3">
           <span className="font-sora font-semibold text-navy text-sm">Plans</span>
-          <button onClick={() => setShowCreate(true)}
-            className="flex items-center gap-1.5 text-xs font-semibold bg-navy text-white px-3 py-1.5 rounded-lg hover:bg-navyMid">
-            <Plus className="w-3.5 h-3.5" /> New
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => setShowWizard(true)}
+              className="flex items-center gap-1 text-xs font-semibold bg-gold text-navy px-2.5 py-1.5 rounded-lg hover:bg-gold/90">
+              <Sparkles className="w-3 h-3" /> AI Setup
+            </button>
+            <button onClick={() => setShowCreate(true)}
+              className="flex items-center gap-1 text-xs font-semibold bg-navy text-white px-2.5 py-1.5 rounded-lg hover:bg-navyMid">
+              <Plus className="w-3 h-3" /> New
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -1016,6 +1024,19 @@ export function AssessmentPlansTab({ grades, academicYears, exams }: {
         onCreated={(s) => setSchemes((prev) => [s, ...prev])}
         academicYears={academicYears}
       />
+
+      {showWizard && (
+        <ExamSetupWizard
+          grades={grades}
+          academicYears={academicYears}
+          onClose={() => setShowWizard(false)}
+          onApplied={(schemeId, schemeName) => {
+            fetchSchemes();
+            setSelectedId(schemeId);
+            fetchDetail(schemeId);
+          }}
+        />
+      )}
     </div>
   );
 }
