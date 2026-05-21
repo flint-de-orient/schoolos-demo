@@ -572,8 +572,7 @@ model Subject {
   homework         Homework[]
   parent           Subject?         @relation("SubjectParts", fields: [parentSubjectId], references: [id])
   parts            Subject[]        @relation("SubjectParts")
-  subjectPatterns  SubjectPattern[]
-  termOverrides    TermSubjectOverride[]
+  termSubjectConfigs TermSubjectConfig[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -3192,7 +3191,6 @@ model AssessmentScheme {
   tenant          Tenant           @relation(fields: [tenantId], references: [id])
   academicYear    AcademicYear     @relation(fields: [academicYearId], references: [id])
   terms           AssessmentTerm[]
-  subjectPatterns SubjectPattern[]
 
   @@index([tenantId])
   @@index([academicYearId])
@@ -3209,27 +3207,14 @@ model AssessmentTerm {
   examScheduleId   String?
   createdAt        DateTime @default(now())
 
-  scheme       AssessmentScheme      @relation(fields: [schemeId], references: [id], onDelete: Cascade)
-  examSchedule ExamSchedule?         @relation(fields: [examScheduleId], references: [id])
-  overrides    TermSubjectOverride[]
+  scheme         AssessmentScheme    @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  examSchedule   ExamSchedule?       @relation(fields: [examScheduleId], references: [id])
+  subjectConfigs TermSubjectConfig[]
 
   @@index([schemeId])
 }
 
-model SubjectPattern {
-  id         String  @id @default(cuid())
-  schemeId   String
-  subjectId  String?
-  components Json    @default("[]")
-
-  scheme  AssessmentScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
-  subject Subject?         @relation(fields: [subjectId], references: [id])
-
-  @@unique([schemeId, subjectId])
-  @@index([schemeId])
-}
-
-model TermSubjectOverride {
+model TermSubjectConfig {
   id         String @id @default(cuid())
   termId     String
   subjectId  String

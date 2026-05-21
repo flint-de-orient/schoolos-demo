@@ -11,7 +11,6 @@ export async function GET(_req: NextRequest) {
     include: {
       academicYear: { select: { id: true, label: true } },
       terms: { orderBy: { sequence: 'asc' } },
-      _count: { select: { subjectPatterns: true } },
     },
     orderBy: { createdAt: 'desc' },
   });

@@ -4,7 +4,7 @@ import { requireSession, ok, err } from '@/lib/api-auth';
 
 type P = { params: { id: string } };
 
-interface Component { name: string; type: string; maxMarks: number; passMark: number }
+type ComponentDef = { name: string; maxMarks: number; passMarks: number };
 interface GradeConfig { grade: string; min: number; max: number }
 interface PassCriteria { perSubject: number; aggregate: number }
 
@@ -28,14 +28,14 @@ export async function GET(req: NextRequest, { params }: P) {
     include: {
       terms: {
         orderBy: { sequence: 'asc' },
-        include: { overrides: true },
+        include: {
+          subjectConfigs: true,
+        },
       },
-      subjectPatterns: true,
     },
   });
   if (!scheme) return err('Not found', 404);
 
-  // Verify grade is in scheme
   if (!scheme.appliedGradeIds.includes(gradeId)) {
     return err('Grade is not part of this scheme');
   }
@@ -43,16 +43,13 @@ export async function GET(req: NextRequest, { params }: P) {
   const gradingConfig = scheme.gradingConfig as unknown as GradeConfig[];
   const passCriteria = scheme.passCriteria as unknown as PassCriteria;
 
-  // Get subjects for this grade (from GradeSubject)
   const gradeSubjects = await db.gradeSubject.findMany({
     where: { gradeId, sessionType: 'THEORY' },
     include: { subject: { select: { id: true, name: true } } },
     orderBy: { subject: { name: 'asc' } },
   });
-
   const subjects = gradeSubjects.map(gs => gs.subject);
 
-  // Get students
   const students = await db.student.findMany({
     where: { gradeId, tenantId: session.user.tenantId, isActive: true, deletedAt: null },
     select: { id: true, name: true, rollNo: true, admissionNo: true },
@@ -63,11 +60,7 @@ export async function GET(req: NextRequest, { params }: P) {
     return ok({ students: [], subjects, scheme });
   }
 
-  // Narrow scheme to non-null for use inside closures
-  const safeScheme = scheme;
-
-  // Get all mark entries for all linked exam schedules
-  const examScheduleIds = safeScheme.terms
+  const examScheduleIds = scheme.terms
     .filter(t => t.examScheduleId)
     .map(t => t.examScheduleId as string);
 
@@ -106,35 +99,22 @@ export async function GET(req: NextRequest, { params }: P) {
     });
   }
 
-  // Helper: get components for a subject in a term
-  function getComponents(term: (typeof safeScheme.terms)[0], subjectId: string): Component[] {
-    // Check term-level override first
-    const override = term.overrides.find(o => o.subjectId === subjectId);
-    if (override) return override.components as unknown as Component[];
+  type TermWithConfigs = (typeof scheme.terms)[0];
 
-    // Then subject-specific pattern
-    const subjectPattern = safeScheme.subjectPatterns.find(p => p.subjectId === subjectId);
-    if (subjectPattern) return subjectPattern.components as unknown as Component[];
-
-    // Then default pattern (subjectId = null)
-    const defaultPattern = safeScheme.subjectPatterns.find(p => p.subjectId === null);
-    if (defaultPattern) return defaultPattern.components as unknown as Component[];
-
-    // Fallback
-    return [{ name: 'Theory', type: 'THEORY', maxMarks: 100, passMark: 33 }];
+  function getComponents(term: TermWithConfigs, subjectId: string): ComponentDef[] {
+    const cfg = term.subjectConfigs.find(c => c.subjectId === subjectId);
+    if (cfg) {
+      const comps = (cfg.components as ComponentDef[]).filter(c => c.maxMarks > 0);
+      if (comps.length > 0) return comps;
+    }
+    return [{ name: 'Theory', maxMarks: 100, passMarks: 33 }];
   }
 
-  // Compute results per student
   const results = students.map(student => {
     const subjectResults: Record<
       string,
       {
-        termBreakdown: {
-          termName: string;
-          obtained: number;
-          maxMarks: number;
-          weightedContrib: number;
-        }[];
+        termBreakdown: { termName: string; obtained: number; maxMarks: number; weightedContrib: number }[];
         finalMark: number;
         grade: string;
         passed: boolean;
@@ -145,15 +125,10 @@ export async function GET(req: NextRequest, { params }: P) {
     let allPassed = true;
 
     for (const subject of subjects) {
-      const termBreakdown: {
-        termName: string;
-        obtained: number;
-        maxMarks: number;
-        weightedContrib: number;
-      }[] = [];
+      const termBreakdown: { termName: string; obtained: number; maxMarks: number; weightedContrib: number }[] = [];
       let finalMark = 0;
 
-      for (const term of safeScheme.terms) {
+      for (const term of scheme.terms) {
         const components = getComponents(term, subject.id);
         const termMaxMarks = components.reduce((s, c) => s + c.maxMarks, 0);
 
@@ -162,25 +137,14 @@ export async function GET(req: NextRequest, { params }: P) {
 
         for (const comp of components) {
           const entry = term.examScheduleId
-            ? markLookup
-                .get(term.examScheduleId)
-                ?.get(student.id)
-                ?.get(subject.id)
-                ?.get(comp.name)
+            ? markLookup.get(term.examScheduleId)?.get(student.id)?.get(subject.id)?.get(comp.name)
             : undefined;
-
-          if (entry?.isAbsent) {
-            anyAbsent = true;
-            break;
-          }
+          if (entry?.isAbsent) { anyAbsent = true; break; }
           termObtained += entry?.marks ?? 0;
         }
 
         if (anyAbsent) termObtained = 0;
-
-        const weightedContrib =
-          termMaxMarks > 0 ? (termObtained / termMaxMarks) * term.weightPct : 0;
-
+        const weightedContrib = termMaxMarks > 0 ? (termObtained / termMaxMarks) * term.weightPct : 0;
         finalMark += weightedContrib;
         termBreakdown.push({
           termName: term.name,
@@ -203,21 +167,12 @@ export async function GET(req: NextRequest, { params }: P) {
       };
     }
 
-    const aggregate =
-      subjects.length > 0 ? Math.round((totalFinal / subjects.length) * 10) / 10 : 0;
+    const aggregate = subjects.length > 0 ? Math.round((totalFinal / subjects.length) * 10) / 10 : 0;
     const overallPassed = allPassed && aggregate >= passCriteria.aggregate;
 
-    return {
-      student,
-      subjectResults,
-      aggregate,
-      overallGrade: applyGrade(aggregate, gradingConfig),
-      passed: overallPassed,
-    };
+    return { student, subjectResults, aggregate, overallGrade: applyGrade(aggregate, gradingConfig), passed: overallPassed };
   });
 
-  // Sort by aggregate desc
   results.sort((a, b) => b.aggregate - a.aggregate);
-
-  return ok({ results, subjects, scheme: safeScheme });
+  return ok({ results, subjects, scheme });
 }

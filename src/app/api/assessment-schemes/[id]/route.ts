@@ -16,11 +16,11 @@ export async function GET(_req: NextRequest, { params }: P) {
         orderBy: { sequence: 'asc' },
         include: {
           examSchedule: { select: { id: true, name: true } },
-          overrides: true,
+          subjectConfigs: {
+            include: { subject: { select: { id: true, name: true } } },
+            orderBy: { subject: { name: 'asc' } },
+          },
         },
-      },
-      subjectPatterns: {
-        include: { subject: { select: { id: true, name: true } } },
       },
     },
   });
